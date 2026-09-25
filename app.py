@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time
 
-APP_VERSION="0.4.1"
+APP_VERSION="0.4.2"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,11 +16,11 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.4.1"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.4.2"); root.geometry("1000x700")
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.4.1 · Explorador GATT en vivo").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.4.2 · Conexión rápida + progreso").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -125,19 +125,24 @@ class App:
             rep=self.base_report(); events=[]; c=None
             try:
                 c,n=await self.connect_retry(); rep["connection"]={"connected":True,"attempts":n}
+                self.root.after(0,lambda:self.status.set("Conectado · leyendo servicios GATT…"))
                 notify=[]
                 def cb(sender,data):
                     events.append({"utc":datetime.now(timezone.utc).isoformat(),"uuid":str(sender.uuid),"handle":sender.handle,"hex":bytes(data).hex(),"length":len(data)})
-                for svc in c.services:
+                services=list(c.services)
+                total=sum(len(x.characteristics) for x in services); done_count=0
+                for svc in services:
                     sd={"uuid":svc.uuid,"description":svc.description,"characteristics":[]}
                     for ch in svc.characteristics:
+                        done_count+=1
+                        self.root.after(0,lambda d=done_count,t=total:self.status.set(f"Conectado · explorando GATT {d}/{t}…"))
                         cd={"uuid":ch.uuid,"handle":ch.handle,"description":ch.description,"properties":list(ch.properties)}
                         if "read" in ch.properties:
                             try:
-                                v=bytes(await c.read_gatt_char(ch)); cd["read_hex"]=v.hex(); cd["read_text"]=v.decode("utf-8","replace").strip("\\x00")
+                                v=bytes(await asyncio.wait_for(c.read_gatt_char(ch),timeout=3)); cd["read_hex"]=v.hex(); cd["read_text"]=v.decode("utf-8","replace").strip("\\x00")
                             except Exception as ex:cd["read_error"]=repr(ex)
                         if "notify" in ch.properties or "indicate" in ch.properties:
-                            try:await c.start_notify(ch,cb); notify.append(ch.uuid); cd["subscribed"]=True
+                            try:await asyncio.wait_for(c.start_notify(ch,cb),timeout=4); notify.append(ch.uuid); cd["subscribed"]=True
                             except Exception as ex:cd["subscribe_error"]=repr(ex)
                         sd["characteristics"].append(cd)
                     rep["services"].append(sd)
