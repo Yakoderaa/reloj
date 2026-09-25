@@ -1,5 +1,1 @@
-{
-  "version": "0.4.1",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe",
-  "notes": "Corrige el instalador automático: valida la descarga, reemplaza el EXE después del cierre, reabre la aplicación y deja log de recuperación."
-}
+{"version":"0.4.2","exe_url":"https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe","notes":"Evita bloqueos al conectar: timeouts cortos, progreso visible por etapa GATT y captura en vivo de 60 segundos."}
