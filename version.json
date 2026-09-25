@@ -1,1 +1,1 @@
-{"version":"0.4.2","exe_url":"https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe","notes":"Evita bloqueos al conectar: timeouts cortos, progreso visible por etapa GATT y captura en vivo de 60 segundos."}
+{"version":"0.5.0","exe_url":"https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe","notes":"Control Lab activo: escritura real por B002, captura de respuestas B001 y sondeo automático de variantes 00–0F. El canal OTA FFC1 permanece separado."}
