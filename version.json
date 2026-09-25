@@ -1,0 +1,5 @@
+{
+  "version": "0.3.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe",
+  "notes": "Mejoras de conexión BLE, diagnóstico de errores y actualización automática."
+}
