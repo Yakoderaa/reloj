@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time
 
-APP_VERSION="0.8.0"
+APP_VERSION="0.8.1"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,11 +16,11 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.8"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.8.1"); root.geometry("1000x700")
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.8 · localizador de acciones").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.8.1 · localizador + updater PyInstaller seguro").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -339,50 +339,39 @@ class App:
     def check_update(self):
         self.status.set("Buscando actualización…")
         def work():
-            req=urllib.request.Request(VERSION_URL,headers={"User-Agent":"RelojLab/"+APP_VERSION})
+            req=urllib.request.Request(VERSION_URL,headers={"User-Agent":"RelojLab/"+APP_VERSION,"Cache-Control":"no-cache"})
             with urllib.request.urlopen(req,timeout=15) as r:meta=json.loads(r.read().decode("utf-8"))
-            if ver_tuple(meta["version"])<=ver_tuple(APP_VERSION):return ("current",meta)
-            td=tempfile.mkdtemp(prefix="RelojLabUpdate-")
-            newexe=os.path.join(td,"RelojLab-new.exe")
-            req=urllib.request.Request(meta["exe_url"],headers={"User-Agent":"RelojLab/"+APP_VERSION})
-            with urllib.request.urlopen(req,timeout=120) as r,open(newexe,"wb") as out:
+            if ver_tuple(meta["version"])<=ver_tuple(APP_VERSION):return ("current",meta,None)
+            install_dir=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab")
+            os.makedirs(install_dir,exist_ok=True)
+            target=os.path.join(install_dir,"RelojLab-"+meta["version"]+".exe")
+            temp=target+".download"
+            req=urllib.request.Request(meta["exe_url"]+"?v="+meta["version"],headers={"User-Agent":"RelojLab/"+APP_VERSION,"Cache-Control":"no-cache"})
+            with urllib.request.urlopen(req,timeout=180) as r,open(temp,"wb") as out:
                 while True:
-                    b=r.read(1024*1024)
-                    if not b:break
-                    out.write(b)
-            if os.path.getsize(newexe)<1000000:raise RuntimeError("La descarga de la actualización no parece ser un EXE válido.")
-            current=os.path.abspath(sys.executable if getattr(sys,"frozen",False) else sys.argv[0])
-            updater=os.path.join(td,"RelojLab-Updater.cmd")
-            log=os.path.join(os.path.dirname(current),"RelojLab-update.log")
-            script='''@echo off
-setlocal
-echo Actualizacion iniciada > "'''+log+'''"
-timeout /t 3 /nobreak >nul
-copy /y "'''+newexe+'''" "'''+current+'''" >> "'''+log+'''" 2>&1
-if errorlevel 1 (
-  echo Fallo reemplazo >> "'''+log+'''"
-  start "" "'''+newexe+'''"
-  exit /b 1
-)
-start "" "'''+current+'''"
-echo OK >> "'''+log+'''"
-del "%~f0"
-'''
-            with open(updater,"w",encoding="utf-8") as out:out.write(script)
-            subprocess.Popen(["cmd.exe","/c","start","",updater],cwd=td,creationflags=0x08000000)
-            return ("updating",meta)
+                    chunk=r.read(1024*1024)
+                    if not chunk:break
+                    out.write(chunk)
+            with open(temp,"rb") as chk:magic=chk.read(2)
+            if os.path.getsize(temp)<5_000_000 or magic!=b"MZ":raise RuntimeError("La descarga no es un EXE válido.")
+            os.replace(temp,target)
+            return ("ready",meta,target)
         def done(r,e):
             if e:
-                self.status.set("Error al actualizar.")
-                messagebox.showerror("Actualización","No se pudo completar la actualización.\n\n"+repr(e)+"\n\nPodés instalar el EXE manualmente.")
-                return
-            state,meta=r
+                self.status.set("Error al actualizar."); messagebox.showerror("Actualización","No se pudo actualizar.\n\n"+repr(e)); return
+            state,meta,target=r
             if state=="current":
-                self.status.set("Ya tenés la última versión.")
-                messagebox.showinfo("Actualización","Reloj Lab "+APP_VERSION+" ya está actualizado.")
-            else:
-                self.status.set("Actualización descargada. Cerrando para instalar…")
-                self.root.after(800,self.root.destroy)
+                self.status.set("Ya tenés la última versión."); messagebox.showinfo("Actualización","Reloj Lab "+APP_VERSION+" ya está actualizado."); return
+            self.status.set("Actualización validada. Reiniciando…")
+            env=os.environ.copy()
+            env["PYINSTALLER_RESET_ENVIRONMENT"]="1"
+            env.pop("_PYI_APPLICATION_HOME_DIR",None)
+            env.pop("_MEIPASS2",None)
+            try:
+                subprocess.Popen([target],cwd=os.path.dirname(target),env=env,close_fds=True)
+            except Exception as ex:
+                messagebox.showerror("Actualización","Se descargó correctamente, pero no se pudo abrir:\n"+repr(ex)); return
+            self.root.after(1500,self.close_app)
         self.run_thread(work,done)
     def show(self):
         self.text.delete("1.0","end"); self.text.insert("end",json.dumps(self.report,ensure_ascii=False,indent=2))
