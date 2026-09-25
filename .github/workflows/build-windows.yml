@@ -3,7 +3,7 @@ on:
   push:
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: windows-latest
@@ -21,3 +21,14 @@ jobs:
           name: RelojLab-Windows
           path: dist/RelojLab.exe
           if-no-files-found: error
+      - name: Publish latest EXE
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view latest *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload latest dist/RelojLab.exe --clobber
+          } else {
+            gh release create latest dist/RelojLab.exe --title "Reloj Lab Latest" --notes "Canal automático de actualización de Reloj Lab."
+          }
