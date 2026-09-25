@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time
 
-APP_VERSION="0.3.0"
+APP_VERSION="0.4.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,11 +16,11 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.3"); root.geometry("1000x700")
-        self.devices=[]; self.selected=None; self.report=None
+        self.root=root; root.title("Reloj Lab V0.4"); root.geometry("1000x700")
+        self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.3 · BK3288 Discovery").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.4 · Explorador GATT en vivo").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -30,7 +30,7 @@ class App:
         self.tree.pack(fill="x"); self.tree.bind("<<TreeviewSelect>>",self.pick)
         a=ttk.Frame(body); a.pack(fill="x",pady=8)
         self.diag=ttk.Button(a,text="DIAGNÓSTICO COMPLETO",command=self.diagnose,state="disabled"); self.diag.pack(side="left")
-        self.listen=ttk.Button(a,text="ESCUCHAR RELOJ 60 s",command=self.listen_notifications,state="disabled"); self.listen.pack(side="left",padx=8)
+        self.listen=ttk.Button(a,text="ESCUCHAR RELOJ 60 s",command=self.listen_notifications,state="disabled"); self.listen.pack(side="left",padx=8)\n        self.explore=ttk.Button(a,text="CONECTAR Y VER TODO",command=self.explore_live,state="disabled"); self.explore.pack(side="left",padx=8)
         ttk.Button(a,text="Guardar diagnóstico",command=self.save).pack(side="left")
         self.status=tk.StringVar(value="Listo. Buscá y seleccioná el reloj.")
         ttk.Label(a,textvariable=self.status).pack(side="right")
@@ -64,7 +64,7 @@ class App:
     def pick(self,_=None):
         s=self.tree.selection()
         if s:
-            self.selected=self.devices[int(s[0])]; self.diag.config(state="normal"); self.listen.config(state="normal")
+            self.selected=self.devices[int(s[0])]; self.diag.config(state="normal"); self.listen.config(state="normal"); self.explore.config(state="normal")
             self.status.set("Seleccionado. Ejecutá DIAGNÓSTICO COMPLETO.")
     def base_report(self):
         return {"app":"Reloj Lab","app_version":APP_VERSION,"generated_utc":datetime.now(timezone.utc).isoformat(),
@@ -116,6 +116,46 @@ class App:
             if e:messagebox.showerror("Diagnóstico",repr(e)); return
             self.report=r; self.show()
             self.status.set("Diagnóstico finalizado." if r["connection"]["connected"] else "No conectó. Guardá este diagnóstico igualmente.")
+        self.run_async(work(),done)
+    def explore_live(self):
+        if not self.selected:return
+        self.status.set("Conectando y abriendo explorador completo…")
+        async def work():
+            rep=self.base_report(); events=[]; c=None
+            try:
+                c,n=await self.connect_retry(); rep["connection"]={"connected":True,"attempts":n}
+                notify=[]
+                def cb(sender,data):
+                    events.append({"utc":datetime.now(timezone.utc).isoformat(),"uuid":str(sender.uuid),"handle":sender.handle,"hex":bytes(data).hex(),"length":len(data)})
+                for svc in c.services:
+                    sd={"uuid":svc.uuid,"description":svc.description,"characteristics":[]}
+                    for ch in svc.characteristics:
+                        cd={"uuid":ch.uuid,"handle":ch.handle,"description":ch.description,"properties":list(ch.properties)}
+                        if "read" in ch.properties:
+                            try:
+                                v=bytes(await c.read_gatt_char(ch)); cd["read_hex"]=v.hex(); cd["read_text"]=v.decode("utf-8","replace").strip("\\x00")
+                            except Exception as ex:cd["read_error"]=repr(ex)
+                        if "notify" in ch.properties or "indicate" in ch.properties:
+                            try:await c.start_notify(ch,cb); notify.append(ch.uuid); cd["subscribed"]=True
+                            except Exception as ex:cd["subscribe_error"]=repr(ex)
+                        sd["characteristics"].append(cd)
+                    rep["services"].append(sd)
+                rep["live_subscriptions"]=notify
+                self.root.after(0,lambda:self.status.set("Conectado. Explorando TODO durante 120 s: usá el reloj ahora."))
+                await asyncio.sleep(120)
+                rep["passive_notifications"]=events
+                for u in notify:
+                    try:await c.stop_notify(u)
+                    except:pass
+            except Exception as ex:rep["errors"].append(repr(ex))
+            finally:
+                if c:
+                    try:await c.disconnect()
+                    except:pass
+            return rep
+        def done(r,e):
+            if e:messagebox.showerror("Explorador",repr(e)); return
+            self.report=r; self.show(); self.status.set(f"Exploración completa: {len(r.get('passive_notifications',[]))} paquetes capturados. Guardá el diagnóstico.")
         self.run_async(work(),done)
     def listen_notifications(self):
         if not self.selected:return
