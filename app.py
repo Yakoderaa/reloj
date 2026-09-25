@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time
 
-APP_VERSION="0.5.0"
+APP_VERSION="0.5.1"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,11 +16,11 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.5"); root.geometry("1000x700")
-        self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
+        self.root=root; root.title("Reloj Lab V0.5.1"); root.geometry("1000x700")
+        self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.5 · Control Lab activo").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.5.1 · cierre seguro").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -38,10 +38,19 @@ class App:
         ttk.Label(a,textvariable=self.status).pack(side="right")
         self.text=tk.Text(body,wrap="none",font=("Consolas",9)); self.text.pack(fill="both",expand=True)
         self.text.insert("end","V0.3\n\nMejora de diagnóstico: reintentos y errores legibles.\nCaptura BLE pasiva.\nActualizador automático integrado.\n\nNo escribe al reloj ni inicia actualización de firmware.")
+    def close_app(self):
+        if self.closing:return
+        self.closing=True
+        self.status.set("Cerrando…")
+        try:self.root.quit()
+        except:pass
+        try:self.root.destroy()
+        except:pass
+
     def run_async(self,coro,done):
         def worker():
-            try:r=asyncio.run(coro); self.root.after(0,lambda:done(r,None))
-            except Exception as e:self.root.after(0,lambda:done(None,e))
+            try:r=asyncio.run(coro); self.root.after(0,lambda:done(r,None)) if not self.closing else None
+            except Exception as e:self.root.after(0,lambda:done(None,e)) if not self.closing else None
         threading.Thread(target=worker,daemon=True).start()
     def run_thread(self,fn,done):
         def w():
