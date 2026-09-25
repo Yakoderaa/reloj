@@ -1,7 +1,6 @@
 name: Build Windows EXE
 on:
   push:
-    branches: [ main ]
   workflow_dispatch:
 permissions:
   contents: read
@@ -13,9 +12,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: pip install -r requirements.txt pyinstaller==6.22.3
-      - run: pyinstaller --noconfirm --clean --onefile --windowed --name RelojLab app.py
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt pyinstaller==6.22.0
+      - name: Build EXE
+        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab app.py
       - uses: actions/upload-artifact@v4
         with:
           name: RelojLab-Windows
           path: dist/RelojLab.exe
+          if-no-files-found: error
