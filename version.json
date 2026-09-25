@@ -1,5 +1,5 @@
 {
-  "version": "0.4.0",
+  "version": "0.4.1",
   "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe",
-  "notes": "Explorador GATT completo en vivo: conexión persistente durante 120 s, lectura de todas las características legibles y suscripción a todas las notificaciones/indicaciones disponibles."
+  "notes": "Corrige el instalador automático: valida la descarga, reemplaza el EXE después del cierre, reabre la aplicación y deja log de recuperación."
 }
