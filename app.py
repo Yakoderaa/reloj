@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time
 
-APP_VERSION="0.6.0"
+APP_VERSION="0.7.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,11 +16,11 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.6"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.7"); root.geometry("1000x700")
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.6 · analizador de protocolo").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.7 · sondeo profundo").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -267,6 +267,44 @@ class App:
             self.run_async(work(),lambda r,e: append("ERROR: "+repr(e)) if e else render(r))
         ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
         ttk.Button(row,text="MAPEO DIFERENCIAL",command=differential).pack(side="left",padx=4)
+        def deep_probe():
+            append("SONDEO PROFUNDO: prueba el campo de comando completo y variantes del tipo de frame.")
+            base=bytearray.fromhex("00ff000101150000010010000000010000000000")
+            tests=[]
+            for val in range(256):
+                p=bytearray(base); p[4]=val; tests.append((f"cmd={val:02x}",bytes(p)))
+            for val in range(64):
+                p=bytearray(base); p[5]=val; tests.append((f"type={val:02x}",bytes(p)))
+            async def work():
+                c,n=await self.connect_retry(); out=[]
+                def cb(sender,d):out.append({"kind":"RX","hex":bytes(d).hex(),"t":time.time()})
+                try:
+                    try:await asyncio.wait_for(c.start_notify("0000b001-0000-1000-8000-00805f9b34fb",cb),timeout=4)
+                    except Exception as ex:out.append({"kind":"NOTIFY_ERROR","hex":repr(ex),"t":time.time()})
+                    for i,(label,data) in enumerate(tests,1):
+                        if not c.is_connected:out.append({"kind":"DISCONNECT","hex":label,"t":time.time()}); break
+                        out.append({"kind":"TX","label":label,"hex":data.hex(),"t":time.time()})
+                        await asyncio.wait_for(c.write_gatt_char("0000b002-0000-1000-8000-00805f9b34fb",data,response=False),timeout=2)
+                        if i%32==0:self.root.after(0,lambda i=i,t=len(tests):append(f"... {i}/{t}"))
+                        await asyncio.sleep(.12)
+                    await asyncio.sleep(1)
+                finally:
+                    try:await c.disconnect()
+                    except:pass
+                return out
+            def done(r,e):
+                if e:append("SONDEO ERROR: "+repr(e)); return
+                unique=[]; last=None; tx=0
+                for x in r:
+                    if x["kind"]=="TX":tx+=1
+                    elif x["kind"]=="RX" and x["hex"]!=last:
+                        last=x["hex"]
+                        if x["hex"] not in unique:unique.append(x["hex"])
+                    elif x["kind"] not in ("TX","RX"):append(x["kind"]+": "+x["hex"])
+                append(f"SONDEO PROFUNDO FINALIZADO · TX={tx} · RX diferentes={len(unique)}")
+                for z in unique:append("RX ÚNICA: "+z)
+            self.run_async(work(),done)
+        ttk.Button(row,text="SONDEO PROFUNDO",command=deep_probe).pack(side="left",padx=4)
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("Listo. El sondeo 00–0F anterior recibió ACKs pero no produjo acción visible; ahora se mapean campos del frame y tráfico espontáneo.")
     def check_update(self):
