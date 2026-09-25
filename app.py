@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time
 
-APP_VERSION="0.8.1"
+APP_VERSION="0.9.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,11 +16,11 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.8.1"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.9"); root.geometry("1000x700")
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.8.1 · localizador + updater PyInstaller seguro").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.9 · localizador rápido + acceso OTA").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -306,7 +306,7 @@ class App:
             self.run_async(work(),done)
         ttk.Button(row,text="SONDEO PROFUNDO",command=deep_probe).pack(side="left",padx=4)
         def action_locator():
-            append("LOCALIZADOR: 256 comandos, 1.0 s por comando. La pantalla muestra exactamente cuál se está ejecutando.")
+            append("LOCALIZADOR RÁPIDO: 256 comandos, 0.25 s por comando. Registra el comando exacto de cada respuesta.")
             base=bytearray.fromhex("00ff000101150000010010000000010000000000")
             async def work():
                 c,n=await self.connect_retry(); out=[]; current={"label":"—"}
@@ -319,7 +319,7 @@ class App:
                         self.root.after(0,lambda z=label:self.status.set("PROBANDO "+z+" · mirá el reloj"))
                         out.append({"kind":"TX","label":label,"hex":bytes(p).hex(),"t":time.time()})
                         await c.write_gatt_char("0000b002-0000-1000-8000-00805f9b34fb",bytes(p),response=False)
-                        await asyncio.sleep(1.0)
+                        await asyncio.sleep(.25)
                     await asyncio.sleep(1)
                 finally:
                     try:await c.disconnect()
@@ -334,6 +334,24 @@ class App:
                 self.status.set("Localizador finalizado.")
             self.run_async(work(),done)
         ttk.Button(row,text="LOCALIZAR ACCIONES",command=action_locator).pack(side="left",padx=4)
+        def ota_inspect():
+            append("OTA/BOOT INSPECTOR: consultando FFC1/FFC2 sin transferir firmware.")
+            async def work():
+                c,n=await self.connect_retry(); out=[]
+                try:
+                    for u in ["f000ffc1-0451-4000-b000-000000000000","f000ffc2-0451-4000-b000-000000000000"]:
+                        try:
+                            ch=c.services.get_characteristic(u)
+                            out.append(u+" props="+str(ch.properties if ch else None))
+                            if ch and "read" in ch.properties:
+                                d=await c.read_gatt_char(u); out.append(u+" read="+bytes(d).hex())
+                        except Exception as ex:out.append(u+" error="+repr(ex))
+                finally:
+                    try:await c.disconnect()
+                    except:pass
+                return out
+            self.run_async(work(),lambda r,e:append("OTA ERROR: "+repr(e)) if e else [append(x) for x in r]+[append("OTA INSPECCIÓN FINALIZADA")])
+        ttk.Button(row,text="INSPECCIONAR OTA/BOOT",command=ota_inspect).pack(side="left",padx=4)
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("Listo. El sondeo 00–0F anterior recibió ACKs pero no produjo acción visible; ahora se mapean campos del frame y tráfico espontáneo.")
     def check_update(self):
