@@ -1,1 +1,1 @@
-{"version":"0.6.0","exe_url":"https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe","notes":"Analizador de protocolo: mapeo diferencial de campos B002 y captura de tráfico espontáneo B001 para identificar comandos reales."}
+{"version":"0.8.0","exe_url":"https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe","notes":"Localizador de acciones: correlaciona cada comando B002 con su respuesta B001 y muestra en vivo el comando exacto que provoca una acción física."}
