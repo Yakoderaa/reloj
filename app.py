@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time
 
-APP_VERSION="0.11.0"
+APP_VERSION="0.12.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,11 +16,11 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.11"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.12"); root.geometry("1000x700")
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.11 · captura dual robusta + watchdog").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.12 · preflight firmware + recuperación BLE").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -404,6 +404,45 @@ class App:
                 self.status.set("Captura finalizada.")
             self.run_async(asyncio.wait_for(work(),timeout=100),done)
         ttk.Button(row,text="CAPTURA DUAL ROBUSTA",command=dual_capture).pack(side="left",padx=4)
+        def firmware_preflight():
+            append("PREFLIGHT FIRMWARE V0.12: recuperación BLE + inventario del canal de actualización. No escribe firmware.")
+            async def work():
+                out=[]; c=None
+                def emit(m):
+                    out.append(m); self.root.after(0,lambda x=m:(append(x),self.status.set(x)))
+                try:
+                    emit("1/5 · Buscando reloj nuevamente…")
+                    found=None
+                    for attempt in range(3):
+                        devs=await asyncio.wait_for(BleakScanner.discover(timeout=6),timeout=9)
+                        cand=[d for d in devs if (d.name or "").lower().find("apple watch ultra")>=0]
+                        if cand:found=cand[0]; emit(f"Encontrado: {found.name} · {found.address}"); break
+                        emit(f"Reintento de escaneo {attempt+1}/3")
+                    if not found:emit("NO ENCONTRADO: apagá/encendé Bluetooth del reloj y repetí."); return out
+                    emit("2/5 · Conexión limpia…")
+                    c=BleakClient(found.address,timeout=12)
+                    await asyncio.wait_for(c.connect(),timeout=15)
+                    emit("Conectado.")
+                    emit("3/5 · Inventariando FFC0…")
+                    for u in ["f000ffc1-0451-4000-b000-000000000000","f000ffc2-0451-4000-b000-000000000000"]:
+                        ch=c.services.get_characteristic(u)
+                        emit(u+" props="+str(ch.properties if ch else None))
+                    emit("4/5 · Probando suscripción FFC2…")
+                    events=[]
+                    try:
+                        await asyncio.wait_for(c.start_notify("f000ffc2-0451-4000-b000-000000000000",lambda sender,d:events.append(bytes(d).hex())),timeout=5)
+                        await asyncio.sleep(3)
+                        emit("FFC2 notify OK · eventos="+str(len(events)))
+                    except Exception as ex:emit("FFC2 notify ERROR: "+repr(ex))
+                    emit("5/5 · Estado: canal de actualización accesible. Escritura FFC1 BLOQUEADA hasta identificar formato/recuperación.")
+                except Exception as ex:emit("PREFLIGHT ERROR: "+repr(ex))
+                finally:
+                    if c:
+                        try:await asyncio.wait_for(c.disconnect(),timeout=4)
+                        except:pass
+                return out
+            self.run_async(asyncio.wait_for(work(),timeout=55),lambda r,e:append("PREFLIGHT WATCHDOG: "+repr(e)) if e else append("PREFLIGHT FINALIZADO"))
+        ttk.Button(row,text="PREFLIGHT FIRMWARE",command=firmware_preflight).pack(side="left",padx=4)
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("Listo. El sondeo 00–0F anterior recibió ACKs pero no produjo acción visible; ahora se mapean campos del frame y tráfico espontáneo.")
     def check_update(self):
