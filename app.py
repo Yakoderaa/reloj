@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time
 
-APP_VERSION="0.4.2"
+APP_VERSION="0.5.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,11 +16,11 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.4.2"); root.geometry("1000x700")
-        self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None
+        self.root=root; root.title("Reloj Lab V0.5"); root.geometry("1000x700")
+        self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.4.2 · Conexión rápida + progreso").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.5 · Control Lab activo").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -32,6 +32,7 @@ class App:
         self.diag=ttk.Button(a,text="DIAGNÓSTICO COMPLETO",command=self.diagnose,state="disabled"); self.diag.pack(side="left")
         self.listen=ttk.Button(a,text="ESCUCHAR RELOJ 60 s",command=self.listen_notifications,state="disabled"); self.listen.pack(side="left",padx=8)
         self.explore=ttk.Button(a,text="CONECTAR Y VER TODO",command=self.explore_live,state="disabled"); self.explore.pack(side="left",padx=8)
+        ttk.Button(a,text="CONTROL ACTIVO",command=self.open_control).pack(side="left",padx=8)
         ttk.Button(a,text="Guardar diagnóstico",command=self.save).pack(side="left")
         self.status=tk.StringVar(value="Listo. Buscá y seleccioná el reloj.")
         ttk.Label(a,textvariable=self.status).pack(side="right")
@@ -192,6 +193,66 @@ class App:
             self.report["passive_notifications"].extend(events); self.report["notification_errors"]=errs; self.show()
             self.status.set(f"Escucha finalizada: {len(events)} paquetes. Guardá el diagnóstico.")
         self.run_async(work(),done)
+    def open_control(self):
+        if not self.selected:
+            messagebox.showinfo("Control activo","Primero buscá y seleccioná el reloj."); return
+        w=tk.Toplevel(self.root); w.title("Reloj Lab · Control activo"); w.geometry("820x560")
+        ttk.Label(w,text="Canal propietario B002 → B001",font=("Segoe UI",14,"bold")).pack(anchor="w",padx=12,pady=(12,4))
+        ttk.Label(w,text="Esta consola escribe comandos reales al reloj. FFC1/OTA queda bloqueado para no pisar firmware accidentalmente.").pack(anchor="w",padx=12)
+        row=ttk.Frame(w,padding=12); row.pack(fill="x")
+        ttk.Entry(row,textvariable=self.raw_hex,width=75).pack(side="left",fill="x",expand=True)
+        log=tk.Text(w,font=("Consolas",9),wrap="word"); log.pack(fill="both",expand=True,padx=12,pady=(0,12))
+        def append(x): log.insert("end",x+"\n"); log.see("end")
+        def send_raw():
+            raw=self.raw_hex.get().replace(" ","").strip()
+            try:data=bytes.fromhex(raw)
+            except Exception as e:messagebox.showerror("HEX","HEX inválido: "+repr(e)); return
+            append("TX B002: "+data.hex())
+            async def work():
+                c,n=await self.connect_retry(); rx=[]
+                def cb(sender,d):rx.append(bytes(d).hex())
+                try:
+                    try:await asyncio.wait_for(c.start_notify("0000b001-0000-1000-8000-00805f9b34fb",cb),timeout=4)
+                    except Exception:pass
+                    await c.write_gatt_char("0000b002-0000-1000-8000-00805f9b34fb",data,response=False)
+                    await asyncio.sleep(2)
+                finally:
+                    try:await c.disconnect()
+                    except:pass
+                return rx
+            def done(r,e):
+                if e:append("ERROR: "+repr(e))
+                elif r:
+                    for x in r:append("RX B001: "+x)
+                else:append("RX: sin respuesta en 2 s")
+            self.run_async(work(),done)
+        def probe():
+            append("SONDEO: 16 variantes del frame observado, una por vez.")
+            base=bytearray.fromhex("00ff000101150000010010000000010000000000")
+            async def work():
+                c,n=await self.connect_retry(); out=[]
+                def cb(sender,d):out.append(("rx",bytes(d).hex(),time.time()))
+                try:
+                    try:await asyncio.wait_for(c.start_notify("0000b001-0000-1000-8000-00805f9b34fb",cb),timeout=4)
+                    except Exception as ex:out.append(("notify_error",repr(ex),time.time()))
+                    for cmd in range(0x00,0x10):
+                        p=bytearray(base); p[4]=cmd
+                        out.append(("tx",bytes(p).hex(),time.time()))
+                        await c.write_gatt_char("0000b002-0000-1000-8000-00805f9b34fb",bytes(p),response=False)
+                        await asyncio.sleep(.55)
+                    await asyncio.sleep(2)
+                finally:
+                    try:await c.disconnect()
+                    except:pass
+                return out
+            def done(r,e):
+                if e:append("SONDEO ERROR: "+repr(e)); return
+                for kind,data,_ in r:append(kind.upper()+": "+data)
+                append("SONDEO FINALIZADO")
+            self.run_async(work(),done)
+        ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=6)
+        ttk.Button(row,text="SONDEO ACTIVO 00–0F",command=probe).pack(side="left")
+        append("Listo. ENVIAR HEX escribe B002. SONDEO prueba variantes controladas y escucha B001.")
     def check_update(self):
         self.status.set("Buscando actualización…")
         def work():
