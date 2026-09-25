@@ -1,1 +1,1 @@
-{"version":"0.8.0","exe_url":"https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe","notes":"Localizador de acciones: correlaciona cada comando B002 con su respuesta B001 y muestra en vivo el comando exacto que provoca una acción física."}
+{"version":"0.8.1","exe_url":"https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe","notes":"Corrige definitivamente el reinicio de actualizaciones PyInstaller: instala fuera de Temp, limpia el entorno heredado _MEI y fuerza un entorno PyInstaller nuevo antes de reabrir."}
