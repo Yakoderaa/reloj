@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time
 
-APP_VERSION="0.5.1"
+APP_VERSION="0.6.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,11 +16,11 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.5.1"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.6"); root.geometry("1000x700")
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.5.1 · cierre seguro").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.6 · analizador de protocolo").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -204,64 +204,71 @@ class App:
         self.run_async(work(),done)
     def open_control(self):
         if not self.selected:
-            messagebox.showinfo("Control activo","Primero buscá y seleccioná el reloj."); return
-        w=tk.Toplevel(self.root); w.title("Reloj Lab · Control activo"); w.geometry("820x560")
-        ttk.Label(w,text="Canal propietario B002 → B001",font=("Segoe UI",14,"bold")).pack(anchor="w",padx=12,pady=(12,4))
-        ttk.Label(w,text="Esta consola escribe comandos reales al reloj. FFC1/OTA queda bloqueado para no pisar firmware accidentalmente.").pack(anchor="w",padx=12)
+            messagebox.showinfo("Analizador","Primero buscá y seleccioná el reloj."); return
+        w=tk.Toplevel(self.root); w.title("Reloj Lab · Analizador de protocolo"); w.geometry("900x620")
+        ttk.Label(w,text="Analizador B002 → B001",font=("Segoe UI",14,"bold")).pack(anchor="w",padx=12,pady=(12,4))
+        ttk.Label(w,text="Captura respuestas completas y compara bytes. El canal OTA FFC1 permanece separado.").pack(anchor="w",padx=12)
         row=ttk.Frame(w,padding=12); row.pack(fill="x")
-        ttk.Entry(row,textvariable=self.raw_hex,width=75).pack(side="left",fill="x",expand=True)
-        log=tk.Text(w,font=("Consolas",9),wrap="word"); log.pack(fill="both",expand=True,padx=12,pady=(0,12))
+        ttk.Entry(row,textvariable=self.raw_hex,width=70).pack(side="left",fill="x",expand=True)
+        log=tk.Text(w,font=("Consolas",9),wrap="none"); log.pack(fill="both",expand=True,padx=12,pady=(0,12))
         def append(x): log.insert("end",x+"\n"); log.see("end")
-        def send_raw():
-            raw=self.raw_hex.get().replace(" ","").strip()
-            try:data=bytes.fromhex(raw)
-            except Exception as e:messagebox.showerror("HEX","HEX inválido: "+repr(e)); return
-            append("TX B002: "+data.hex())
-            async def work():
-                c,n=await self.connect_retry(); rx=[]
-                def cb(sender,d):rx.append(bytes(d).hex())
-                try:
-                    try:await asyncio.wait_for(c.start_notify("0000b001-0000-1000-8000-00805f9b34fb",cb),timeout=4)
-                    except Exception:pass
+        async def exchange(payloads,wait=.8):
+            c,n=await self.connect_retry(); out=[]
+            def cb(sender,d):out.append({"kind":"RX","hex":bytes(d).hex(),"t":time.time()})
+            try:
+                try:await asyncio.wait_for(c.start_notify("0000b001-0000-1000-8000-00805f9b34fb",cb),timeout=4)
+                except Exception as ex:out.append({"kind":"NOTIFY_ERROR","hex":repr(ex),"t":time.time()})
+                await asyncio.sleep(.3)
+                for label,data in payloads:
+                    out.append({"kind":"TX","label":label,"hex":data.hex(),"t":time.time()})
                     await c.write_gatt_char("0000b002-0000-1000-8000-00805f9b34fb",data,response=False)
-                    await asyncio.sleep(2)
-                finally:
-                    try:await c.disconnect()
-                    except:pass
-                return rx
-            def done(r,e):
-                if e:append("ERROR: "+repr(e))
-                elif r:
-                    for x in r:append("RX B001: "+x)
-                else:append("RX: sin respuesta en 2 s")
-            self.run_async(work(),done)
-        def probe():
-            append("SONDEO: 16 variantes del frame observado, una por vez.")
+                    await asyncio.sleep(wait)
+                await asyncio.sleep(1.5)
+            finally:
+                try:await c.disconnect()
+                except:pass
+            return out
+        def render(rows):
+            last_tx=None
+            for x in rows:
+                if x["kind"]=="TX":
+                    last_tx=x; append("TX "+x.get("label","")+": "+x["hex"])
+                elif x["kind"]=="RX":
+                    append("RX"+((" ← "+last_tx.get("label","")) if last_tx else "")+": "+x["hex"])
+                else:append(x["kind"]+": "+x["hex"])
+            append("PRUEBA FINALIZADA")
+        def send_raw():
+            try:data=bytes.fromhex(self.raw_hex.get().replace(" ","").strip())
+            except Exception as e:messagebox.showerror("HEX","HEX inválido: "+repr(e)); return
+            self.run_async(exchange([("manual",data)],1.2),lambda r,e: append("ERROR: "+repr(e)) if e else render(r))
+        def differential():
             base=bytearray.fromhex("00ff000101150000010010000000010000000000")
+            tests=[]
+            for idx in [2,3,4,5,8,9,10,14,15,16]:
+                for val in [0x00,0x01,0x02,0x10,0xff]:
+                    p=bytearray(base); p[idx]=val
+                    tests.append((f"byte[{idx}]={val:02x}",bytes(p)))
+            append("MAPEO DIFERENCIAL: 50 paquetes controlados. Mirá el reloj y anotá cualquier cambio.")
+            self.run_async(exchange(tests,.35),lambda r,e: append("ERROR: "+repr(e)) if e else render(r))
+        def capture():
+            append("CAPTURA 90 s: usá funciones del reloj; se registrará todo B001 espontáneo.")
             async def work():
                 c,n=await self.connect_retry(); out=[]
-                def cb(sender,d):out.append(("rx",bytes(d).hex(),time.time()))
+                def cb(sender,d):out.append({"kind":"RX","hex":bytes(d).hex(),"t":time.time()})
                 try:
-                    try:await asyncio.wait_for(c.start_notify("0000b001-0000-1000-8000-00805f9b34fb",cb),timeout=4)
-                    except Exception as ex:out.append(("notify_error",repr(ex),time.time()))
-                    for cmd in range(0x00,0x10):
-                        p=bytearray(base); p[4]=cmd
-                        out.append(("tx",bytes(p).hex(),time.time()))
-                        await c.write_gatt_char("0000b002-0000-1000-8000-00805f9b34fb",bytes(p),response=False)
-                        await asyncio.sleep(.55)
-                    await asyncio.sleep(2)
+                    await asyncio.wait_for(c.start_notify("0000b001-0000-1000-8000-00805f9b34fb",cb),timeout=4)
+                    for left in range(90,0,-1):
+                        if left%10==0:self.root.after(0,lambda z=left:append(f"... faltan {z}s · RX={len(out)}"))
+                        await asyncio.sleep(1)
                 finally:
                     try:await c.disconnect()
                     except:pass
                 return out
-            def done(r,e):
-                if e:append("SONDEO ERROR: "+repr(e)); return
-                for kind,data,_ in r:append(kind.upper()+": "+data)
-                append("SONDEO FINALIZADO")
-            self.run_async(work(),done)
-        ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=6)
-        ttk.Button(row,text="SONDEO ACTIVO 00–0F",command=probe).pack(side="left")
-        append("Listo. ENVIAR HEX escribe B002. SONDEO prueba variantes controladas y escucha B001.")
+            self.run_async(work(),lambda r,e: append("ERROR: "+repr(e)) if e else render(r))
+        ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
+        ttk.Button(row,text="MAPEO DIFERENCIAL",command=differential).pack(side="left",padx=4)
+        ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
+        append("Listo. El sondeo 00–0F anterior recibió ACKs pero no produjo acción visible; ahora se mapean campos del frame y tráfico espontáneo.")
     def check_update(self):
         self.status.set("Buscando actualización…")
         def work():
