@@ -1,1 +1,1 @@
-{"version":"0.5.1","exe_url":"https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe","notes":"Corrige el cierre de la ventana y evita que tareas BLE en segundo plano vuelvan a tocar la interfaz después de cerrarla."}
+{"version":"0.6.0","exe_url":"https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe","notes":"Analizador de protocolo: mapeo diferencial de campos B002 y captura de tráfico espontáneo B001 para identificar comandos reales."}
