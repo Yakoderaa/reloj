@@ -1,1 +1,1 @@
-{"version":"0.5.0","exe_url":"https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe","notes":"Control Lab activo: escritura real por B002, captura de respuestas B001 y sondeo automático de variantes 00–0F. El canal OTA FFC1 permanece separado."}
+{"version":"0.5.1","exe_url":"https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe","notes":"Corrige el cierre de la ventana y evita que tareas BLE en segundo plano vuelvan a tocar la interfaz después de cerrarla."}
