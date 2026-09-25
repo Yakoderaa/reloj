@@ -1,1 +1,1 @@
-{"version":"0.10.0","exe_url":"https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe","notes":"Captura dual con marcas temporales para correlacionar acciones reales del reloj."}
+{"version":"0.11.0","exe_url":"https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe","notes":"Captura dual robusta con progreso por etapas, límites de espera, watchdog y continuación automática si un canal no responde."}
