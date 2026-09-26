@@ -1,6 +1,6 @@
 {
-  "version": "0.43.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.43.0/RelojLab.exe",
-  "notes": "V0.43: búsqueda del prefijo mínimo OP08-OP0D que dispara la caída. Copiar diagnóstico permanece como segundo botón.",
-  "sha256": "c5fb5c6044ee2575c72d9f0ce96b279ed43d9531400ef1a2818e8be4975a42ef"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.44.0/RelojLab.exe",
+  "sha256": "4382411cdc2ff284e2c6f6c2cd525b8e5f01afefc4f9d8b9c311b81c3caf6d97",
+  "notes": "V0.44: minimización del contexto que hace caer GATT al llegar a OP0C. Copiar diagnóstico permanece como segundo botón.",
+  "version": "0.44.0"
 }
