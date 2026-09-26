@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue
 
-APP_VERSION="0.14.0"
+APP_VERSION="0.14.1"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.14.0"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.14.1"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -31,7 +31,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.14.0 · conexión trazable + informe de firmware").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.14.1 · conexión directa + recuperación por escaneo").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -91,6 +91,10 @@ class App:
             except Exception as e:self.root.after(0,lambda error=e:done(None,error))
         threading.Thread(target=w,daemon=True).start()
     def scan(self):
+        if self.ble_busy:
+            self.status.set("Esperá a que termine la operación Bluetooth actual."); return
+        self.selected=None
+        for button in (self.diag,self.listen,self.explore):button.config(state="disabled")
         self.status.set("Buscando BLE durante 8 segundos…"); self.tree.delete(*self.tree.get_children()); self.devices=[]
         async def work():
             found=await BleakScanner.discover(timeout=8,return_adv=True); out=[]
@@ -116,35 +120,52 @@ class App:
         "connection":{"connected":False,"attempts":0},"services":[],"standard_reads":{},"passive_notifications":[],
         "safety":{"writes_performed":0,"firmware_actions":0},"errors":[]}
     async def connect_retry(self,attempts=2,progress=None):
-        last=None
         progress=progress or (lambda message:None)
-        address=self.selected.get("address") or getattr(self.selected.get("device"),"address",None)
+        selected=dict(self.selected or {})
+        address=selected.get("address") or getattr(selected.get("device"),"address",None)
+        if not address:raise RuntimeError("Seleccioná un reloj en Buscar relojes.")
+        last=None
+        self.connection_state={"connected":False,"attempts":0,"phase":"starting"}
         for i in range(attempts):
-            c=None
+            self.connection_state.update(attempts=i+1,phase="selecting_device")
+            client=None; connected=False
             try:
-                # En Windows una referencia BLE vieja puede quedar inutilizable. Cada intento
-                # vuelve a descubrir el dispositivo y conecta contra el objeto recién creado.
-                fresh=None
-                progress(f"Intento {i+1}/{attempts}: buscando el reloj seleccionado (5 s)…")
-                devs=await asyncio.wait_for(BleakScanner.discover(timeout=5),timeout=8)
-                for d in devs:
-                    if getattr(d,"address",None)==address:
-                        fresh=d; break
-                target=fresh or address or self.selected["device"]
+                target=selected.get("device") if i==0 else None
+                # Keep the BLEDevice obtained by our scanner. Passing its address as a
+                # string would trigger a second, implicit scan inside Bleak.connect().
+                if target is not None and str(getattr(target,"address","")).casefold()!=str(address).casefold():
+                    target=None
+                if target is not None:
+                    progress(f"Intento {i+1}/{attempts}: conexión directa al reloj seleccionado {address}.")
+                else:
+                    progress(f"Intento {i+1}/{attempts}: buscando anuncio BLE de {address} (12 s). Si está conectado al teléfono, desconectalo allí.")
+                    self.connection_state["phase"]="scanning"
+                    target=await asyncio.wait_for(BleakScanner.find_device_by_address(address,timeout=12),timeout=14)
+                    if target is None:
+                        raise RuntimeError("RELOJ NO VISIBLE: no se recibió su anuncio BLE. Apagá temporalmente el Bluetooth del teléfono, acercá el reloj y volvé a Buscar relojes. No se intentó abrir GATT sin detectar el dispositivo.")
+                    progress("Reloj detectado nuevamente; usando sus datos BLE actuales.")
                 progress(f"Intento {i+1}/{attempts}: abriendo GATT (límite 18 s)…")
-                c=BleakClient(target,timeout=16)
-                await asyncio.wait_for(c.connect(),timeout=18)
-                if c.is_connected:
-                    _=c.services
-                    self.selected["device"]=fresh or self.selected["device"]
-                    return c,i+1
-            except Exception as e:
-                last=e; progress(f"Intento {i+1}: {type(e).__name__}: {e}")
-            if c:
-                try:await asyncio.wait_for(c.disconnect(),timeout=4)
-                except:pass
+                self.connection_state["phase"]="gatt_connect"
+                client=BleakClient(target,timeout=16)
+                await asyncio.wait_for(client.connect(),timeout=18)
+                if not client.is_connected:raise RuntimeError("Windows no confirmó la conexión GATT.")
+                _=client.services
+                self.selected["device"]=target
+                connected=True
+                self.connection_state.update(connected=True,phase="gatt_open")
+                return client,i+1
+            except asyncio.TimeoutError:
+                last=RuntimeError("TIEMPO DE CONEXIÓN AGOTADO: Windows no completó la operación Bluetooth. El reloj puede estar ocupado, fuera de alcance o sin responder.")
+                progress(str(last))
+            except Exception as ex:
+                last=ex; progress(f"Intento {i+1}: {type(ex).__name__}: {ex}")
+            finally:
+                if client is not None and not connected:
+                    try:await asyncio.wait_for(client.disconnect(),timeout=4)
+                    except Exception:pass
             if i+1<attempts:await asyncio.sleep(1)
-        raise RuntimeError("No se pudo abrir GATT tras %d estrategias. Último error: %r"%(attempts,last))
+        self.connection_state["error"]=str(last)
+        raise RuntimeError("No se pudo conectar. "+str(last))
     def diagnose(self):
         if not self.selected:return
         self.status.set("Conectando y leyendo GATT…")
@@ -458,7 +479,7 @@ class App:
         def firmware_preflight():
             if self.ble_busy:
                 append("Ya hay una operación Bluetooth en curso."); return
-            append("PREFLIGHT V0.14: conexión trazable e identificación. No instala otro sistema.")
+            append("PREFLIGHT V"+APP_VERSION+": conexión directa e identificación. No instala otro sistema.")
             rep=self.base_report()
             rep["firmware_access"]={"bootloader_confirmed":False,"compatible_image":False,
                 "ready_to_flash":False,"reason":"Faltan hardware confirmado, firmware compatible y protocolo de instalación verificado."}
@@ -514,6 +535,7 @@ class App:
             def done(result,error):
                 if error:rep["errors"].append(repr(error))
                 self.report=result or rep
+                self.report["connection"]=dict(getattr(self,"connection_state",self.report["connection"]))
                 self.show()
                 append("Informe disponible en Guardar diagnóstico.")
                 self.status.set("Preflight finalizado con errores." if self.report["errors"] else "Preflight finalizado. Firmware aún no habilitado.")
