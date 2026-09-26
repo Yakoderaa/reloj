@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue
 
-APP_VERSION="0.19.0"
+APP_VERSION="0.20.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.19"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.20"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -31,7 +31,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.19 · mapa de reinicio OTA + fingerprint post-01").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.20 · recuperación BLE persistente + mapa OTA").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -119,7 +119,7 @@ class App:
         "computer":{"platform":platform.platform(),"python":sys.version},"advertisement":{k:v for k,v in self.selected.items() if k!="device"},
         "connection":{"connected":False,"attempts":0},"services":[],"standard_reads":{},"passive_notifications":[],
         "safety":{"writes_performed":0,"firmware_actions":0},"errors":[]}
-    async def connect_retry(self,attempts=4,progress=None):
+    async def connect_retry(self,attempts=8,progress=None):
         progress=progress or (lambda message:None)
         selected=dict(self.selected or {})
         address=selected.get("address") or getattr(selected.get("device"),"address",None)
@@ -508,7 +508,7 @@ class App:
                 pulse=asyncio.create_task(heartbeat())
                 try:
                     emit("1/4 · Probando cuatro rutas de conexión Windows/BLE…")
-                    c,n=await self.connect_retry(4,emit)
+                    c,n=await self.connect_retry(8,emit)
                     rep["connection"]={"connected":True,"attempts":n}
                     emit("2/4 · Leyendo identidad del firmware…")
                     for key,short in [("manufacturer","2a29"),("model","2a24"),("hardware","2a27"),("firmware","2a26"),("software","2a28")]:
@@ -600,8 +600,8 @@ class App:
                 def emit(m):
                     report.append(m); self.root.after(0,lambda x=m:(append(x),self.status.set(x)))
                 try:
-                    emit("1/7 · Recuperando GATT con las estrategias validadas…")
-                    c,n=await asyncio.wait_for(self.connect_retry(4,emit),timeout=165)
+                    emit("1/7 · Recuperando GATT con 8 estrategias y reintentos Windows…")
+                    c,n=await asyncio.wait_for(self.connect_retry(4,emit),timeout=290)
                     emit(f"GATT ABIERTO · estrategia {n}")
                     before_services=sorted(str(x.uuid) for x in c.services)
                     emit("2/7 · Huella previa: "+str(len(before_services))+" servicios · MTU="+str(getattr(c,"mtu_size","?")))
