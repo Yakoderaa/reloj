@@ -1,6 +1,6 @@
 {
-  "notes": "V0.45: aislamiento de OP0B y de la segunda escritura que provoca la caída diferida. Copiar diagnóstico permanece como segundo botón.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.45.0/RelojLab.exe",
-  "version": "0.45.0",
-  "sha256": "e890392d0239504e7ac550a9f23b5014c9f2668fb701bf79632a202190669388"
+  "notes": "V0.46: matriz post-OP0B para identificar qué segunda escritura provoca la caída diferida. Copiar diagnóstico permanece como segundo botón.",
+  "version": "0.46.0",
+  "sha256": "0a22ac24390ed736217da5fbabb735c96c48e8f094580a9dd1ee370acac29236",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.46.0/RelojLab.exe"
 }
