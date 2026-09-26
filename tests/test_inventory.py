@@ -13,9 +13,9 @@ with tempfile.TemporaryDirectory() as folder:
     old=os.getcwd()
     try:
         os.chdir(folder)
-        Path('app.py').write_text((ROOT/'app.py').read_text())
+        Path('app.py').write_text((ROOT/'app.py').read_text(encoding='utf-8'),encoding='utf-8')
         runpy.run_path(str(ROOT/'build_patch_v029.py'))
-        source=ast.parse(Path('app.py').read_text())
+        source=ast.parse(Path('app.py').read_text(encoding='utf-8'))
     finally:
         os.chdir(old)
 cls=next(n for n in source.body if isinstance(n,ast.ClassDef))
@@ -61,3 +61,4 @@ class InventoryTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('connect failure',result['errors'][0])
 
 if __name__=='__main__': unittest.main()
+
