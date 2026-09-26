@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.44.0/RelojLab.exe",
-  "sha256": "4382411cdc2ff284e2c6f6c2cd525b8e5f01afefc4f9d8b9c311b81c3caf6d97",
-  "notes": "V0.44: minimización del contexto que hace caer GATT al llegar a OP0C. Copiar diagnóstico permanece como segundo botón.",
-  "version": "0.44.0"
+  "notes": "V0.45: aislamiento de OP0B y de la segunda escritura que provoca la caída diferida. Copiar diagnóstico permanece como segundo botón.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.45.0/RelojLab.exe",
+  "version": "0.45.0",
+  "sha256": "e890392d0239504e7ac550a9f23b5014c9f2668fb701bf79632a202190669388"
 }
