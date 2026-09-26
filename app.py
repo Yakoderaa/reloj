@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue
 
-APP_VERSION="0.25.0"
+APP_VERSION="0.26.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.25"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.26"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -31,7 +31,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.25 · conexión rápida adaptativa + OTA").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.26 · enlace BLE persistente + OTA").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -126,33 +126,40 @@ class App:
         if not address:raise RuntimeError("Seleccioná un reloj en Buscar relojes.")
         last=None
         self.connection_state={"connected":False,"attempts":0,"phase":"starting","strategies":[]}
-        strategies=["BLEDevice seleccionado","BLEDevice redescubierto","Windows pairing + BLEDevice fresco","Dirección directa WinRT"]
+        # V0.26: the selected watch repeatedly advertises while Windows times out opening GATT.
+        # Keep discovery short, serialize every attempt, and give WinRT progressively longer cooldowns.
+        plan=[
+            ("BLEDevice fresco",False,True,18),
+            ("Dirección directa WinRT",False,False,24),
+            ("BLEDevice fresco + pairing",True,True,28),
+            ("Dirección directa WinRT + pairing",True,False,32),
+            ("BLEDevice fresco recuperación",False,True,35),
+            ("Dirección directa recuperación",False,False,40),
+            ("BLEDevice fresco final",False,True,45),
+            ("Dirección directa final",False,False,50),
+        ]
         for i in range(max(1,attempts)):
-            # V0.25: after repeated WinRT success, prioritize direct-address attempts instead of burning ~2 minutes on stale/cached paths.
-            order=[3,1,3,1,2,3,1,3] if attempts>=8 else list(range(attempts))
-            si=order[i] if i<len(order) else (i % len(strategies))
-            label=strategies[si]; client=None; connected=False
+            label,pairing,scan_first,connect_timeout=plan[i % len(plan)]
+            client=None; connected=False
             self.connection_state.update(attempts=i+1,phase="preparing",strategy=label)
             self.connection_state["strategies"].append(label)
             try:
                 progress(f"ESTRATEGIA {i+1}/{attempts} · {label}")
-                target=selected.get("device") if (i==0 and si==0) else None
-                # Never trust a cached BLEDevice that belongs to another address.
-                if target is not None and str(getattr(target,"address","")).casefold()!=str(address).casefold():
-                    target=None
-                if target is None and si<3:
+                target=None
+                if scan_first:
                     self.connection_state["phase"]="scanning"
-                    progress("Buscando anuncio BLE fresco de la dirección seleccionada…")
-                    target=await asyncio.wait_for(BleakScanner.find_device_by_address(address,timeout=10),timeout=12)
+                    progress("Escaneo corto: esperando anuncio fresco…")
+                    target=await asyncio.wait_for(BleakScanner.find_device_by_address(address,timeout=4),timeout=6)
                     if target is None:
-                        raise RuntimeError("RELOJ NO VISIBLE: no se recibió anuncio BLE de "+str(address))
-                    progress("Reloj detectado nuevamente; usando exclusivamente su dirección.")
-                if target is None:target=address
-                pairing=(si>=2)
+                        progress("Sin anuncio en esta ventana; pruebo la dirección directa sin bloquear.")
+                        target=address
+                    else:
+                        progress("Anuncio fresco detectado.")
+                else:target=address
                 self.connection_state["phase"]="gatt_connect"
-                progress("Abriendo GATT"+(" con pairing Windows…" if pairing else "…"))
-                client=BleakClient(target,timeout=25,pair=pairing)
-                await asyncio.wait_for(client.connect(),timeout=30)
+                progress(f"Abriendo GATT · timeout {connect_timeout}s"+(" · pairing" if pairing else "")+"…")
+                client=BleakClient(target,timeout=connect_timeout,pair=pairing)
+                await asyncio.wait_for(client.connect(),timeout=connect_timeout+3)
                 if not client.is_connected:raise RuntimeError("Windows no confirmó is_connected.")
                 self.connection_state["phase"]="services"
                 progress("Enlace BLE abierto; comprobando servicios GATT…")
@@ -164,8 +171,7 @@ class App:
                 self.connection_state.update(connected=True,phase="gatt_open",strategy=label)
                 progress("GATT ABIERTO correctamente con: "+label)
                 return client,i+1
-            except asyncio.CancelledError:
-                raise
+            except asyncio.CancelledError:raise
             except (asyncio.TimeoutError,TimeoutError):
                 last=RuntimeError("TIEMPO DE CONEXIÓN AGOTADO en "+self.connection_state.get("phase","desconocido"))
                 progress(str(last))
@@ -173,16 +179,15 @@ class App:
                 last=ex; progress("FALLÓ "+label+f": {type(ex).__name__}: {ex}")
             finally:
                 if client is not None and not connected:
-                    try:await asyncio.wait_for(client.disconnect(),timeout=4)
+                    try:await asyncio.wait_for(client.disconnect(),timeout=5)
                     except Exception:pass
             if i+1<attempts:
-                delay=1 if i<3 else min(5,2+(i-3))
-                progress(f"RECUPERACIÓN BLE · esperando {delay} s antes del intento {i+2}/{attempts}…")
+                delay=(2,3,4,5,7,9,12)[min(i,6)]
+                progress(f"RECUPERACIÓN BLE · liberando WinRT {delay}s antes del intento {i+2}/{attempts}…")
                 await asyncio.sleep(delay)
         self.connection_state["error"]=repr(last)
-        if isinstance(last,RuntimeError) and ("RELOJ NO VISIBLE" in str(last) or "TIEMPO DE CONEXIÓN AGOTADO" in str(last)):
-            raise last
-        raise RuntimeError("Todas las estrategias Windows BLE fallaron. Último error: "+repr(last))
+        raise RuntimeError("ENLACE GATT NO DISPONIBLE tras "+str(attempts)+" intentos: "+str(last))
+
     def diagnose(self):
         if not self.selected:return
         self.status.set("Conectando y leyendo GATT…")
@@ -600,7 +605,7 @@ class App:
             self.run_async(asyncio.wait_for(work(),timeout=190),lambda r,e:append("HUELLA OTA WATCHDOG: "+repr(e)) if e else append("HUELLA OTA V0.16 FINALIZADA"))
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab():
-            append("MAPA OTA V0.25: conexión adaptativa prioriza WinRT/directa, luego mide reinicio, advertising y recuperación GATT.")
+            append("MAPA OTA V0.26: enlace BLE persistente con escaneo corto, timeouts crecientes y recuperación WinRT; luego sigue el reinicio OTA.")
             async def work():
                 c=None; rx=[]; report=[]; address=self.selected.get("address") or getattr(self.selected.get("device"),"address",None)
                 t0=time.monotonic()
@@ -705,15 +710,15 @@ class App:
                         for u in sorted(set(before)|set(post)):
                             if before.get(u)!=post.get(u):emit("DIF GATT "+u+" PRE="+str(before.get(u))+" POST="+str(post.get(u)))
                     if rx:emit("RESPUESTAS FFC2="+str(rx))
-                    emit("MAPA OTA V0.25 FINALIZADO · sin transferencia de firmware.")
+                    emit("MAPA OTA V0.26 FINALIZADO · sin transferencia de firmware.")
                 except Exception as ex:emit("MAPA OTA ERROR: "+type(ex).__name__+": "+str(ex))
                 finally:
                     if c:
                         try:await asyncio.wait_for(c.disconnect(),timeout=5)
                         except:pass
                 return report
-            self.run_async(asyncio.wait_for(work(),timeout=470),lambda r,e:append("MAPA OTA WATCHDOG: "+repr(e)) if e else append("MAPA OTA V0.25 FINALIZADO"))
-        ttk.Button(row,text="SEGUIR REINICIO OTA",command=ota_lab).pack(side="left",padx=4)
+            self.run_async(asyncio.wait_for(work(),timeout=470),lambda r,e:append("MAPA OTA WATCHDOG: "+repr(e)) if e else append("MAPA OTA V0.26 FINALIZADO"))
+        # V0.26: the requested test is always the first control in the row.\n        ttk.Button(row,text="▶ PRUEBA V0.26 · CONECTAR + SEGUIR REINICIO OTA",command=ota_lab).pack(side="left",padx=4)
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("Listo. El sondeo 00–0F anterior recibió ACKs pero no produjo acción visible; ahora se mapean campos del frame y tráfico espontáneo.")
