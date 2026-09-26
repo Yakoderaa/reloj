@@ -1,6 +1,6 @@
 {
-  "sha256": "b644ba401ad9f2d70a5b387241b2a16098375942844d50ee5a00f2353eae881c",
-  "version": "0.34.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.34.0/RelojLab.exe",
-  "notes": "V0.34: validación FFC1 con sesión B002 viva y rastreo OAD. Copiar diagnóstico permanece como segundo botón."
+  "notes": "V0.35: identidad del dispositivo + perfilado seguro FFC1/FFC2. Copiar diagnóstico permanece como segundo botón.",
+  "version": "0.35.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.35.0/RelojLab.exe",
+  "sha256": "301a28a912edbbaaa05a0eba7ef7ce82a54ac3ed47379fb757284d60b0860975"
 }
