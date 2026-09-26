@@ -172,7 +172,10 @@ class App:
                 if client is not None and not connected:
                     try:await asyncio.wait_for(client.disconnect(),timeout=4)
                     except Exception:pass
-            if i+1<attempts:\n                delay=2 if i<3 else min(10,3+(i-3)*2)\n                progress(f"RECUPERACIÓN BLE · esperando {delay} s antes del intento {i+2}/{attempts}…")\n                await asyncio.sleep(delay)
+            if i+1<attempts:
+                delay=2 if i<3 else min(10,3+(i-3)*2)
+                progress(f"RECUPERACIÓN BLE · esperando {delay} s antes del intento {i+2}/{attempts}…")
+                await asyncio.sleep(delay)
         self.connection_state["error"]=repr(last)
         if isinstance(last,RuntimeError) and ("RELOJ NO VISIBLE" in str(last) or "TIEMPO DE CONEXIÓN AGOTADO" in str(last)):
             raise last
