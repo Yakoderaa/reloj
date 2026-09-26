@@ -28,3 +28,5 @@ jobs:
           name: RelojLab-Windows
           path: dist/RelojLab.exe
           if-no-files-found: error
+
+# corrected v0.26 rebuild
