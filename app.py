@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue
 
-APP_VERSION="0.17.0"
+APP_VERSION="0.18.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.17"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.18"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -31,7 +31,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.17 · laboratorio OTA + WinRT prioritario").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.18 · GATT recuperable + laboratorio OTA").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -594,19 +594,15 @@ class App:
             self.run_async(asyncio.wait_for(work(),timeout=190),lambda r,e:append("HUELLA OTA WATCHDOG: "+repr(e)) if e else append("HUELLA OTA V0.16 FINALIZADA"))
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab():
-            append("LAB OTA V0.17: WinRT prioritario + handshake conservador. No transfiere bloques de firmware.")
+            append("LAB OTA V0.18: primero recupera GATT; sólo después prueba handshake mínimo. Sin bloques de firmware.")
             async def work():
                 c=None; rx=[]; report=[]
                 def emit(m):
                     report.append(m); self.root.after(0,lambda x=m:(append(x),self.status.set(x)))
                 try:
-                    address=self.selected.get("address") or getattr(self.selected.get("device"),"address",None)
-                    if not address:raise RuntimeError("Seleccioná el reloj primero.")
-                    emit("1/6 · Conexión directa WinRT con pairing Windows…")
-                    c=BleakClient(address,timeout=30,pair=True)
-                    await asyncio.wait_for(c.connect(),timeout=35)
-                    if not c.is_connected:raise RuntimeError("WinRT no confirmó conexión.")
-                    emit("GATT ABIERTO · WinRT directo")
+                    emit("1/6 · Recuperando conexión GATT con las 4 estrategias validadas…")
+                    c,n=await asyncio.wait_for(self.connect_retry(4,emit),timeout=165)
+                    emit(f"GATT ABIERTO · estrategia {n}. Mantengo esta misma sesión para OTA.")
                     emit("2/6 · Suscribiendo FFC2 antes de cualquier TX…")
                     def cb(sender,data):
                         h=bytes(data).hex(); rx.append((time.time(),h))
@@ -614,34 +610,35 @@ class App:
                     await asyncio.wait_for(c.start_notify("f000ffc2-0451-4000-b000-000000000000",cb),timeout=8)
                     await asyncio.sleep(2)
                     emit("3/6 · Baseline FFC2="+str(len(rx))+" paquetes.")
-                    # Only tiny discovery candidates. Stop immediately on any response or disconnect.
                     probes=[b"\x00",b"\x01",b"\x00\x00",b"\x01\x00"]
-                    emit("4/6 · Sondeo de handshake mínimo: "+str(len(probes))+" candidatos.")
+                    emit("4/6 · Handshake mínimo: "+str(len(probes))+" candidatos; stop ante RX o desconexión.")
                     for idx,p in enumerate(probes,1):
                         if not c.is_connected:
-                            emit("REBOOT/DESCONEXIÓN detectada antes del candidato "+str(idx)); break
+                            emit("DESCONEXIÓN/REBOOT antes de TX "+str(idx)); break
                         before=len(rx)
-                        emit("TX FFC1 candidato "+str(idx)+"/"+str(len(probes))+" · "+p.hex())
+                        emit("TX FFC1 "+str(idx)+"/"+str(len(probes))+" · "+p.hex())
                         try:
                             await asyncio.wait_for(c.write_gatt_char("f000ffc1-0451-4000-b000-000000000000",p,response=False),timeout=4)
                         except Exception as ex:
-                            emit("TX ERROR: "+repr(ex)); break
-                        await asyncio.sleep(2)
+                            emit("TX ERROR "+p.hex()+": "+repr(ex)); break
+                        for _ in range(8):
+                            await asyncio.sleep(.25)
+                            if len(rx)>before or not c.is_connected:break
                         if not c.is_connected:
-                            emit("REBOOT/DESCONEXIÓN después de TX "+p.hex()); break
+                            emit("DESCONEXIÓN/REBOOT inmediatamente después de "+p.hex()); break
                         if len(rx)>before:
-                            emit("RESPUESTA OTA detectada tras "+p.hex()+" · detengo sondeo.")
+                            emit("RESPUESTA OTA tras "+p.hex()+" · sondeo detenido.")
                             break
                     emit("5/6 · RX FFC2 total="+str(len(rx)))
                     for n,(ts,h) in enumerate(rx,1):emit("RX#"+str(n)+" "+h)
-                    emit("6/6 · LAB OTA FINALIZADO. Sin transferencia de imagen/flash.")
-                except Exception as ex:emit("LAB OTA ERROR: "+repr(ex))
+                    emit("6/6 · LAB OTA V0.18 FINALIZADO · sin transferencia de imagen/flash.")
+                except Exception as ex:emit("LAB OTA ERROR: "+type(ex).__name__+": "+str(ex))
                 finally:
                     if c:
                         try:await asyncio.wait_for(c.disconnect(),timeout=5)
                         except:pass
                 return report
-            self.run_async(asyncio.wait_for(work(),timeout=90),lambda r,e:append("LAB OTA WATCHDOG: "+repr(e)) if e else append("LAB OTA V0.17 FINALIZADO"))
+            self.run_async(asyncio.wait_for(work(),timeout=190),lambda r,e:append("LAB OTA WATCHDOG: "+repr(e)) if e else append("LAB OTA V0.18 FINALIZADO"))
         ttk.Button(row,text="LAB OTA ACTIVO",command=ota_lab).pack(side="left",padx=4)
 
 
