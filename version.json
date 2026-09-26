@@ -1,1 +1,6 @@
-{"version":"0.13.1","exe_url":"https://github.com/Yakoderaa/reloj/releases/download/latest/RelojLab.exe","notes":"Restaura el botón PREFLIGHT FIRMWARE conservando la reconexión BLE/GATT agresiva y el actualizador anti-cache."}
+{
+  "notes": "Conexión BLE serializada y preflight con progreso e informe exportable. Acceso al bootloader aún no confirmado.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.14.0/RelojLab.exe",
+  "version": "0.14.0",
+  "sha256": "47d89bf9019175cfc40b4c31e6410fb26d1c441610f42b53eabdd24cedbe3f26"
+}
