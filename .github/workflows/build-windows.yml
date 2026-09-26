@@ -1,7 +1,7 @@
 name: Build Windows EXE
 on:
   push:
-    branches: [main, prepare-v0.15.0]
+    branches: [main, prepare-v0.15.0, prepare-v0.16.0]
     paths-ignore: [version.json]
   workflow_dispatch:
 permissions:
