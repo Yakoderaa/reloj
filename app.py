@@ -2,9 +2,9 @@ import asyncio, json, platform, sys, threading, tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
-import urllib.request, tempfile, os, subprocess, time
+import urllib.request, tempfile, os, subprocess, time, hashlib, queue
 
-APP_VERSION="0.13.1"
+APP_VERSION="0.14.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,11 +16,22 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.13.1"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.14.0"); root.geometry("1000x700")
+        self.ui_queue=queue.Queue()
+        self.ble_loop=asyncio.new_event_loop()
+        self.ble_busy=False
+        def bluetooth_worker():
+            asyncio.set_event_loop(self.ble_loop)
+            if sys.platform == "win32":
+                from bleak.backends.winrt.util import uninitialize_sta
+                uninitialize_sta()
+            self.ble_loop.run_forever()
+        threading.Thread(target=bluetooth_worker,daemon=True).start()
+        self.root.after(50,self.drain_ui)
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.13.1 · preflight restaurado + reconexión BLE").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.14.0 · conexión trazable + informe de firmware").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -47,15 +58,37 @@ class App:
         try:self.root.destroy()
         except:pass
 
+    def drain_ui(self):
+        if self.closing:return
+        while True:
+            try:callback=self.ui_queue.get_nowait()
+            except queue.Empty:break
+            try:callback()
+            except tk.TclError:pass
+        self.root.after(50,self.drain_ui)
+
     def run_async(self,coro,done):
-        def worker():
-            try:r=asyncio.run(coro); self.root.after(0,lambda:done(r,None)) if not self.closing else None
-            except Exception as e:self.root.after(0,lambda:done(None,e)) if not self.closing else None
-        threading.Thread(target=worker,daemon=True).start()
+        if self.ble_busy:
+            coro.close()
+            done(None,RuntimeError("Hay una operación Bluetooth en curso. Esperá a que termine."))
+            return
+        self.ble_busy=True
+        self.tree.state(["disabled"])
+        future=asyncio.run_coroutine_threadsafe(coro,self.ble_loop)
+        def finished(f):
+            try:result=f.result(); error=None
+            except BaseException as ex:result=None; error=ex
+            def deliver():
+                self.ble_busy=False
+                self.tree.state(["!disabled"])
+                done(result,error)
+            self.ui_queue.put(deliver)
+        future.add_done_callback(finished)
+
     def run_thread(self,fn,done):
         def w():
             try:r=fn(); self.root.after(0,lambda:done(r,None))
-            except Exception as e:self.root.after(0,lambda:done(None,e))
+            except Exception as e:self.root.after(0,lambda error=e:done(None,error))
         threading.Thread(target=w,daemon=True).start()
     def scan(self):
         self.status.set("Buscando BLE durante 8 segundos…"); self.tree.delete(*self.tree.get_children()); self.devices=[]
@@ -82,8 +115,9 @@ class App:
         "computer":{"platform":platform.platform(),"python":sys.version},"advertisement":{k:v for k,v in self.selected.items() if k!="device"},
         "connection":{"connected":False,"attempts":0},"services":[],"standard_reads":{},"passive_notifications":[],
         "safety":{"writes_performed":0,"firmware_actions":0},"errors":[]}
-    async def connect_retry(self,attempts=4):
+    async def connect_retry(self,attempts=2,progress=None):
         last=None
+        progress=progress or (lambda message:None)
         address=self.selected.get("address") or getattr(self.selected.get("device"),"address",None)
         for i in range(attempts):
             c=None
@@ -91,22 +125,25 @@ class App:
                 # En Windows una referencia BLE vieja puede quedar inutilizable. Cada intento
                 # vuelve a descubrir el dispositivo y conecta contra el objeto recién creado.
                 fresh=None
+                progress(f"Intento {i+1}/{attempts}: buscando el reloj seleccionado (5 s)…")
                 devs=await asyncio.wait_for(BleakScanner.discover(timeout=5),timeout=8)
                 for d in devs:
-                    if getattr(d,"address",None)==address or (getattr(d,"name",None) or "")=="Apple Watch Ultra":
+                    if getattr(d,"address",None)==address:
                         fresh=d; break
                 target=fresh or address or self.selected["device"]
-                c=BleakClient(target,timeout=30)
-                await asyncio.wait_for(c.connect(),timeout=32)
+                progress(f"Intento {i+1}/{attempts}: abriendo GATT (límite 18 s)…")
+                c=BleakClient(target,timeout=16)
+                await asyncio.wait_for(c.connect(),timeout=18)
                 if c.is_connected:
                     _=c.services
                     self.selected["device"]=fresh or self.selected["device"]
                     return c,i+1
-            except Exception as e:last=e
+            except Exception as e:
+                last=e; progress(f"Intento {i+1}: {type(e).__name__}: {e}")
             if c:
                 try:await asyncio.wait_for(c.disconnect(),timeout=4)
                 except:pass
-            await asyncio.sleep(2+i)
+            if i+1<attempts:await asyncio.sleep(1)
         raise RuntimeError("No se pudo abrir GATT tras %d estrategias. Último error: %r"%(attempts,last))
     def diagnose(self):
         if not self.selected:return
@@ -419,40 +456,68 @@ class App:
             self.run_async(asyncio.wait_for(work(),timeout=100),done)
         ttk.Button(row,text="CAPTURA DUAL ROBUSTA",command=dual_capture).pack(side="left",padx=4)
         def firmware_preflight():
-            append("PREFLIGHT V0.13: recuperación GATT agresiva + inventario OTA. Sin escritura de firmware.")
+            if self.ble_busy:
+                append("Ya hay una operación Bluetooth en curso."); return
+            append("PREFLIGHT V0.14: conexión trazable e identificación. No instala otro sistema.")
+            rep=self.base_report()
+            rep["firmware_access"]={"bootloader_confirmed":False,"compatible_image":False,
+                "ready_to_flash":False,"reason":"Faltan hardware confirmado, firmware compatible y protocolo de instalación verificado."}
+            rep["preflight_log"]=[]
             async def work():
-                out=[]; c=None
+                c=None
                 def emit(m):
-                    out.append(m); self.root.after(0,lambda x=m:(append(x),self.status.set(x)))
+                    rep["preflight_log"].append(m)
+                    self.ui_queue.put(lambda x=m:(append(x),self.status.set(x)))
+                async def heartbeat():
+                    started=time.monotonic()
+                    while True:
+                        await asyncio.sleep(5)
+                        emit(f"En curso: {int(time.monotonic()-started)} s")
+                pulse=asyncio.create_task(heartbeat())
                 try:
-                    emit("1/5 · Liberando sesión anterior y reescaneando…")
-                    try:
-                        if self.live_client and self.live_client.is_connected:
-                            await asyncio.wait_for(self.live_client.disconnect(),timeout=4)
-                    except:pass
-                    await asyncio.sleep(2)
-                    emit("2/5 · Abriendo GATT con hasta 4 intentos frescos…")
-                    c,n=await asyncio.wait_for(self.connect_retry(4),timeout=155)
-                    emit(f"GATT ABIERTO · intento {n} · connected={c.is_connected}")
-                    emit("3/5 · Inventariando canal OTA…")
-                    for u in ["f000ffc1-0451-4000-b000-000000000000","f000ffc2-0451-4000-b000-000000000000"]:
-                        ch=c.services.get_characteristic(u)
-                        emit(u+" props="+str(list(ch.properties) if ch else None))
-                    emit("4/5 · Activando FFC2 notify…")
-                    events=[]
-                    try:
-                        await asyncio.wait_for(c.start_notify("f000ffc2-0451-4000-b000-000000000000",lambda sender,d:events.append(bytes(d).hex())),timeout=7)
-                        await asyncio.sleep(4)
-                        emit("FFC2 NOTIFY OK · eventos="+str(len(events)))
-                    except Exception as ex:emit("FFC2 ERROR: "+repr(ex))
-                    emit("5/5 · PRECHECK OTA COMPLETO. FFC1 sigue sin escritura hasta conocer handshake/formato.")
-                except Exception as ex:emit("PREFLIGHT ERROR: "+repr(ex))
+                    emit("1/4 · Abriendo conexión al dispositivo seleccionado…")
+                    c,n=await self.connect_retry(2,emit)
+                    rep["connection"]={"connected":True,"attempts":n}
+                    emit("2/4 · Leyendo identidad del firmware…")
+                    for key,short in [("manufacturer","2a29"),("model","2a24"),("hardware","2a27"),("firmware","2a26"),("software","2a28")]:
+                        uuid=f"0000{short}-0000-1000-8000-00805f9b34fb"
+                        ch=c.services.get_characteristic(uuid)
+                        if ch and "read" in ch.properties:
+                            try:
+                                data=bytes(await asyncio.wait_for(c.read_gatt_char(ch),timeout=4))
+                                rep["standard_reads"][key]={"hex":data.hex(),"text":data.decode("utf-8",errors="replace")}
+                                emit(key+": "+rep["standard_reads"][key]["text"])
+                            except Exception as ex:rep["errors"].append(key+": "+repr(ex))
+                    emit("3/4 · Inventario GATT y canal candidato a OTA…")
+                    for svc in c.services:
+                        rep["services"].append({"uuid":svc.uuid,"characteristics":[{"uuid":ch.uuid,"properties":list(ch.properties)} for ch in svc.characteristics]})
+                    for uuid in NOTIFY_UUIDS:
+                        ch=c.services.get_characteristic(uuid)
+                        if not ch or "notify" not in ch.properties:continue
+                        try:
+                            def notification(sender,data):
+                                rep["passive_notifications"].append({"uuid":str(sender.uuid),"hex":bytes(data).hex()})
+                            await asyncio.wait_for(c.start_notify(ch,notification),timeout=5)
+                            emit("Notificaciones habilitadas: "+uuid)
+                        except Exception as ex:rep["errors"].append(uuid+": "+repr(ex))
+                    await asyncio.sleep(4)
+                    emit("4/4 · Inventario terminado. Acceso al bootloader NO confirmado; firmware alternativo NO disponible.")
+                except Exception as ex:
+                    rep["errors"].append(repr(ex)); emit("No se completó el preflight: "+repr(ex))
                 finally:
+                    pulse.cancel()
+                    await asyncio.gather(pulse,return_exceptions=True)
                     if c:
-                        try:await asyncio.wait_for(c.disconnect(),timeout=5)
-                        except:pass
-                return out
-            self.run_async(asyncio.wait_for(work(),timeout=180),lambda r,e:append("PREFLIGHT WATCHDOG: "+repr(e)) if e else append("PREFLIGHT V0.13 FINALIZADO"))
+                        try:await asyncio.wait_for(c.disconnect(),timeout=4)
+                        except Exception as ex:rep["errors"].append("Desconexión: "+repr(ex))
+                return rep
+            def done(result,error):
+                if error:rep["errors"].append(repr(error))
+                self.report=result or rep
+                self.show()
+                append("Informe disponible en Guardar diagnóstico.")
+                self.status.set("Preflight finalizado con errores." if self.report["errors"] else "Preflight finalizado. Firmware aún no habilitado.")
+            self.run_async(work(),done)
         ttk.Button(row,text="PREFLIGHT FIRMWARE",command=firmware_preflight).pack(side="left",padx=4)
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("Listo. El sondeo 00–0F anterior recibió ACKs pero no produjo acción visible; ahora se mapean campos del frame y tráfico espontáneo.")
@@ -475,6 +540,9 @@ class App:
                     out.write(chunk)
             with open(temp,"rb") as chk:magic=chk.read(2)
             if os.path.getsize(temp)<5_000_000 or magic!=b"MZ":raise RuntimeError("La descarga no es un EXE válido.")
+            if meta.get("sha256"):
+                with open(temp,"rb") as downloaded:digest=hashlib.file_digest(downloaded,"sha256").hexdigest()
+                if digest!=meta["sha256"]:raise RuntimeError("La descarga no coincide con la versión publicada (SHA-256).")
             os.replace(temp,target)
             return ("ready",meta,target)
         def done(r,e):
@@ -498,7 +566,7 @@ class App:
         self.text.delete("1.0","end"); self.text.insert("end",json.dumps(self.report,ensure_ascii=False,indent=2))
     def save(self):
         if not self.report:messagebox.showinfo("Diagnóstico","Primero ejecutá el diagnóstico."); return
-        p=filedialog.asksaveasfilename(defaultextension=".json",filetypes=[("JSON","*.json")],initialfile="reloj-diagnostico-v0.3.json")
+        p=filedialog.asksaveasfilename(defaultextension=".json",filetypes=[("JSON","*.json")],initialfile="reloj-diagnostico-v"+APP_VERSION+".json")
         if p:
             with open(p,"w",encoding="utf-8") as f:json.dump(self.report,f,ensure_ascii=False,indent=2)
             self.status.set("Diagnóstico guardado.")
