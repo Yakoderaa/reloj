@@ -1,6 +1,6 @@
 {
-  "version": "0.20.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.20.0/RelojLab.exe",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.21.0/RelojLab.exe",
+  "sha256": "21266ac7466f9f4b5be879a0fcc7f5ab4be635fd8c016d02a2b1d230938b3cc0",
   "notes": "Conexión BLE serializada y preflight con progreso e informe exportable. Acceso al bootloader aún no confirmado.",
-  "sha256": "8b8395c1092a32faa2fc39dc850d458e19603cde279f0e26d67de2bd702e1581"
+  "version": "0.21.0"
 }
