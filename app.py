@@ -359,7 +359,9 @@ class App:
                     except:pass
                 return out
             self.run_async(work(),lambda r,e: append("ERROR: "+repr(e)) if e else render(r))
-        primary_test=ttk.Button(row,text="▶ PRUEBA V0.26 · CONECTAR + SEGUIR REINICIO OTA")\n        primary_test.pack(side="left",padx=4)\n        ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
+        primary_test=ttk.Button(row,text="PRUEBA V0.26 - CONECTAR + SEGUIR REINICIO OTA")
+        primary_test.pack(side="left",padx=4)
+        ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
         ttk.Button(row,text="MAPEO DIFERENCIAL",command=differential).pack(side="left",padx=4)
         def deep_probe():
             append("SONDEO PROFUNDO: prueba el campo de comando completo y variantes del tipo de frame.")
