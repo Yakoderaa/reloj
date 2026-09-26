@@ -1,6 +1,6 @@
 {
-  "notes": "V0.46: matriz post-OP0B para identificar qué segunda escritura provoca la caída diferida. Copiar diagnóstico permanece como segundo botón.",
-  "version": "0.46.0",
-  "sha256": "0a22ac24390ed736217da5fbabb735c96c48e8f094580a9dd1ee370acac29236",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.46.0/RelojLab.exe"
+  "sha256": "dd0721886939b03b88c07b69b5f94e1928f74028c72270449a1090fafd0ff53f",
+  "version": "0.47.0",
+  "notes": "V0.47: inspección de servicios GATT sin escrituras. Copiar diagnóstico permanece como segundo botón.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.47.0/RelojLab.exe"
 }
