@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue
 
-APP_VERSION="0.19.0"
+APP_VERSION="0.20.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.19"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.20"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -31,7 +31,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.19 · mapa de reinicio OTA + fingerprint post-01").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.20 · recuperación BLE persistente + mapa OTA").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -119,50 +119,55 @@ class App:
         "computer":{"platform":platform.platform(),"python":sys.version},"advertisement":{k:v for k,v in self.selected.items() if k!="device"},
         "connection":{"connected":False,"attempts":0},"services":[],"standard_reads":{},"passive_notifications":[],
         "safety":{"writes_performed":0,"firmware_actions":0},"errors":[]}
-    async def connect_retry(self,attempts=4,progress=None):
+    async def connect_retry(self,attempts=8,progress=None):
         progress=progress or (lambda message:None)
         selected=dict(self.selected or {})
         address=selected.get("address") or getattr(selected.get("device"),"address",None)
         if not address:raise RuntimeError("Seleccioná un reloj en Buscar relojes.")
         last=None
         self.connection_state={"connected":False,"attempts":0,"phase":"starting","strategies":[]}
-        strategies=["BLEDevice seleccionado","BLEDevice redescubierto","Windows pairing + BLEDevice fresco","Dirección directa WinRT"]
-        for i in range(min(attempts,len(strategies))):
-            label=strategies[i]; client=None; connected=False
+        plan=[
+            ("BLEDevice seleccionado",False,False),
+            ("Redescubrimiento fresco",True,False),
+            ("Dirección directa WinRT",False,False),
+            ("Dirección directa WinRT + pairing",False,True),
+            ("Redescubrimiento + pairing",True,True),
+            ("WinRT directo reintento",False,False),
+            ("Escaneo largo + GATT",True,False),
+            ("WinRT pairing final",False,True),
+        ]
+        for i,(label,rediscover,pairing) in enumerate(plan[:attempts]):
+            client=None; connected=False
             self.connection_state.update(attempts=i+1,phase="preparing",strategy=label)
             self.connection_state["strategies"].append(label)
             try:
-                progress(f"ESTRATEGIA {i+1}/{min(attempts,len(strategies))} · {label}")
+                progress(f"ESTRATEGIA {i+1}/{min(attempts,len(plan))} · {label}")
                 target=selected.get("device") if i==0 else None
-                # Never trust a cached BLEDevice that belongs to another address.
-                if target is not None and str(getattr(target,"address","")).casefold()!=str(address).casefold():
-                    target=None
-                if target is None and i<3:
+                if target is not None and str(getattr(target,"address","")).casefold()!=str(address).casefold():target=None
+                if rediscover:
                     self.connection_state["phase"]="scanning"
-                    progress("Buscando anuncio BLE fresco de la dirección seleccionada…")
-                    target=await asyncio.wait_for(BleakScanner.find_device_by_address(address,timeout=10),timeout=12)
-                    if target is None:
-                        raise RuntimeError("RELOJ NO VISIBLE: no se recibió anuncio BLE de "+str(address))
-                    progress("Reloj detectado nuevamente; usando exclusivamente su dirección.")
+                    timeout=18 if i>=6 else 10
+                    progress(f"Escaneo BLE fresco ({timeout}s máx.)…")
+                    target=await asyncio.wait_for(BleakScanner.find_device_by_address(address,timeout=timeout),timeout=timeout+3)
+                    if target is None:raise RuntimeError("RELOJ NO VISIBLE: "+str(address))
+                    self.selected["device"]=target
+                    progress("Anuncio BLE recuperado.")
                 if target is None:target=address
-                pairing=(i>=2)
                 self.connection_state["phase"]="gatt_connect"
-                progress("Abriendo GATT"+(" con pairing Windows…" if pairing else "…"))
-                client=BleakClient(target,timeout=25,pair=pairing)
-                await asyncio.wait_for(client.connect(),timeout=30)
+                progress("Abriendo GATT"+(" + pairing…" if pairing else "…"))
+                client=BleakClient(target,timeout=22,pair=pairing)
+                await asyncio.wait_for(client.connect(),timeout=27)
                 if not client.is_connected:raise RuntimeError("Windows no confirmó is_connected.")
                 self.connection_state["phase"]="services"
-                progress("Enlace BLE abierto; comprobando servicios GATT…")
-                if hasattr(client,"get_services"):
-                    await asyncio.wait_for(client.get_services(),timeout=12)
+                progress("Enlace BLE abierto; validando GATT…")
+                if hasattr(client,"get_services"):await asyncio.wait_for(client.get_services(),timeout=10)
                 _=client.services
                 connected=True
                 if not isinstance(target,str):self.selected["device"]=target
                 self.connection_state.update(connected=True,phase="gatt_open",strategy=label)
                 progress("GATT ABIERTO correctamente con: "+label)
                 return client,i+1
-            except asyncio.CancelledError:
-                raise
+            except asyncio.CancelledError:raise
             except (asyncio.TimeoutError,TimeoutError):
                 last=RuntimeError("TIEMPO DE CONEXIÓN AGOTADO en "+self.connection_state.get("phase","desconocido"))
                 progress(str(last))
@@ -170,13 +175,14 @@ class App:
                 last=ex; progress("FALLÓ "+label+f": {type(ex).__name__}: {ex}")
             finally:
                 if client is not None and not connected:
-                    try:await asyncio.wait_for(client.disconnect(),timeout=4)
+                    try:await asyncio.wait_for(client.disconnect(),timeout=3)
                     except Exception:pass
-            if i+1<min(attempts,len(strategies)):await asyncio.sleep(2)
+            if i+1<min(attempts,len(plan)):
+                wait=3 if self.connection_state.get("phase")=="gatt_connect" else 1
+                progress(f"Recuperación Windows BLE · espera {wait}s…")
+                await asyncio.sleep(wait)
         self.connection_state["error"]=repr(last)
-        if isinstance(last,RuntimeError) and ("RELOJ NO VISIBLE" in str(last) or "TIEMPO DE CONEXIÓN AGOTADO" in str(last)):
-            raise last
-        raise RuntimeError("Todas las estrategias Windows BLE fallaron. Último error: "+repr(last))
+        raise RuntimeError("No se pudo abrir GATT tras "+str(min(attempts,len(plan)))+" estrategias. Último error: "+repr(last))
     def diagnose(self):
         if not self.selected:return
         self.status.set("Conectando y leyendo GATT…")
@@ -508,7 +514,7 @@ class App:
                 pulse=asyncio.create_task(heartbeat())
                 try:
                     emit("1/4 · Probando cuatro rutas de conexión Windows/BLE…")
-                    c,n=await self.connect_retry(4,emit)
+                    c,n=await self.connect_retry(8,emit)
                     rep["connection"]={"connected":True,"attempts":n}
                     emit("2/4 · Leyendo identidad del firmware…")
                     for key,short in [("manufacturer","2a29"),("model","2a24"),("hardware","2a27"),("firmware","2a26"),("software","2a28")]:
@@ -600,8 +606,8 @@ class App:
                 def emit(m):
                     report.append(m); self.root.after(0,lambda x=m:(append(x),self.status.set(x)))
                 try:
-                    emit("1/7 · Recuperando GATT con las estrategias validadas…")
-                    c,n=await asyncio.wait_for(self.connect_retry(4,emit),timeout=165)
+                    emit("1/7 · Recuperando GATT con 8 estrategias y reintentos Windows…")
+                    c,n=await asyncio.wait_for(self.connect_retry(4,emit),timeout=290)
                     emit(f"GATT ABIERTO · estrategia {n}")
                     before_services=sorted(str(x.uuid) for x in c.services)
                     emit("2/7 · Huella previa: "+str(len(before_services))+" servicios · MTU="+str(getattr(c,"mtu_size","?")))
