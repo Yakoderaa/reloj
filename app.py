@@ -126,57 +126,56 @@ class App:
         if not address:raise RuntimeError("Seleccioná un reloj en Buscar relojes.")
         last=None
         self.connection_state={"connected":False,"attempts":0,"phase":"starting","strategies":[]}
-        async def fresh_device():
-            return await asyncio.wait_for(BleakScanner.find_device_by_address(address,timeout=10),timeout=12)
-        strategies=[
-            ("BLEDevice seleccionado",False,False),
-            ("BLEDevice redescubierto",True,False),
-            ("Windows pairing + BLEDevice fresco",True,True),
-            ("Dirección directa WinRT",False,True),
-        ]
-        for i,(label,rediscover,pairing) in enumerate(strategies[:attempts]):
-            client=None; connected=False
+        strategies=["BLEDevice seleccionado","BLEDevice redescubierto","Windows pairing + BLEDevice fresco","Dirección directa WinRT"]
+        for i in range(min(attempts,len(strategies))):
+            label=strategies[i]; client=None; connected=False
             self.connection_state.update(attempts=i+1,phase="preparing",strategy=label)
             self.connection_state["strategies"].append(label)
             try:
                 progress(f"ESTRATEGIA {i+1}/{min(attempts,len(strategies))} · {label}")
-                target=None
-                if rediscover:
+                target=selected.get("device") if i==0 else None
+                # Never trust a cached BLEDevice that belongs to another address.
+                if target is not None and str(getattr(target,"address","")).casefold()!=str(address).casefold():
+                    target=None
+                if target is None and i<3:
                     self.connection_state["phase"]="scanning"
-                    progress("Escaneando anuncio BLE fresco…")
-                    target=await fresh_device()
-                    if target is None:raise RuntimeError("El reloj dejó de anunciarse durante este intento.")
-                elif i==0:
-                    target=selected.get("device")
+                    progress("Buscando anuncio BLE fresco de la dirección seleccionada…")
+                    target=await asyncio.wait_for(BleakScanner.find_device_by_address(address,timeout=10),timeout=12)
+                    if target is None:
+                        raise RuntimeError("RELOJ NO VISIBLE: no se recibió anuncio BLE de "+str(address))
+                    progress("Reloj detectado nuevamente; usando exclusivamente su dirección.")
                 if target is None:target=address
+                pairing=(i>=2)
                 self.connection_state["phase"]="gatt_connect"
-                progress("Abriendo GATT"+(" con solicitud de emparejamiento…" if pairing else "…"))
+                progress("Abriendo GATT"+(" con pairing Windows…" if pairing else "…"))
                 client=BleakClient(target,timeout=25,pair=pairing)
                 await asyncio.wait_for(client.connect(),timeout=30)
                 if not client.is_connected:raise RuntimeError("Windows no confirmó is_connected.")
-                progress("Enlace BLE abierto; esperando tabla GATT…")
                 self.connection_state["phase"]="services"
-                await asyncio.wait_for(client.get_services() if hasattr(client,"get_services") else asyncio.sleep(0),timeout=12)
+                progress("Enlace BLE abierto; comprobando servicios GATT…")
+                if hasattr(client,"get_services"):
+                    await asyncio.wait_for(client.get_services(),timeout=12)
                 _=client.services
                 connected=True
-                self.selected["device"]=target if not isinstance(target,str) else self.selected.get("device")
+                if not isinstance(target,str):self.selected["device"]=target
                 self.connection_state.update(connected=True,phase="gatt_open",strategy=label)
                 progress("GATT ABIERTO correctamente con: "+label)
                 return client,i+1
-            except asyncio.TimeoutError:
-                last=RuntimeError("TIMEOUT en "+self.connection_state.get("phase","desconocido"))
-                progress("FALLÓ "+label+": "+str(last))
+            except asyncio.CancelledError:
+                raise
+            except (asyncio.TimeoutError,TimeoutError):
+                last=RuntimeError("TIEMPO DE CONEXIÓN AGOTADO en "+self.connection_state.get("phase","desconocido"))
+                progress(str(last))
             except Exception as ex:
-                last=ex
-                progress("FALLÓ "+label+f": {type(ex).__name__}: {ex}")
+                last=ex; progress("FALLÓ "+label+f": {type(ex).__name__}: {ex}")
             finally:
                 if client is not None and not connected:
                     try:await asyncio.wait_for(client.disconnect(),timeout=4)
                     except Exception:pass
-            if i+1<min(attempts,len(strategies)):
-                progress("Liberando intento anterior durante 2 s…")
-                await asyncio.sleep(2)
+            if i+1<min(attempts,len(strategies)):await asyncio.sleep(2)
         self.connection_state["error"]=repr(last)
+        if isinstance(last,RuntimeError) and ("RELOJ NO VISIBLE" in str(last) or "TIEMPO DE CONEXIÓN AGOTADO" in str(last)):
+            raise last
         raise RuntimeError("Todas las estrategias Windows BLE fallaron. Último error: "+repr(last))
     def diagnose(self):
         if not self.selected:return
