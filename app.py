@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue
 
-APP_VERSION="0.26.0"
+APP_VERSION="0.27.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.26"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.27"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -28,6 +28,11 @@ class App:
             self.ble_loop.run_forever()
         threading.Thread(target=bluetooth_worker,daemon=True).start()
         self.root.after(50,self.drain_ui)
+        self.state_path=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","window-state.json")
+        self.window_state=self.load_window_state()
+        if self.window_state.get("main_geometry"):
+            try: root.geometry(self.window_state["main_geometry"])
+            except: pass
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
@@ -49,8 +54,22 @@ class App:
         ttk.Label(a,textvariable=self.status).pack(side="right")
         self.text=tk.Text(body,wrap="none",font=("Consolas",9)); self.text.pack(fill="both",expand=True)
         self.text.insert("end","V0.3\n\nMejora de diagnóstico: reintentos y errores legibles.\nCaptura BLE pasiva.\nActualizador automático integrado.\n\nNo escribe al reloj ni inicia actualización de firmware.")
+    def load_window_state(self):
+        try:
+            with open(self.state_path,"r",encoding="utf-8") as fh:return json.load(fh)
+        except:return {}
+    def save_window_state(self,control_geometry=None):
+        try:
+            os.makedirs(os.path.dirname(self.state_path),exist_ok=True)
+            self.window_state["main_geometry"]=self.root.geometry()
+            if control_geometry:self.window_state["control_geometry"]=control_geometry
+            with open(self.state_path,"w",encoding="utf-8") as fh:json.dump(self.window_state,fh)
+        except:pass
+
     def close_app(self):
         if self.closing:return
+        try:self.save_window_state()
+        except:pass
         self.closing=True
         self.status.set("Cerrando…")
         try:self.root.quit()
@@ -299,7 +318,12 @@ class App:
     def open_control(self):
         if not self.selected:
             messagebox.showinfo("Analizador","Primero buscá y seleccioná el reloj."); return
-        w=tk.Toplevel(self.root); w.title("Reloj Lab · Analizador de protocolo"); w.geometry("900x620")
+        w=tk.Toplevel(self.root); w.title("Reloj Lab · Analizador de protocolo"); w.geometry(self.window_state.get("control_geometry","900x620"))
+        def close_control():
+            try:self.save_window_state(w.geometry())
+            except:pass
+            w.destroy()
+        w.protocol("WM_DELETE_WINDOW",close_control)
         ttk.Label(w,text="Analizador B002 → B001",font=("Segoe UI",14,"bold")).pack(anchor="w",padx=12,pady=(12,4))
         ttk.Label(w,text="Captura respuestas completas y compara bytes. El canal OTA FFC1 permanece separado.").pack(anchor="w",padx=12)
         row=ttk.Frame(w,padding=12); row.pack(fill="x")
@@ -359,7 +383,7 @@ class App:
                     except:pass
                 return out
             self.run_async(work(),lambda r,e: append("ERROR: "+repr(e)) if e else render(r))
-        primary_test=ttk.Button(row,text="PRUEBA V0.26 - CONECTAR + SEGUIR REINICIO OTA")
+        primary_test=ttk.Button(row,text="PRUEBA V0.27 - CONECTAR + SEGUIR REINICIO OTA")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
         ttk.Button(row,text="MAPEO DIFERENCIAL",command=differential).pack(side="left",padx=4)
@@ -607,7 +631,7 @@ class App:
             self.run_async(asyncio.wait_for(work(),timeout=190),lambda r,e:append("HUELLA OTA WATCHDOG: "+repr(e)) if e else append("HUELLA OTA V0.16 FINALIZADA"))
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab():
-            append("MAPA OTA V0.26: enlace BLE persistente con escaneo corto, timeouts crecientes y recuperación WinRT; luego sigue el reinicio OTA.")
+            append("MAPA OTA V0.27: conexión serializada, seguimiento de reinicio y recuperación GATT.")
             async def work():
                 c=None; rx=[]; report=[]; address=self.selected.get("address") or getattr(self.selected.get("device"),"address",None)
                 t0=time.monotonic()
@@ -712,15 +736,17 @@ class App:
                         for u in sorted(set(before)|set(post)):
                             if before.get(u)!=post.get(u):emit("DIF GATT "+u+" PRE="+str(before.get(u))+" POST="+str(post.get(u)))
                     if rx:emit("RESPUESTAS FFC2="+str(rx))
-                    emit("MAPA OTA V0.26 FINALIZADO · sin transferencia de firmware.")
+                    emit("MAPA OTA V0.27 FINALIZADO · sin transferencia de firmware.")
                 except Exception as ex:emit("MAPA OTA ERROR: "+type(ex).__name__+": "+str(ex))
                 finally:
                     if c:
                         try:await asyncio.wait_for(c.disconnect(),timeout=5)
                         except:pass
                 return report
-            self.run_async(asyncio.wait_for(work(),timeout=470),lambda r,e:append("MAPA OTA WATCHDOG: "+repr(e)) if e else append("MAPA OTA V0.26 FINALIZADO"))
-        # Bind the already-visible first button now that ota_lab exists.\n        primary_test.configure(command=ota_lab)
+            self.run_async(asyncio.wait_for(work(),timeout=470),lambda r,e:append("MAPA OTA WATCHDOG: "+repr(e)) if e else append("MAPA OTA V0.27 FINALIZADO"))
+        # Bind the already-visible first button now that ota_lab exists.
+        primary_test.configure(command=ota_lab)
+        append("V0.27 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("Listo. El sondeo 00–0F anterior recibió ACKs pero no produjo acción visible; ahora se mapean campos del frame y tráfico espontáneo.")
