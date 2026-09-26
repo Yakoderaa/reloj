@@ -3,8 +3,8 @@ from pathlib import Path
 p = Path("app.py")
 s = p.read_text(encoding="utf-8")
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.41.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.41")', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.42.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.42")', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -20,7 +20,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="PRUEBA V0.41 - AISLAR OP0D")
+        primary_test=ttk.Button(row,text="PRUEBA V0.42 - SECUENCIA 08-0D")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -32,10 +32,10 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("PRUEBA V0.41 NO INICIADA · Bluetooth ocupado. Esperá a que termine y volvé a pulsar el primer botón.")
-                self.status.set("Bluetooth ocupado; esperá y volvé a pulsar PRUEBA V0.41.")
+                append("PRUEBA V0.42 NO INICIADA · Bluetooth ocupado. Esperá a que termine y volvé a pulsar el primer botón.")
+                self.status.set("Bluetooth ocupado; esperá y volvé a pulsar PRUEBA V0.42.")
                 return
-            append("PRUEBA V0.41: A/B OP0C vs OP0D para aislar la caída vista en V0.39.")
+            append("PRUEBA V0.42: compara seis escrituras benignas OP0C contra la secuencia 08→0D con el mismo ritmo.")
             async def work():
                 c=None; report=[]; address=self.selected.get("address") or getattr(self.selected.get("device"),"address",None)
                 t0=time.monotonic()
@@ -100,31 +100,50 @@ new_ota = '''        def ota_lab():
                     await asyncio.wait_for(client.start_notify(FFC2,f_cb),timeout=5)
                     emit(label+" · FFC2 NOTIFY OK")
                     return client,b_rx,f_rx,current
-                async def send_op(client,op,rx,current,wait_s=2.0):
-                    current["op"]=f"{op:02X}"
-                    before=len(rx)
-                    emit(f"TX FFC1 OP {op:02X}")
-                    await asyncio.wait_for(client.write_gatt_char(FFC1,bytes([op]),response=False),timeout=4)
-                    deadline=time.monotonic()+wait_s
-                    while time.monotonic()<deadline and len(rx)==before and client.is_connected:
-                        await asyncio.sleep(.05)
-                    return rx[before:]
+                async def run_sequence(client,label,ops,rx,current,interval=2.5):
+                    out=[]; lost=None
+                    for idx,op in enumerate(ops,1):
+                        if not client.is_connected:
+                            lost={"before_index":idx,"before_op":f"{op:02X}"}
+                            emit(label+" · GATT ya caído antes de "+f"OP {op:02X}")
+                            break
+                        current["op"]=f"{op:02X}"
+                        before=len(rx)
+                        sent=time.monotonic()
+                        emit(f"{label} · TX {idx}/{len(ops)} · OP {op:02X}")
+                        try:
+                            await asyncio.wait_for(client.write_gatt_char(FFC1,bytes([op]),response=False),timeout=4)
+                        except Exception as ex:
+                            lost={"write_error":f"{op:02X}","error":repr(ex)}
+                            emit(label+" · WRITE ERROR · "+repr(ex))
+                            break
+                        while time.monotonic()-sent < interval:
+                            await asyncio.sleep(.1)
+                            if not client.is_connected:
+                                lost={"after_index":idx,"after_op":f"{op:02X}","delta":time.monotonic()-sent}
+                                emit(label+f" · GATT cayó {time.monotonic()-sent:.2f}s después de OP {op:02X}")
+                                break
+                        new=rx[before:]
+                        out.append((f"{op:02X}",[x["rx"] for x in new],bool(client.is_connected)))
+                        emit(label+f" · OP {op:02X} · respuestas="+str(new)+" · GATT="+str(bool(client.is_connected)))
+                        if lost:
+                            break
+                    return out,lost
                 async def observe(client,label,seconds):
-                    start=time.monotonic(); lost=None
-                    last=-1
+                    start=time.monotonic(); lost=None; last=-1
                     while time.monotonic()-start<seconds:
                         await asyncio.sleep(.2)
                         if not client.is_connected:
                             lost=time.monotonic()-start
-                            emit(f"{label} · GATT cayó tras {lost:.2f}s")
+                            emit(f"{label} · GATT cayó {lost:.2f}s después de terminar la secuencia")
                             break
                         e=int(time.monotonic()-start)
-                        if e in (5,10,15,20,25) and e!=last:
-                            last=e; emit(f"{label} · sigue conectado a {e}s")
+                        if e in (5,10,15,20) and e!=last:
+                            last=e; emit(f"{label} · sigue conectado a +{e}s")
                     if lost is None:
-                        emit(f"{label} · sobrevivió {seconds}s conectado")
+                        emit(f"{label} · sobrevivió {seconds}s después de la secuencia")
                     return lost
-                async def scan_after(label,seconds=25):
+                async def scan_after(label,seconds=20):
                     emit(f"{label} · escaneo post-caída {seconds}s")
                     seen=[]
                     deadline=time.monotonic()+seconds
@@ -144,60 +163,70 @@ new_ota = '''        def ota_lab():
                         await asyncio.sleep(.15)
                     return seen
 
-                a_lost=None; b_lost=None; b_adv=[]
+                a_lost=None; b_lost=None; a_results=[]; b_results=[]; b_adv=[]
                 try:
-                    emit("1/8 · FASE A CONTROL: handshake + OP0C único + 25 s.")
+                    emit("1/8 · FASE A CONTROL: OP0C ×6, cada 2.5 s.")
                     c,b_rx,f_rx,current=await setup_session("FASE A")
-                    r=await send_op(c,12,f_rx,current)
-                    emit("FASE A OP0C respuestas="+str(r))
-                    a_lost=await observe(c,"FASE A",25)
+                    a_results,a_seq_lost=await run_sequence(c,"FASE A",[12]*6,f_rx,current,2.5)
+                    if a_seq_lost:
+                        a_lost=("durante",a_seq_lost)
+                    else:
+                        a_post=await observe(c,"FASE A",20)
+                        if a_post is not None:
+                            a_lost=("después",a_post)
                     await disconnect_clean(c); c=None
                     await asyncio.sleep(2)
 
-                    emit("2/8 · FASE B TEST: handshake + OP0D único + 25 s.")
+                    emit("2/8 · FASE B TEST: secuencia OP08→OP0D, mismo número de escrituras y mismo ritmo.")
                     c,b_rx,f_rx,current=await setup_session("FASE B")
-                    r=await send_op(c,13,f_rx,current)
-                    emit("FASE B OP0D respuestas="+str(r))
-                    b_lost=await observe(c,"FASE B",25)
-
-                    emit("3/8 · COMPARACIÓN A/B")
-                    emit("OP0C caída="+str(a_lost))
-                    emit("OP0D caída="+str(b_lost))
-                    if a_lost is None and b_lost is not None:
-                        emit("RESULTADO FUERTE · OP0D provoca la caída diferida y OP0C no.")
-                    elif a_lost is None and b_lost is None:
-                        emit("OP0C y OP0D sobreviven aislados: la caída V0.39 requiere una secuencia/carga acumulada.")
-                    elif a_lost is not None and b_lost is not None:
-                        emit("Ambos caen aislados: la causa no es exclusiva de OP0D.")
+                    b_results,b_seq_lost=await run_sequence(c,"FASE B",list(range(8,14)),f_rx,current,2.5)
+                    if b_seq_lost:
+                        b_lost=("durante",b_seq_lost)
                     else:
-                        emit("Resultado atípico: OP0C cae pero OP0D no.")
+                        b_post=await observe(c,"FASE B",20)
+                        if b_post is not None:
+                            b_lost=("después",b_post)
+
+                    emit("3/8 · COMPARACIÓN CONTROL vs SECUENCIA")
+                    emit("FASE A resultados="+str(a_results))
+                    emit("FASE A caída="+str(a_lost))
+                    emit("FASE B resultados="+str(b_results))
+                    emit("FASE B caída="+str(b_lost))
+                    if a_lost is None and b_lost is not None:
+                        emit("RESULTADO FUERTE · la secuencia 08→0D provoca la caída; seis escrituras OP0C no.")
+                    elif a_lost is not None and b_lost is not None:
+                        emit("Ambas fases caen: el factor probable es carga/cantidad de escrituras FFC1, no la secuencia específica.")
+                    elif a_lost is None and b_lost is None:
+                        emit("Ambas fases sobreviven: la caída V0.39 requiere el preámbulo OP01/05/07 o fue una caída BLE transitoria.")
+                    else:
+                        emit("Resultado atípico: cae el control OP0C pero sobrevive 08→0D.")
 
                     if b_lost is not None:
-                        emit("4/8 · Caída tras OP0D: capturo advertising real sin desconectar manualmente.")
+                        emit("4/8 · FASE B cayó; no desconecto manualmente y capturo advertising.")
                         c=None
-                        b_adv=await scan_after("POST-OP0D",25)
+                        b_adv=await scan_after("POST-SECUENCIA",20)
                     else:
-                        emit("4/8 · OP0D estable; cierro sesión de forma controlada.")
+                        emit("4/8 · FASE B estable; cierro sesión controladamente.")
                         await disconnect_clean(c); c=None
 
-                    emit("5/8 · ADV POST-OP0D="+str(b_adv))
-                    emit("6/8 · Si OP0D es inocuo, la próxima prueba será la secuencia 08→0D contra control.")
+                    emit("5/8 · ADV POST-SECUENCIA="+str(b_adv))
+                    emit("6/8 · Esta prueba igualó cantidad de escrituras y ritmo entre control y secuencia.")
                     emit("7/8 · No se escribió FFC2 ni se transfirió firmware.")
-                    emit("8/8 · PRUEBA V0.41 FINALIZADA")
+                    emit("8/8 · PRUEBA V0.42 FINALIZADA")
                 except Exception as ex:
-                    emit("PRUEBA V0.41 ERROR: "+type(ex).__name__+": "+str(ex))
+                    emit("PRUEBA V0.42 ERROR: "+type(ex).__name__+": "+str(ex))
                 finally:
                     await disconnect_clean(c)
                 return report
-            self.run_async(asyncio.wait_for(work(),timeout=240),lambda r,e:append("PRUEBA V0.41 WATCHDOG: "+repr(e)) if e else append("PRUEBA V0.41 FINALIZADA"))
+            self.run_async(asyncio.wait_for(work(),timeout=260),lambda r,e:append("PRUEBA V0.42 WATCHDOG: "+repr(e)) if e else append("PRUEBA V0.42 FINALIZADA"))
 '''
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.41 LISTA · 1º PRUEBA V0.41; 2º COPIAR DIAGNÓSTICO. Aísla OP0D contra OP0C para explicar la caída de V0.39.")'
+new_ready='append("V0.42 LISTA · 1º PRUEBA V0.42; 2º COPIAR DIAGNÓSTICO. Compara OP0C ×6 contra la secuencia 08→0D al mismo ritmo.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.41 aplicado")
+print("build patch v0.42 aplicado")
