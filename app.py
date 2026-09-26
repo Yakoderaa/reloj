@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue
 
-APP_VERSION="0.15.0"
+APP_VERSION="0.16.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.15"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.16"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -31,7 +31,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.15 · conexión Windows multiestrategia").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.16 · huella OTA + mapa GATT completo").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -552,6 +552,48 @@ class App:
                 self.status.set("Preflight finalizado con errores." if self.report["errors"] else "Preflight finalizado. Firmware aún no habilitado.")
             self.run_async(work(),done)
         ttk.Button(row,text="PREFLIGHT FIRMWARE",command=firmware_preflight).pack(side="left",padx=4)
+        def ota_fingerprint():
+            append("HUELLA OTA V0.16: inventario GATT completo + escucha FFC2. No escribe FFC1.")
+            async def work():
+                c=None; rows=[]
+                def emit(m):
+                    rows.append(m); self.root.after(0,lambda x=m:(append(x),self.status.set(x)))
+                try:
+                    emit("1/5 · Abriendo GATT con la ruta validada…")
+                    c,n=await self.connect_retry(4,emit)
+                    emit(f"2/5 · GATT abierto en intento {n}. Enumerando servicios/características…")
+                    for svc in c.services:
+                        emit("SERVICE "+str(svc.uuid))
+                        for ch in svc.characteristics:
+                            emit("  CHAR "+str(ch.uuid)+" props="+",".join(ch.properties))
+                            for desc in ch.descriptors:
+                                emit("    DESC "+str(desc.uuid)+" handle="+str(desc.handle))
+                    emit("3/5 · Midiendo MTU negociado…")
+                    emit("MTU="+str(getattr(c,"mtu_size","desconocido")))
+                    events=[]
+                    emit("4/5 · Suscribiendo FFC2 durante 12 s…")
+                    try:
+                        def rx(sender,data):
+                            h=bytes(data).hex(); events.append(h)
+                            self.root.after(0,lambda x=h:append("FFC2 RX "+x))
+                        await asyncio.wait_for(c.start_notify("f000ffc2-0451-4000-b000-000000000000",rx),timeout=7)
+                        for sec in range(12):
+                            self.root.after(0,lambda n=12-sec:self.status.set(f"HUELLA OTA · escucha FFC2 · {n}s"))
+                            await asyncio.sleep(1)
+                        try:await c.stop_notify("f000ffc2-0451-4000-b000-000000000000")
+                        except:pass
+                    except Exception as ex:emit("FFC2 LISTEN ERROR: "+repr(ex))
+                    emit("5/5 · HUELLA OTA COMPLETA · paquetes FFC2="+str(len(events)))
+                    if not events:emit("FFC2 quedó silencioso sin una orden previa: necesitamos identificar el handshake antes de escribir.")
+                except Exception as ex:emit("HUELLA OTA ERROR: "+repr(ex))
+                finally:
+                    if c:
+                        try:await asyncio.wait_for(c.disconnect(),timeout=5)
+                        except:pass
+                return rows
+            self.run_async(asyncio.wait_for(work(),timeout=190),lambda r,e:append("HUELLA OTA WATCHDOG: "+repr(e)) if e else append("HUELLA OTA V0.16 FINALIZADA"))
+        ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
+
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("Listo. El sondeo 00–0F anterior recibió ACKs pero no produjo acción visible; ahora se mapean campos del frame y tráfico espontáneo.")
     def check_update(self):
