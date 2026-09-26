@@ -30,3 +30,5 @@ jobs:
           if-no-files-found: error
 
 # rebuild v0.20 after regression fixes
+
+# rebuild v0.20 strict compatibility
