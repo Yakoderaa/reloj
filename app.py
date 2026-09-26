@@ -126,7 +126,7 @@ class App:
         if not address:raise RuntimeError("Seleccioná un reloj en Buscar relojes.")
         last=None
         self.connection_state={"connected":False,"attempts":0,"phase":"starting","strategies":[]}
-        plan=[
+        # Preserve the strict one-attempt behavior used by diagnostics/tests.\n        if attempts==1:\n            target=selected.get("device")\n            if target is not None and str(getattr(target,"address","")).casefold()!=str(address).casefold():target=None\n            if target is None:\n                progress("Buscando anuncio BLE fresco de la dirección seleccionada…")\n                target=await asyncio.wait_for(BleakScanner.find_device_by_address(address,timeout=10),timeout=12)\n                if target is None:raise RuntimeError("RELOJ NO VISIBLE: no se recibió anuncio BLE de "+str(address))\n            client=BleakClient(target,timeout=25)\n            try:\n                await asyncio.wait_for(client.connect(),timeout=30)\n                if not client.is_connected:raise RuntimeError("Windows no confirmó is_connected.")\n                _=client.services\n                return client,1\n            except Exception:\n                try:await client.disconnect()\n                except:pass\n                raise\n        plan=[
             ("BLEDevice seleccionado",False,False),
             ("Redescubrimiento fresco",True,False),
             ("Dirección directa WinRT",False,False),
