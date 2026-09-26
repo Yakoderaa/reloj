@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.28.0/RelojLab.exe",
-  "notes": "Conexión BLE serializada y preflight con progreso e informe exportable. Acceso al bootloader aún no confirmado.",
-  "sha256": "a53860291987b4a79478f1c4a90b75ddd73bf3384b115cf7ceb05c2abf4df5f0",
-  "version": "0.28.0"
+  "sha256": "104c5ce7ad089fc120d6fa43879dfff42631118ab3cb8aa45738b15897f50ce5",
+  "notes": "V0.29: recuperación GATT post-boot más paciente y botón Copiar diagnóstico como segundo botón.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.29.0/RelojLab.exe",
+  "version": "0.29.0"
 }
