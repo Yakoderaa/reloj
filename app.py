@@ -142,7 +142,7 @@ class App:
             self.connection_state["strategies"].append(label)
             try:
                 progress(f"ESTRATEGIA {i+1}/{min(attempts,len(plan))} · {label}")
-                target=selected.get("device") if i==0 else None
+                target=selected.get("device") if (i==0 or attempts==1) else None
                 if target is not None and str(getattr(target,"address","")).casefold()!=str(address).casefold():target=None
                 if rediscover:
                     self.connection_state["phase"]="scanning"
