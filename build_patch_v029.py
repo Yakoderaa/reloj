@@ -3,8 +3,8 @@ from pathlib import Path
 p = Path("app.py")
 s = p.read_text(encoding="utf-8")
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.40.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.40")', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.41.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.41")', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -20,7 +20,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="PRUEBA V0.40 - AISLAR OP07")
+        primary_test=ttk.Button(row,text="PRUEBA V0.41 - AISLAR OP0D")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -32,10 +32,10 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("PRUEBA V0.40 NO INICIADA · Bluetooth ocupado. Esperá a que termine y volvé a pulsar el primer botón.")
-                self.status.set("Bluetooth ocupado; esperá y volvé a pulsar PRUEBA V0.40.")
+                append("PRUEBA V0.41 NO INICIADA · Bluetooth ocupado. Esperá a que termine y volvé a pulsar el primer botón.")
+                self.status.set("Bluetooth ocupado; esperá y volvé a pulsar PRUEBA V0.41.")
                 return
-            append("PRUEBA V0.40: A/B OP05 vs OP07. Busca si OP07 provoca una caída diferida de la sesión.")
+            append("PRUEBA V0.41: A/B OP0C vs OP0D para aislar la caída vista en V0.39.")
             async def work():
                 c=None; report=[]; address=self.selected.get("address") or getattr(self.selected.get("device"),"address",None)
                 t0=time.monotonic()
@@ -44,8 +44,6 @@ new_ota = '''        def ota_lab():
                 FFC1="f000ffc1-0451-4000-b000-000000000000"
                 FFC2="f000ffc2-0451-4000-b000-000000000000"
                 HANDSHAKE=bytes.fromhex("00ff000101150000010010000000010000000000")
-                KNOWN05="0600040000000000"
-                KNOWN07="0800010001"
                 def emit(m):
                     stamp=time.monotonic()-t0
                     line=f"+{stamp:06.2f}s · {m}"
@@ -102,7 +100,7 @@ new_ota = '''        def ota_lab():
                     await asyncio.wait_for(client.start_notify(FFC2,f_cb),timeout=5)
                     emit(label+" · FFC2 NOTIFY OK")
                     return client,b_rx,f_rx,current
-                async def send_op(client,op,rx,current,wait_s=2.5):
+                async def send_op(client,op,rx,current,wait_s=2.0):
                     current["op"]=f"{op:02X}"
                     before=len(rx)
                     emit(f"TX FFC1 OP {op:02X}")
@@ -111,23 +109,22 @@ new_ota = '''        def ota_lab():
                     while time.monotonic()<deadline and len(rx)==before and client.is_connected:
                         await asyncio.sleep(.05)
                     return rx[before:]
-                async def observe_link(client,label,seconds):
-                    start=time.monotonic()
-                    lost=None
+                async def observe(client,label,seconds):
+                    start=time.monotonic(); lost=None
+                    last=-1
                     while time.monotonic()-start<seconds:
-                        await asyncio.sleep(.25)
+                        await asyncio.sleep(.2)
                         if not client.is_connected:
                             lost=time.monotonic()-start
                             emit(f"{label} · GATT cayó tras {lost:.2f}s")
                             break
-                        elapsed=int(time.monotonic()-start)
-                        if elapsed and elapsed%10==0:
-                            emit(f"{label} · sigue conectado a {elapsed}s")
-                            await asyncio.sleep(.15)
+                        e=int(time.monotonic()-start)
+                        if e in (5,10,15,20,25) and e!=last:
+                            last=e; emit(f"{label} · sigue conectado a {e}s")
                     if lost is None:
                         emit(f"{label} · sobrevivió {seconds}s conectado")
                     return lost
-                async def scan_transition(label,seconds=30):
+                async def scan_after(label,seconds=25):
                     emit(f"{label} · escaneo post-caída {seconds}s")
                     seen=[]
                     deadline=time.monotonic()+seconds
@@ -147,69 +144,60 @@ new_ota = '''        def ota_lab():
                         await asyncio.sleep(.15)
                     return seen
 
-                phase_a_lost=None; phase_b_lost=None; phase_b_adv=[]
+                a_lost=None; b_lost=None; b_adv=[]
                 try:
-                    emit("1/8 · FASE A CONTROL: handshake B002 + OP05 único + 35 s sin más escrituras.")
+                    emit("1/8 · FASE A CONTROL: handshake + OP0C único + 25 s.")
                     c,b_rx,f_rx,current=await setup_session("FASE A")
-                    resp=await send_op(c,5,f_rx,current)
-                    emit("FASE A OP05="+str(resp))
-                    if not resp or resp[0]["rx"]!=KNOWN05:
-                        emit("STOP · OP05 no coincide con la firma conocida.")
-                        return report
-                    phase_a_lost=await observe_link(c,"FASE A",35)
+                    r=await send_op(c,12,f_rx,current)
+                    emit("FASE A OP0C respuestas="+str(r))
+                    a_lost=await observe(c,"FASE A",25)
                     await disconnect_clean(c); c=None
                     await asyncio.sleep(2)
 
-                    emit("2/8 · FASE B TEST: handshake B002 + OP07 único + 35 s sin más escrituras.")
+                    emit("2/8 · FASE B TEST: handshake + OP0D único + 25 s.")
                     c,b_rx,f_rx,current=await setup_session("FASE B")
-                    resp=await send_op(c,7,f_rx,current)
-                    emit("FASE B OP07="+str(resp))
-                    if not resp or resp[0]["rx"]!=KNOWN07:
-                        emit("STOP · OP07 no coincide con la firma conocida.")
-                        return report
-                    op07_sent=time.monotonic()
-                    phase_b_lost=await observe_link(c,"FASE B",35)
+                    r=await send_op(c,13,f_rx,current)
+                    emit("FASE B OP0D respuestas="+str(r))
+                    b_lost=await observe(c,"FASE B",25)
 
                     emit("3/8 · COMPARACIÓN A/B")
-                    emit("FASE A caída="+str(phase_a_lost))
-                    emit("FASE B caída="+str(phase_b_lost))
-                    if phase_a_lost is None and phase_b_lost is not None:
-                        emit("RESULTADO FUERTE · OP07 provoca una caída diferida que OP05 no provoca.")
-                    elif phase_a_lost is None and phase_b_lost is None:
-                        emit("OP05 y OP07 sobrevivieron 35 s; la caída V0.39 no fue causada por OP07 por sí solo.")
-                    elif phase_a_lost is not None and phase_b_lost is not None:
-                        emit("Ambas fases cayeron; no se puede atribuir la caída exclusivamente a OP07.")
+                    emit("OP0C caída="+str(a_lost))
+                    emit("OP0D caída="+str(b_lost))
+                    if a_lost is None and b_lost is not None:
+                        emit("RESULTADO FUERTE · OP0D provoca la caída diferida y OP0C no.")
+                    elif a_lost is None and b_lost is None:
+                        emit("OP0C y OP0D sobreviven aislados: la caída V0.39 requiere una secuencia/carga acumulada.")
+                    elif a_lost is not None and b_lost is not None:
+                        emit("Ambos caen aislados: la causa no es exclusiva de OP0D.")
                     else:
-                        emit("Resultado atípico: cayó OP05 pero no OP07.")
+                        emit("Resultado atípico: OP0C cae pero OP0D no.")
 
-                    if phase_b_lost is not None:
-                        emit("4/8 · OP07 produjo caída; NO desconecto manualmente. Capturo advertising real posterior.")
+                    if b_lost is not None:
+                        emit("4/8 · Caída tras OP0D: capturo advertising real sin desconectar manualmente.")
                         c=None
-                        phase_b_adv=await scan_transition("POST-OP07",30)
+                        b_adv=await scan_after("POST-OP0D",25)
                     else:
-                        emit("4/8 · OP07 no produjo caída en 35 s; cierro sesión de forma controlada.")
+                        emit("4/8 · OP0D estable; cierro sesión de forma controlada.")
                         await disconnect_clean(c); c=None
 
-                    emit("5/8 · ADV POST-OP07="+str(phase_b_adv))
-                    emit("6/8 · TIEMPO DESDE OP07 A CAÍDA="+str(phase_b_lost))
-                    if phase_b_lost is not None and 14 <= phase_b_lost <= 24:
-                        emit("VENTANA DETECTADA · caída entre 14–24 s, consistente con el retraso observado en V0.39.")
+                    emit("5/8 · ADV POST-OP0D="+str(b_adv))
+                    emit("6/8 · Si OP0D es inocuo, la próxima prueba será la secuencia 08→0D contra control.")
                     emit("7/8 · No se escribió FFC2 ni se transfirió firmware.")
-                    emit("8/8 · PRUEBA V0.40 FINALIZADA")
+                    emit("8/8 · PRUEBA V0.41 FINALIZADA")
                 except Exception as ex:
-                    emit("PRUEBA V0.40 ERROR: "+type(ex).__name__+": "+str(ex))
+                    emit("PRUEBA V0.41 ERROR: "+type(ex).__name__+": "+str(ex))
                 finally:
                     await disconnect_clean(c)
                 return report
-            self.run_async(asyncio.wait_for(work(),timeout=260),lambda r,e:append("PRUEBA V0.40 WATCHDOG: "+repr(e)) if e else append("PRUEBA V0.40 FINALIZADA"))
+            self.run_async(asyncio.wait_for(work(),timeout=240),lambda r,e:append("PRUEBA V0.41 WATCHDOG: "+repr(e)) if e else append("PRUEBA V0.41 FINALIZADA"))
 '''
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.40 LISTA · 1º PRUEBA V0.40; 2º COPIAR DIAGNÓSTICO. Aísla si OP07 causa la caída diferida observada en V0.39.")'
+new_ready='append("V0.41 LISTA · 1º PRUEBA V0.41; 2º COPIAR DIAGNÓSTICO. Aísla OP0D contra OP0C para explicar la caída de V0.39.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.40 aplicado")
+print("build patch v0.41 aplicado")
