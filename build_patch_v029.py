@@ -3,8 +3,8 @@ from pathlib import Path
 p = Path("app.py")
 s = p.read_text(encoding="utf-8")
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.35.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.35")', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.36.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.36")', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -20,7 +20,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="PRUEBA V0.35 - PERFILAR OAD")
+        primary_test=ttk.Button(row,text="PRUEBA V0.36 - IDENTIFICAR PROTOCOLO OTA")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -32,10 +32,10 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("PRUEBA V0.35 NO INICIADA · Bluetooth ocupado. Esperá a que termine la operación actual y volvé a pulsar el primer botón.")
-                self.status.set("Bluetooth ocupado; esperá y volvé a pulsar PRUEBA V0.35.")
+                append("PRUEBA V0.36 NO INICIADA · Bluetooth ocupado. Esperá a que termine la operación actual y volvé a pulsar el primer botón.")
+                self.status.set("Bluetooth ocupado; esperá y volvé a pulsar PRUEBA V0.36.")
                 return
-            append("PRUEBA V0.35: identifica hardware/firmware y perfila respuestas FFC1→FFC2 sin enviar bloques de firmware.")
+            append("PRUEBA V0.36: perfila el formato real de Image Identify usando sólo cabeceras inválidas; no envía bloques de firmware.")
             async def work():
                 c=None; report=[]; address=self.selected.get("address") or getattr(self.selected.get("device"),"address",None)
                 t0=time.monotonic()
@@ -44,17 +44,6 @@ new_ota = '''        def ota_lab():
                 FFC1="f000ffc1-0451-4000-b000-000000000000"
                 FFC2="f000ffc2-0451-4000-b000-000000000000"
                 HANDSHAKE=bytes.fromhex("00ff000101150000010010000000010000000000")
-                DIS=[
-                    ("SYSTEM_ID","00002a23-0000-1000-8000-00805f9b34fb"),
-                    ("MODEL","00002a24-0000-1000-8000-00805f9b34fb"),
-                    ("SERIAL","00002a25-0000-1000-8000-00805f9b34fb"),
-                    ("FIRMWARE","00002a26-0000-1000-8000-00805f9b34fb"),
-                    ("HARDWARE","00002a27-0000-1000-8000-00805f9b34fb"),
-                    ("SOFTWARE","00002a28-0000-1000-8000-00805f9b34fb"),
-                    ("MANUFACTURER","00002a29-0000-1000-8000-00805f9b34fb"),
-                    ("IEEE_11073","00002a2a-0000-1000-8000-00805f9b34fb"),
-                    ("PNP_ID","00002a50-0000-1000-8000-00805f9b34fb"),
-                ]
                 def emit(m):
                     stamp=time.monotonic()-t0
                     line=f"+{stamp:06.2f}s · {m}"
@@ -89,12 +78,10 @@ new_ota = '''        def ota_lab():
                         try: await asyncio.wait_for(client.disconnect(),timeout=4)
                         except Exception: pass
 
-                b001_rx=[]; ffc2_rx=[]; probe_results=[]
-                current_probe={"label":"—","hex":"—"}
+                b001_rx=[]; ffc2_rx=[]; current={"label":"—","hex":"—"}
                 try:
-                    emit("1/8 · Abriendo GATT fresco.")
+                    emit("1/8 · Abriendo GATT fresco y estableciendo handshake B002.")
                     c=await connect_fresh("CONEXIÓN")
-                    emit("2/8 · Estableciendo handshake B002 validado.")
                     def b001_cb(sender,data):
                         h=bytes(data).hex(); b001_rx.append((time.monotonic()-t0,h))
                         self.root.after(0,lambda x=h:append("B001 RX "+x))
@@ -108,87 +95,100 @@ new_ota = '''        def ota_lab():
                     if not c.is_connected:
                         raise RuntimeError("GATT cayó durante handshake")
 
-                    emit("3/8 · Leyendo identidad estándar del dispositivo.")
-                    for label,uuid in DIS:
-                        try:
-                            ch=c.services.get_characteristic(uuid)
-                            if not ch:
-                                emit(label+" · no presente"); continue
-                            raw=bytes(await asyncio.wait_for(c.read_gatt_char(ch),timeout=4))
-                            txt=raw.decode("utf-8",errors="replace").strip(chr(0))
-                            emit(label+f" · hex={raw.hex()} · texto={txt!r}")
-                        except Exception as ex:
-                            emit(label+" · ERROR "+type(ex).__name__+": "+str(ex))
-
-                    emit("4/8 · Inventario exacto FFC1/FFC2.")
-                    for uuid,label in [(FFC1,"FFC1"),(FFC2,"FFC2")]:
-                        ch=c.services.get_characteristic(uuid)
-                        if ch:
-                            emit(label+f" · handle={getattr(ch,'handle','?')} · props={list(ch.properties)} · descriptors="+str([(str(d.uuid),getattr(d,'handle','?')) for d in ch.descriptors]))
-                        else:
-                            emit(label+" · NO PRESENTE")
-
-                    emit("5/8 · Suscribiendo FFC2. Sólo haré sondas FFC1 de 1 byte; no se enviarán bloques.")
+                    emit("2/8 · Suscribiendo FFC2.")
                     def ffc2_cb(sender,data):
-                        raw=bytes(data); h=raw.hex()
-                        evt={"t":time.monotonic()-t0,"probe":current_probe["label"],"tx":current_probe["hex"],"rx":h,"len":len(raw)}
+                        raw=bytes(data)
+                        evt={"t":time.monotonic()-t0,"probe":current["label"],"tx":current["hex"],"rx":raw.hex(),"len":len(raw)}
                         ffc2_rx.append(evt)
                         self.root.after(0,lambda e=evt:append("FFC2 RX · "+str(e)))
                     await asyncio.wait_for(c.start_notify(FFC2,ffc2_cb),timeout=5)
                     emit("FFC2 NOTIFY OK")
 
-                    probes=[("FFC1=01",bytes([1])),("FFC1=00",bytes([0])),("FFC1=02",bytes([2])),("FFC1=FF",bytes([255]))]
+                    emit("3/8 · Consulta base FFC1=01 para capturar la firma actual.")
+                    current["label"]="QUERY_01"; current["hex"]="01"
+                    before=len(ffc2_rx)
+                    await asyncio.wait_for(c.write_gatt_char(FFC1,bytes([1]),response=False),timeout=4)
+                    deadline=time.monotonic()+3
+                    while time.monotonic()<deadline and len(ffc2_rx)==before and c.is_connected:
+                        await asyncio.sleep(.05)
+                    base_events=ffc2_rx[before:]
+                    emit("QUERY_01 respuestas="+str(base_events))
+                    base_rx=base_events[0]["rx"] if base_events else None
+                    if base_rx:
+                        raw=bytes.fromhex(base_rx)
+                        if len(raw)==11:
+                            field_3_6=int.from_bytes(raw[3:7],"little")
+                            emit(f"FIRMA 11B · cmd={raw[0]:02x} · status={raw[1]:02x} · campo2={raw[2]:02x} · campo[3:7]_LE=0x{field_3_6:08x} ({field_3_6}) · cola={raw[7:].hex()}")
+                            if field_3_6==1048576:
+                                emit("HEURÍSTICA · campo[3:7] equivale a 1 MiB; podría describir tamaño/espacio de imagen, aún no confirmado.")
+
+                    emit("4/8 · Probando longitudes de cabecera inválida. Sólo FFC1; nunca escribo FFC2.")
+                    probes=[
+                        ("INVALID_8_ZERO",bytes(8)),
+                        ("INVALID_12_ZERO",bytes(12)),
+                        ("INVALID_16_ZERO",bytes(16)),
+                        ("INVALID_16_FF",bytes([255])*16),
+                        ("INVALID_TI16_ZERO_LENGTH",bytes.fromhex("0000ffff0000000045454545000001ff")),
+                    ]
+                    results=[]
                     stop=False
                     for label,payload in probes:
                         if stop or not c.is_connected:
                             break
+                        current["label"]=label; current["hex"]=payload.hex()
                         before=len(ffc2_rx)
-                        current_probe["label"]=label; current_probe["hex"]=payload.hex()
-                        emit("6/8 · TX "+label+" · payload="+payload.hex())
+                        emit(f"TX {label} · len={len(payload)} · {payload.hex()}")
                         try:
                             await asyncio.wait_for(c.write_gatt_char(FFC1,payload,response=False),timeout=4)
                         except Exception as ex:
-                            emit(label+" · WRITE ERROR "+type(ex).__name__+": "+str(ex))
-                            probe_results.append((label,"write_error",repr(ex))); continue
-                        deadline=time.monotonic()+3
-                        while time.monotonic()<deadline and len(ffc2_rx)==before and c.is_connected:
+                            results.append((label,"WRITE_ERROR",repr(ex)))
+                            emit(label+" · WRITE ERROR · "+type(ex).__name__+": "+str(ex))
+                            continue
+                        wait_until=time.monotonic()+3
+                        while time.monotonic()<wait_until and len(ffc2_rx)==before and c.is_connected:
                             await asyncio.sleep(.05)
                         new=ffc2_rx[before:]
-                        probe_results.append((label,[x["rx"] for x in new]))
+                        results.append((label,[x["rx"] for x in new]))
                         emit(label+" · respuestas="+str(new))
                         for evt in new:
-                            if evt["len"]<=2:
-                                emit("STOP SEGURIDAD · respuesta FFC2 de <=2 bytes: puede ser solicitud de bloque OAD. No envío nada más.")
+                            if evt["len"]<=4:
+                                emit("STOP SEGURIDAD · respuesta corta compatible con status/block request. No pruebo más cabeceras.")
                                 stop=True
                                 break
-                        await asyncio.sleep(1)
+                            if base_rx and evt["rx"]!=base_rx:
+                                emit("RESPUESTA NUEVA · difiere de QUERY_01; protocolo discrimina la forma de la cabecera.")
+                        await asyncio.sleep(.8)
 
-                    emit("7/8 · Comparando respuestas.")
+                    emit("5/8 · Verificando si GATT sigue vivo después de las cabeceras inválidas.")
+                    emit("GATT vivo="+str(bool(c and c.is_connected)))
+                    emit("6/8 · RESULTADOS="+str(results))
                     unique=sorted({x["rx"] for x in ffc2_rx})
-                    emit("FFC2 RESPUESTAS ÚNICAS="+str(unique))
-                    emit("PROBES="+str(probe_results))
-                    if len(unique)==1 and unique:
-                        emit("Todas las sondas respondieron igual: FFC1 parece exponer una consulta/identidad estable en este firmware.")
-                    elif len(unique)>1:
-                        emit("FFC1 cambia la respuesta según el byte de entrada: hay semántica de comando/identidad por mapear.")
-                    elif not unique:
-                        emit("Sin respuestas FFC2: el canal OAD no respondió durante esta sesión.")
+                    emit("FFC2 ÚNICAS="+str(unique))
 
-                    emit("8/8 · PRUEBA V0.35 FINALIZADA · sin escrituras FFC2 y sin transferencia de firmware.")
+                    emit("7/8 · INTERPRETACIÓN AUTOMÁTICA")
+                    probe_responses=[(label,r) for label,r in results if isinstance(r,list) and r]
+                    if any(any(len(bytes.fromhex(h))<=4 for h in vals) for label,vals in probe_responses):
+                        emit("Hay respuesta corta a una cabecera larga: comportamiento compatible con validación OAD/bloque. Se detuvo antes de transferir datos.")
+                    elif probe_responses:
+                        emit("Las cabeceras largas generan respuesta, pero no una solicitud corta de bloque: el perfil es probablemente una variante propietaria.")
+                    else:
+                        emit("Sólo QUERY_01 responde; las cabeceras TI inválidas son ignoradas. Esto apunta a un protocolo propietario sobre UUIDs OAD reutilizados.")
+
+                    emit("8/8 · PRUEBA V0.36 FINALIZADA · cero escrituras FFC2, cero bloques de firmware.")
                 except Exception as ex:
-                    emit("PRUEBA V0.35 ERROR: "+type(ex).__name__+": "+str(ex))
+                    emit("PRUEBA V0.36 ERROR: "+type(ex).__name__+": "+str(ex))
                 finally:
                     await disconnect_clean(c)
                 return report
-            self.run_async(asyncio.wait_for(work(),timeout=220),lambda r,e:append("PRUEBA V0.35 WATCHDOG: "+repr(e)) if e else append("PRUEBA V0.35 FINALIZADA"))
+            self.run_async(asyncio.wait_for(work(),timeout=220),lambda r,e:append("PRUEBA V0.36 WATCHDOG: "+repr(e)) if e else append("PRUEBA V0.36 FINALIZADA"))
 '''
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.35 LISTA · 1º PRUEBA V0.35; 2º COPIAR DIAGNÓSTICO. Lee identidad y perfila FFC1→FFC2 sin enviar firmware.")'
+new_ready='append("V0.36 LISTA · 1º PRUEBA V0.36; 2º COPIAR DIAGNÓSTICO. Distingue TI OAD clásico de protocolo propietario sin enviar firmware.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.35 aplicado")
+print("build patch v0.36 aplicado")
