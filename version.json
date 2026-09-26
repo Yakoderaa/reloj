@@ -1,6 +1,6 @@
 {
-  "sha256": "104c5ce7ad089fc120d6fa43879dfff42631118ab3cb8aa45738b15897f50ce5",
   "notes": "V0.29: recuperación GATT post-boot más paciente y botón Copiar diagnóstico como segundo botón.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.29.0/RelojLab.exe",
-  "version": "0.29.0"
+  "sha256": "b2507771231fb097196ecad903b894b7ee1b7c3fb16a9f0184e68dc638dbf569",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.30.0/RelojLab.exe",
+  "version": "0.30.0"
 }
