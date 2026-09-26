@@ -137,7 +137,7 @@ new_ota = '''        def ota_lab():
                     await asyncio.wait_for(c.start_notify(FFC2,ffc2_cb),timeout=5)
                     emit("FFC2 NOTIFY OK")
 
-                    probes=[("FFC1=01",b"\x01"),("FFC1=00",b"\x00"),("FFC1=02",b"\x02"),("FFC1=FF",b"\xff")]
+                    probes=[("FFC1=01",bytes([1])),("FFC1=00",bytes([0])),("FFC1=02",bytes([2])),("FFC1=FF",bytes([255]))]
                     stop=False
                     for label,payload in probes:
                         if stop or not c.is_connected:
