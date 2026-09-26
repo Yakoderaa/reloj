@@ -1,6 +1,6 @@
 {
-  "notes": "V0.40: aislamiento OP07 con control OP05 y captura de advertising posterior. Copiar diagnóstico permanece como segundo botón.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.40.0/RelojLab.exe",
-  "version": "0.40.0",
-  "sha256": "88cd8b7a52e9f918e54898d80aa111b5e08968919859aee377d97b36e44752c8"
+  "notes": "V0.41: aislamiento OP0D vs OP0C. Copiar diagnóstico permanece como segundo botón.",
+  "sha256": "b2f2b876026ade37e3a663707f1587a0dd51f770b804529f70eae5a8aef256bb",
+  "version": "0.41.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.41.0/RelojLab.exe"
 }
