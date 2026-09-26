@@ -3,8 +3,8 @@ from pathlib import Path
 p = Path("app.py")
 s = p.read_text(encoding="utf-8")
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.44.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.44")', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.45.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.45")', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -20,7 +20,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="PRUEBA V0.44 - CONTEXTO DE 0C")
+        primary_test=ttk.Button(row,text="PRUEBA V0.45 - AISLAR OP0B")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -32,10 +32,10 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("PRUEBA V0.44 NO INICIADA · Bluetooth ocupado. Esperá a que termine y volvé a pulsar el primer botón.")
-                self.status.set("Bluetooth ocupado; esperá y volvé a pulsar PRUEBA V0.44.")
+                append("PRUEBA V0.45 NO INICIADA · Bluetooth ocupado. Esperá a que termine y volvé a pulsar el primer botón.")
+                self.status.set("Bluetooth ocupado; esperá y volvé a pulsar PRUEBA V0.45.")
                 return
-            append("PRUEBA V0.44: busca el contexto mínimo que hace peligroso OP0C, empezando por 0B→0C.")
+            append("PRUEBA V0.45: aísla si OP0B solo arma la caída o si necesita una segunda escritura.")
             async def work():
                 c=None; report=[]; address=self.selected.get("address") or getattr(self.selected.get("device"),"address",None)
                 t0=time.monotonic()
@@ -155,68 +155,78 @@ new_ota = '''        def ota_lab():
                     return seen
 
                 cases=[
-                    ("CONTROL 0B→0B",[0x0B,0x0B]),
-                    ("CASO 1 · 0B→0C",[0x0B,0x0C]),
-                    ("CASO 2 · 0A→0B→0C",[0x0A,0x0B,0x0C]),
-                    ("CASO 3 · 09→0A→0B→0C",[0x09,0x0A,0x0B,0x0C]),
-                    ("CASO 4 · 08→09→0A→0B→0C",[0x08,0x09,0x0A,0x0B,0x0C]),
+                    ("CONTROL 0 · SOLO HANDSHAKE",[]),
+                    ("CONTROL 1 · 0A→0A",[0x0A,0x0A]),
+                    ("CONTROL 2 · 0C→0C",[0x0C,0x0C]),
+                    ("CASO 1 · 0B SOLO",[0x0B]),
+                    ("CASO 2 · 0B→0A",[0x0B,0x0A]),
+                    ("CASO 3 · 0B→0C",[0x0B,0x0C]),
+                    ("CASO 4 · 0B→0B",[0x0B,0x0B]),
                 ]
                 summary=[]; trigger=None; adv=[]
                 try:
-                    emit("1/9 · V0.43 demostró: 08→0B estable; 08→0C cae. Ahora minimizo el contexto previo a OP0C.")
+                    emit("1/10 · V0.44 mostró que 0B→0B puede hacer caer GATT. Ahora separo caída natural, opcode 0B y segunda escritura.")
                     for idx,(label,ops) in enumerate(cases,1):
-                        emit(f"2/9 · FASE {idx}/5 · {label} · ops="+str([f"{x:02X}" for x in ops]))
+                        emit(f"2/10 · FASE {idx}/7 · {label} · ops="+str([f"{x:02X}" for x in ops]))
                         c,b_rx,f_rx,current=await setup_session(label)
                         results,lost=await run_prefix(c,label,ops,f_rx,current,2.5)
                         summary.append((label,results,lost))
                         emit(label+" · caída="+str(lost))
-                        if idx==1 and lost is not None:
+                        if lost is not None:
                             trigger=(label,ops,lost)
-                            emit("CONTROL INESPERADO · 0B→0B también provoca caída; no atribuyo todavía el efecto a 0C.")
-                            c=None
-                            adv=await scan_after("POST-"+label,20)
-                            break
-                        if idx>1 and lost is not None:
-                            trigger=(label,ops,lost)
-                            emit("CONTEXTO MÍNIMO DISPARADOR · "+str(trigger))
+                            if idx==1:
+                                emit("RESULTADO CRÍTICO · cae incluso sin escribir FFC1: la caída pertenece a la sesión/handshake y no a OP0B.")
+                            elif idx in (2,3):
+                                emit("CONTROL INESPERADO · también cae un opcode repetido distinto de 0B; investigar repetición/estado general.")
+                            elif idx==4:
+                                emit("RESULTADO FUERTE · un solo OP0B basta para armar la caída diferida.")
+                            elif idx==5:
+                                emit("RESULTADO FUERTE · OP0B solo sobrevive, pero 0B→0A cae: cualquier segunda escritura tras 0B puede disparar el estado.")
+                            elif idx==6:
+                                emit("RESULTADO · 0B→0A sobrevive pero 0B→0C cae: la transición 0B→0C tiene efecto especial.")
+                            else:
+                                emit("RESULTADO FUERTE · solo 0B→0B cayó entre los casos probados: la repetición de OP0B es el disparador mínimo observado.")
                             c=None
                             adv=await scan_after("POST-"+label,20)
                             break
                         await disconnect_clean(c); c=None
                         await asyncio.sleep(2)
 
-                    emit("3/9 · RESUMEN CASOS="+str(summary))
-                    emit("4/9 · TRIGGER="+str(trigger))
-                    if trigger and trigger[0]=="CASO 1 · 0B→0C":
-                        emit("5/9 · RESULTADO FUERTE · 0B→0B sobrevivió y 0B→0C cayó: la transición 0B→0C es suficiente.")
-                    elif trigger and trigger[0].startswith("CASO 2"):
-                        emit("5/9 · RESULTADO · 0B→0C solo no basta; hace falta al menos el contexto 0A→0B→0C.")
-                    elif trigger and trigger[0].startswith("CASO 3"):
-                        emit("5/9 · RESULTADO · hace falta al menos el contexto 09→0A→0B→0C.")
-                    elif trigger and trigger[0].startswith("CASO 4"):
-                        emit("5/9 · RESULTADO · el disparador requiere el prefijo completo conocido 08→09→0A→0B→0C.")
-                    elif trigger:
-                        emit("5/9 · RESULTADO · cayó el control 0B→0B; hay estado interno adicional por aislar.")
+                    emit("3/10 · RESUMEN CASOS="+str(summary))
+                    emit("4/10 · TRIGGER="+str(trigger))
+                    emit("5/10 · ADV POST-TRIGGER="+str(adv))
+                    if trigger is None:
+                        emit("6/10 · Ningún caso cayó en 22 s; la V0.44 pudo depender de estado residual/intermitencia.")
+                    elif trigger[0]=="CONTROL 0 · SOLO HANDSHAKE":
+                        emit("6/10 · HIPÓTESIS · la sesión GATT/handshake puede tener timeout propio independiente de FFC1.")
+                    elif trigger[0].startswith("CONTROL"):
+                        emit("6/10 · HIPÓTESIS · la caída no es exclusiva de OP0B; revisar patrón de escrituras y estado interno.")
+                    elif trigger[0]=="CASO 1 · 0B SOLO":
+                        emit("6/10 · HIPÓTESIS · OP0B inicia por sí solo un estado diferido que termina cerrando GATT.")
+                    elif trigger[0]=="CASO 2 · 0B→0A":
+                        emit("6/10 · HIPÓTESIS · OP0B arma estado y una segunda escritura cualquiera lo completa.")
+                    elif trigger[0]=="CASO 3 · 0B→0C":
+                        emit("6/10 · HIPÓTESIS · OP0C completa un estado iniciado por OP0B.")
                     else:
-                        emit("5/9 · RESULTADO · ningún caso reprodujo la caída; el efecto depende de estado previo o es intermitente.")
-                    emit("6/9 · ADV POST-TRIGGER="+str(adv))
-                    emit("7/9 · Cada caso usó sesión nueva, mismo handshake, ritmo 2.5 s y observación 22 s.")
-                    emit("8/9 · No se escribió FFC2 ni se transfirió firmware.")
-                    emit("9/9 · PRUEBA V0.44 FINALIZADA")
+                        emit("6/10 · HIPÓTESIS · la repetición consecutiva de OP0B es el disparador mínimo observado.")
+                    emit("7/10 · Cada fase usa sesión nueva, mismo handshake, ritmo 2.5 s y observación 22 s.")
+                    emit("8/10 · No se escribió FFC2 ni se transfirió firmware.")
+                    emit("9/10 · La próxima prueba se elegirá directamente según el primer caso que caiga.")
+                    emit("10/10 · PRUEBA V0.45 FINALIZADA")
                 except Exception as ex:
-                    emit("PRUEBA V0.44 ERROR: "+type(ex).__name__+": "+str(ex))
+                    emit("PRUEBA V0.45 ERROR: "+type(ex).__name__+": "+str(ex))
                 finally:
                     await disconnect_clean(c)
                 return report
-            self.run_async(asyncio.wait_for(work(),timeout=360),lambda r,e:append("PRUEBA V0.44 WATCHDOG: "+repr(e)) if e else append("PRUEBA V0.44 FINALIZADA"))
+            self.run_async(asyncio.wait_for(work(),timeout=480),lambda r,e:append("PRUEBA V0.45 WATCHDOG: "+repr(e)) if e else append("PRUEBA V0.45 FINALIZADA"))
 '''
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.44 LISTA · 1º PRUEBA V0.44; 2º COPIAR DIAGNÓSTICO. Aísla el contexto mínimo que hace caer GATT al llegar a OP0C.")'
+new_ready='append("V0.45 LISTA · 1º PRUEBA V0.45; 2º COPIAR DIAGNÓSTICO. Aísla si OP0B solo o una segunda escritura provoca la caída.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.44 aplicado")
+print("build patch v0.45 aplicado")
