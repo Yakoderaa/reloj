@@ -1,7 +1,7 @@
 name: Build Windows EXE
 on:
   push:
-    branches: [main]
+    branches: [main, prepare-v0.21.0]
     paths-ignore: [version.json]
   workflow_dispatch:
 permissions:
@@ -28,27 +28,3 @@ jobs:
           name: RelojLab-Windows
           path: dist/RelojLab.exe
           if-no-files-found: error
-      - name: Publish verified EXE then announce update
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $releaseVersion = python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); print(next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)))"
-          $releaseTag = "v$releaseVersion"
-          gh release view $releaseTag *> $null
-          if ($LASTEXITCODE -eq 0) { throw "La versión ya existe; no se reemplazan ejecutables publicados." }
-          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "Conexión BLE serializada, progreso por intento e informe de firmware. No instala un sistema operativo alternativo."
-          if ($LASTEXITCODE -ne 0) { throw "Falló la publicación del EXE" }
-          New-Item -ItemType Directory -Path verified | Out-Null
-          gh release download $releaseTag --pattern RelojLab.exe --dir verified
-          if ($LASTEXITCODE -ne 0) { throw "No se pudo verificar la descarga publicada" }
-          $expectedHash = (Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
-          if ((Get-FileHash verified/RelojLab.exe -Algorithm SHA256).Hash.ToLower() -ne $expectedHash) { throw "SHA-256 publicado incorrecto" }
-          $metadata = @{version=$releaseVersion; exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe"; sha256=$expectedHash; notes="Conexión BLE serializada y preflight con progreso e informe exportable. Acceso al bootloader aún no confirmado."}
-          $metadata | ConvertTo-Json | Set-Content -Encoding utf8NoBOM version.json
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add version.json
-          git commit -m "Publish verified $releaseTag update metadata"
-          git push origin HEAD:main
-          if ($LASTEXITCODE -ne 0) { throw "EXE disponible pero actualización no anunciada" }
