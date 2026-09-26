@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue
 
-APP_VERSION="0.23.0"
+APP_VERSION="0.24.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.23"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.24"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -31,7 +31,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.23 · recuperación BLE post-reinicio + seguimiento OTA").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.24 · huella exacta del reinicio + recuperación post-OTA").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -597,7 +597,7 @@ class App:
             self.run_async(asyncio.wait_for(work(),timeout=190),lambda r,e:append("HUELLA OTA WATCHDOG: "+repr(e)) if e else append("HUELLA OTA V0.16 FINALIZADA"))
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab():
-            append("MAPA OTA V0.23: recuperación BLE en 8 intentos reales; después sigue FFC1=01, reinicio, advertising y GATT post-arranque.")
+            append("MAPA OTA V0.24: mide el reinicio real, registra cada transición de advertising y espera una recuperación GATT estable.")
             async def work():
                 c=None; rx=[]; report=[]; address=self.selected.get("address") or getattr(self.selected.get("device"),"address",None)
                 t0=time.monotonic()
@@ -635,7 +635,7 @@ class App:
                     except:pass
                     c=None
                     emit("5/8 · Siguiendo advertising durante 45 s…")
-                    first_seen=None; last_seen=None; snapshots={}
+                    first_seen=None; last_seen=None; snapshots={}; presence=[]; was_seen=None; seen_count=0; missing_count=0
                     deadline=time.monotonic()+45
                     while time.monotonic()<deadline:
                         try:
@@ -651,14 +651,32 @@ class App:
                                     matched=True; now=time.monotonic()-t0
                                     if first_seen is None:first_seen=now; emit("REAPARECIÓ advertising: "+repr(name))
                                     last_seen=now; snapshots[(name,uuids,mfg)]=now
-                            if not matched and first_seen is None:pass
+                            if matched:
+                                seen_count+=1; missing_count=0
+                                if was_seen is not True:
+                                    presence.append((time.monotonic()-t0,"VISIBLE")); emit("TRANSICIÓN ADV · VISIBLE")
+                                was_seen=True
+                            else:
+                                missing_count+=1; seen_count=0
+                                if missing_count>=2 and was_seen is not False:
+                                    presence.append((time.monotonic()-t0,"AUSENTE")); emit("TRANSICIÓN ADV · AUSENTE")
+                                    was_seen=False
                         except Exception as ex:emit("SCAN parcial: "+type(ex).__name__+": "+str(ex))
                         await asyncio.sleep(.25)
-                    emit("6/8 · Huellas advertising="+str(len(snapshots)))
+                    emit("6/8 · Huellas advertising="+str(len(snapshots))+" · transiciones="+str(presence))
                     for (name,uuids,mfg),ts in snapshots.items():emit(f"ADV @{ts:.2f}s name={name!r} services={list(uuids)} mfg={dict(mfg)}")
-                    emit("7/8 · Reintentando GATT post-reinicio hasta 90 s…")
+                    emit("7/8 · Reintentando GATT post-reinicio; primero espero advertising estable…")
+                    stable=0
+                    for _ in range(18):
+                        try:
+                            t=await asyncio.wait_for(BleakScanner.find_device_by_address(address,timeout=3),timeout=5)
+                            stable=stable+1 if t is not None else 0
+                            if stable>=2:
+                                emit("ADV ESTABLE · dos detecciones consecutivas"); break
+                        except Exception:stable=0
+                        await asyncio.sleep(2)
                     post=None
-                    for attempt in range(1,7):
+                    for attempt in range(1,9):
                         try:
                             target=await asyncio.wait_for(BleakScanner.find_device_by_address(address,timeout=8),timeout=10)
                             if target is None:raise RuntimeError("sin anuncio")
@@ -684,14 +702,14 @@ class App:
                         for u in sorted(set(before)|set(post)):
                             if before.get(u)!=post.get(u):emit("DIF GATT "+u+" PRE="+str(before.get(u))+" POST="+str(post.get(u)))
                     if rx:emit("RESPUESTAS FFC2="+str(rx))
-                    emit("MAPA OTA V0.23 FINALIZADO · sin transferencia de firmware.")
+                    emit("MAPA OTA V0.24 FINALIZADO · sin transferencia de firmware.")
                 except Exception as ex:emit("MAPA OTA ERROR: "+type(ex).__name__+": "+str(ex))
                 finally:
                     if c:
                         try:await asyncio.wait_for(c.disconnect(),timeout=5)
                         except:pass
                 return report
-            self.run_async(asyncio.wait_for(work(),timeout=470),lambda r,e:append("MAPA OTA WATCHDOG: "+repr(e)) if e else append("MAPA OTA V0.23 FINALIZADO"))
+            self.run_async(asyncio.wait_for(work(),timeout=470),lambda r,e:append("MAPA OTA WATCHDOG: "+repr(e)) if e else append("MAPA OTA V0.24 FINALIZADO"))
         ttk.Button(row,text="SEGUIR REINICIO OTA",command=ota_lab).pack(side="left",padx=4)
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
