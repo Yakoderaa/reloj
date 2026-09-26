@@ -359,7 +359,7 @@ class App:
                     except:pass
                 return out
             self.run_async(work(),lambda r,e: append("ERROR: "+repr(e)) if e else render(r))
-        ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
+        primary_test=ttk.Button(row,text="▶ PRUEBA V0.26 · CONECTAR + SEGUIR REINICIO OTA")\n        primary_test.pack(side="left",padx=4)\n        ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
         ttk.Button(row,text="MAPEO DIFERENCIAL",command=differential).pack(side="left",padx=4)
         def deep_probe():
             append("SONDEO PROFUNDO: prueba el campo de comando completo y variantes del tipo de frame.")
@@ -718,7 +718,7 @@ class App:
                         except:pass
                 return report
             self.run_async(asyncio.wait_for(work(),timeout=470),lambda r,e:append("MAPA OTA WATCHDOG: "+repr(e)) if e else append("MAPA OTA V0.26 FINALIZADO"))
-        # V0.26: the requested test is always the first control in the row.\n        ttk.Button(row,text="▶ PRUEBA V0.26 · CONECTAR + SEGUIR REINICIO OTA",command=ota_lab).pack(side="left",padx=4)
+        # Bind the already-visible first button now that ota_lab exists.\n        primary_test.configure(command=ota_lab)
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("Listo. El sondeo 00–0F anterior recibió ACKs pero no produjo acción visible; ahora se mapean campos del frame y tráfico espontáneo.")
