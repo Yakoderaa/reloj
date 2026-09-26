@@ -1,6 +1,6 @@
 {
-  "sha256": "b2a72fa2b095dc429fa857fe22d360ccd9a7557518dad0ca717353a677f091b7",
-  "notes": "V0.36: identificación segura del protocolo OTA FFC1/FFC2. Copiar diagnóstico permanece como segundo botón.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.36.0/RelojLab.exe",
-  "version": "0.36.0"
+  "sha256": "7383de931336af0925c2992ca2007f0c42b3b7b9407467fb7b715d9ff160b6fb",
+  "notes": "V0.37: mapa seguro de opcodes FFC1 03-0F. Copiar diagnóstico permanece como segundo botón.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.37.0/RelojLab.exe",
+  "version": "0.37.0"
 }
