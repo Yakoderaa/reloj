@@ -3,8 +3,8 @@ from pathlib import Path
 p = Path("app.py")
 s = p.read_text(encoding="utf-8")
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.46.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.46")', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.47.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.47")', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -20,7 +20,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="PRUEBA V0.46 - MATRIZ POST-0B")
+        primary_test=ttk.Button(row,text="INSPECCIONAR SERVICIOS V0.47")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -32,192 +32,45 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("PRUEBA V0.46 NO INICIADA · Bluetooth ocupado. Esperá a que termine y volvé a pulsar el primer botón.")
-                self.status.set("Bluetooth ocupado; esperá y volvé a pulsar PRUEBA V0.46.")
+                append("INSPECCIÓN V0.47 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("PRUEBA V0.46: mapea qué segunda escritura después de OP0B provoca la caída diferida.")
+            append("V0.47 · dos inventarios GATT de lectura, sin comandos ni suscripciones.")
             async def work():
-                c=None; report=[]; address=self.selected.get("address") or getattr(self.selected.get("device"),"address",None)
-                t0=time.monotonic()
-                B001="0000b001-0000-1000-8000-00805f9b34fb"
-                B002="0000b002-0000-1000-8000-00805f9b34fb"
-                FFC1="f000ffc1-0451-4000-b000-000000000000"
-                FFC2="f000ffc2-0451-4000-b000-000000000000"
-                HANDSHAKE=bytes.fromhex("00ff000101150000010010000000010000000000")
-                def emit(m):
-                    stamp=time.monotonic()-t0
-                    line=f"+{stamp:06.2f}s · {m}"
-                    report.append(line)
-                    self.root.after(0,lambda x=line:(append(x),self.status.set(x)))
-                async def connect_fresh(label,window=90):
-                    deadline=time.monotonic()+window; attempt=0
-                    while time.monotonic()<deadline:
-                        try:
-                            target=await asyncio.wait_for(BleakScanner.find_device_by_address(address,timeout=4),timeout=6)
-                            if target is None:
-                                await asyncio.sleep(.4); continue
-                            attempt+=1
-                            emit(f"{label} · intento {attempt} · DEVICE + CACHE OFF")
-                            client=BleakClient(target,timeout=14,winrt={"use_cached_services":False})
-                            try:
-                                await asyncio.wait_for(client.connect(),timeout=16)
-                                if not client.is_connected:
-                                    raise RuntimeError("is_connected=False")
-                                emit(f"{label} · GATT OK · MTU={getattr(client,'mtu_size','?')}")
-                                return client
-                            except Exception as ex:
-                                emit(f"{label} · intento {attempt} FALLÓ · {type(ex).__name__}: {ex}")
-                                try: await asyncio.wait_for(client.disconnect(),timeout=2)
-                                except Exception: pass
-                        except Exception as ex:
-                            emit(f"{label} · búsqueda parcial · {type(ex).__name__}: {ex}")
-                        await asyncio.sleep(.5)
-                    raise RuntimeError(label+" · no conectó dentro de la ventana")
-                async def disconnect_clean(client):
-                    if client:
-                        try: await asyncio.wait_for(client.disconnect(),timeout=4)
-                        except Exception: pass
-                async def setup_session(label):
-                    client=await connect_fresh(label+" CONEXIÓN")
-                    b_rx=[]; f_rx=[]; current={"op":"--"}
-                    def b_cb(sender,data):
-                        h=bytes(data).hex(); b_rx.append((time.monotonic()-t0,h))
-                        self.root.after(0,lambda x=h,l=label:append(l+" B001 RX "+x))
-                    def f_cb(sender,data):
-                        raw=bytes(data)
-                        evt={"t":time.monotonic()-t0,"op":current["op"],"rx":raw.hex(),"len":len(raw)}
-                        f_rx.append(evt)
-                        self.root.after(0,lambda e=evt,l=label:append(l+" FFC2 RX · "+str(e)))
-                    await asyncio.wait_for(client.start_notify(B001,b_cb),timeout=5)
-                    await asyncio.wait_for(client.write_gatt_char(B002,HANDSHAKE,response=False),timeout=4)
-                    emit(label+" · TX B002 HANDSHAKE")
-                    ack_deadline=time.monotonic()+4
-                    while time.monotonic()<ack_deadline and not b_rx:
-                        await asyncio.sleep(.1)
-                    emit(label+" · HANDSHAKE ACK="+str(b_rx[-1] if b_rx else None))
-                    if not client.is_connected:
-                        raise RuntimeError(label+" · GATT cayó durante handshake")
-                    await asyncio.wait_for(client.start_notify(FFC2,f_cb),timeout=5)
-                    emit(label+" · FFC2 NOTIFY OK")
-                    return client,b_rx,f_rx,current
-                async def run_prefix(client,label,ops,rx,current,interval=2.5):
-                    results=[]
-                    for idx,op in enumerate(ops,1):
-                        if not client.is_connected:
-                            return results,("durante",{"before":f"{op:02X}","index":idx})
-                        current["op"]=f"{op:02X}"
-                        before=len(rx); sent=time.monotonic()
-                        emit(f"{label} · TX {idx}/{len(ops)} · OP {op:02X}")
-                        try:
-                            await asyncio.wait_for(client.write_gatt_char(FFC1,bytes([op]),response=False),timeout=4)
-                        except Exception as ex:
-                            return results,("write_error",repr(ex))
-                        while time.monotonic()-sent<interval:
-                            await asyncio.sleep(.1)
-                            if not client.is_connected:
-                                delta=time.monotonic()-sent
-                                emit(f"{label} · GATT cayó {delta:.2f}s después de OP {op:02X}")
-                                results.append((f"{op:02X}",[x["rx"] for x in rx[before:]],False))
-                                return results,("durante",{"after":f"{op:02X}","delta":delta})
-                        new=rx[before:]
-                        results.append((f"{op:02X}",[x["rx"] for x in new],True))
-                        emit(label+f" · OP {op:02X} · respuestas="+str(new)+" · GATT=True")
-                    start=time.monotonic(); last=-1
-                    while time.monotonic()-start<22:
-                        await asyncio.sleep(.2)
-                        if not client.is_connected:
-                            lost=time.monotonic()-start
-                            emit(f"{label} · GATT cayó {lost:.2f}s después de terminar el prefijo")
-                            return results,("después",lost)
-                        e=int(time.monotonic()-start)
-                        if e in (5,10,15,20) and e!=last:
-                            last=e; emit(f"{label} · sigue conectado a +{e}s")
-                    emit(label+" · sobrevivió 22s después del prefijo")
-                    return results,None
-                async def scan_after(label,seconds=20):
-                    emit(f"{label} · escaneo post-caída {seconds}s")
-                    seen=[]
-                    deadline=time.monotonic()+seconds
-                    while time.monotonic()<deadline:
-                        try:
-                            found=await asyncio.wait_for(BleakScanner.discover(timeout=1.0,return_adv=True),timeout=2.5)
-                            items=found.values() if isinstance(found,dict) else []
-                            for dev,adv in items:
-                                name=(getattr(dev,"name",None) or getattr(adv,"local_name",None) or "")
-                                addr=str(getattr(dev,"address",None) or "")
-                                if addr.casefold()==str(address).casefold() or "apple watch" in name.casefold():
-                                    sig=(addr,name,tuple(sorted(getattr(adv,"service_uuids",None) or [])),{str(k):bytes(v).hex() for k,v in (getattr(adv,"manufacturer_data",None) or {}).items()})
-                                    if sig not in seen:
-                                        seen.append(sig); emit(label+" ADV · "+str(sig))
-                        except Exception as ex:
-                            emit(label+" scan parcial · "+type(ex).__name__+": "+str(ex))
-                        await asyncio.sleep(.15)
-                    return seen
-
-                cases=[
-                    ("CONTROL · 0A→0A",[0x0A,0x0A]),
-                    ("POST-0B · 00",[0x0B,0x00]),
-                    ("POST-0B · 05",[0x0B,0x05]),
-                    ("POST-0B · 07",[0x0B,0x07]),
-                    ("POST-0B · 08",[0x0B,0x08]),
-                    ("POST-0B · 09",[0x0B,0x09]),
-                    ("POST-0B · 0A",[0x0B,0x0A]),
-                    ("POST-0B · 0B",[0x0B,0x0B]),
-                    ("POST-0B · 0C",[0x0B,0x0C]),
-                    ("POST-0B · 0D",[0x0B,0x0D]),
-                    ("POST-0B · 0F",[0x0B,0x0F]),
-                ]
-                summary=[]; falls=[]; survives=[]
+                snapshots=[]
+                def emit(line):
+                    self.ui_queue.put(lambda x=line:append(x))
                 try:
-                    emit("1/9 · V0.45 probó que OP0B solo sobrevive pero 0B→0A cae. Ahora pruebo varios segundos opcodes sin detenerme en la primera caída.")
-                    total=len(cases)
-                    for idx,(label,ops) in enumerate(cases,1):
-                        emit(f"2/9 · FASE {idx}/{total} · {label} · ops="+str([f"{x:02X}" for x in ops]))
-                        c,b_rx,f_rx,current=await setup_session(label)
-                        results,lost=await run_prefix(c,label,ops,f_rx,current,2.5)
-                        summary.append((label,results,lost))
-                        emit(label+" · caída="+str(lost))
-                        if lost is None:
-                            survives.append(label)
-                            await disconnect_clean(c); c=None
-                            await asyncio.sleep(2)
-                        else:
-                            falls.append((label,lost))
-                            c=None
-                            emit(label+" · CAÍDA REGISTRADA · continúo con una sesión nueva.")
-                            await asyncio.sleep(2)
-
-                    emit("3/9 · RESUMEN CASOS="+str(summary))
-                    emit("4/9 · CAEN="+str(falls))
-                    emit("5/9 · SOBREVIVEN="+str(survives))
-                    post_cases=[x for x in summary if x[0].startswith("POST-0B")]
-                    post_falls=[x for x in post_cases if x[2] is not None]
-                    post_survive=[x for x in post_cases if x[2] is None]
-                    if len(post_falls)==len(post_cases) and post_cases:
-                        emit("6/9 · RESULTADO FUERTE · todos los segundos opcodes probados después de OP0B provocaron caída; el valor del segundo opcode no parece ser el factor principal.")
-                    elif post_falls and post_survive:
-                        emit("6/9 · RESULTADO SELECTIVO · después de OP0B algunos opcodes caen y otros sobreviven; el valor del segundo opcode sí importa.")
-                    elif not post_falls:
-                        emit("6/9 · RESULTADO · ninguno de los segundos opcodes reprodujo la caída; revisar timing/estado residual de V0.45.")
-                    else:
-                        emit("6/9 · RESULTADO · matriz incompleta.")
-                    emit("7/9 · Cada caso usa sesión nueva, mismo handshake, intervalo 2.5 s y observación 22 s.")
-                    emit("8/9 · No se escribió FFC2 ni se transfirió firmware.")
-                    emit("9/9 · PRUEBA V0.46 FINALIZADA")
-                except Exception as ex:
-                    emit("PRUEBA V0.46 ERROR: "+type(ex).__name__+": "+str(ex))
+                    for index in range(2):
+                        emit(f"INSPECCIÓN {index+1}/2")
+                        snapshot=await self.inspect_gatt_snapshot(emit)
+                        snapshots.append(snapshot)
+                        if index==0: await asyncio.sleep(3)
+                    self.report=self.base_report()
+                    self.report["gatt_snapshots"]=snapshots
+                    self.report["errors"]=[error for snap in snapshots for error in snap["errors"]]
+                    emit("RESUMEN · "+str([{"present":x.get("present"),"errors":x["errors"]} for x in snapshots]))
+                    return snapshots
                 finally:
-                    await disconnect_clean(c)
-                return report
-            self.run_async(asyncio.wait_for(work(),timeout=720),lambda r,e:append("PRUEBA V0.46 WATCHDOG: "+repr(e)) if e else append("PRUEBA V0.46 FINALIZADA"))
+                    emit("INSPECCIÓN TERMINADA · sin escrituras de características ni firmware.")
+            def done(result,error):
+                if error:
+                    append("INSPECCIÓN V0.47 INTERRUMPIDA · "+repr(error))
+                    return
+                if any(snap["errors"] for snap in result):
+                    append("INSPECCIÓN V0.47 COMPLETADA CON ERRORES · copiá el diagnóstico.")
+                else:
+                    append("INSPECCIÓN V0.47 COMPLETADA · copiá el diagnóstico.")
+            self.run_async(work(),done)
 '''
+
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.46 LISTA · 1º PRUEBA V0.46; 2º COPIAR DIAGNÓSTICO. Mapea qué segundos opcodes después de OP0B hacen caer GATT.")'
+new_ready='append("V0.47 LISTA · 1º INSPECCIONAR SERVICIOS; 2º COPIAR DIAGNÓSTICO. Registra los servicios disponibles y si B001 está presente.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
 
+s=s.replace("    def open_control(self):", '    async def inspect_gatt_snapshot(self,emit):\n        address=(self.selected or {}).get("address")\n        if not address: raise RuntimeError("Seleccioná el reloj primero.")\n        client=None\n        snapshot={"services":[],"errors":[],"connected":False}\n        try:\n            target=await asyncio.wait_for(BleakScanner.find_device_by_address(address,timeout=8),timeout=10)\n            if target is None: raise RuntimeError("El reloj seleccionado no está visible.")\n            client=BleakClient(target,timeout=15,winrt={"use_cached_services":False})\n            await asyncio.wait_for(client.connect(),timeout=18)\n            if not client.is_connected: raise RuntimeError("GATT no conectado")\n            snapshot["connected"]=True\n            present=set()\n            for svc in client.services:\n                entry={"uuid":svc.uuid,"characteristics":[]}\n                emit("SERVICIO "+svc.uuid)\n                for ch in svc.characteristics:\n                    present.add(ch.uuid.lower())\n                    row={"uuid":ch.uuid,"handle":ch.handle,"properties":list(ch.properties)}\n                    entry["characteristics"].append(row)\n                    emit("  CARACTERÍSTICA "+str(row))\n                snapshot["services"].append(entry)\n            expected={"B001":"0000b001-0000-1000-8000-00805f9b34fb","B002":"0000b002-0000-1000-8000-00805f9b34fb","FFC1":"f000ffc1-0451-4000-b000-000000000000","FFC2":"f000ffc2-0451-4000-b000-000000000000"}\n            snapshot["present"]={name:uuid in present for name,uuid in expected.items()}\n            emit("PRESENCIA "+str(snapshot["present"]))\n            if not snapshot["present"]["B001"]:\n                emit("B001 AUSENTE en esta enumeración. Causa pendiente; no confirma modo OTA.")\n        except asyncio.CancelledError: raise\n        except Exception as ex:\n            snapshot["errors"].append(type(ex).__name__+": "+str(ex))\n            emit("ERROR DE INSPECCIÓN · "+snapshot["errors"][-1])\n        finally:\n            if client is not None:\n                try: await asyncio.wait_for(client.disconnect(),timeout=4)\n                except Exception as ex:\n                    snapshot["errors"].append("Cierre: "+repr(ex))\n                    emit("ERROR DE CIERRE · "+repr(ex))\n        return snapshot\n' + "\n    def open_control(self):",1)
 p.write_text(s,encoding="utf-8")
-print("build patch v0.46 aplicado")
+print("build patch v0.47 aplicado")
