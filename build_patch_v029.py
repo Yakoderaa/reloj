@@ -3,8 +3,8 @@ from pathlib import Path
 p = Path("app.py")
 s = p.read_text(encoding="utf-8")
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.32.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.32")', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.33.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.33")', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -20,7 +20,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="PRUEBA V0.32 - ENCONTRAR KEEPALIVE")
+        primary_test=ttk.Button(row,text="PRUEBA V0.33 - HANDSHAKE B002")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -31,18 +31,23 @@ start = s.index("        def ota_lab():")
 end = s.index("        # Bind the already-visible first button now that ota_lab exists.", start)
 
 new_ota = '''        def ota_lab():
-            append("PRUEBA V0.32: compara tráfico de lectura contra suscripción B001 para descubrir qué mantiene viva la sesión BLE.")
+            if self.ble_busy:
+                append("PRUEBA V0.33 NO INICIADA · Bluetooth ocupado. Esperá a que termine la operación actual y volvé a pulsar el primer botón.")
+                self.status.set("Bluetooth ocupado; esperá y volvé a pulsar PRUEBA V0.33.")
+                return
+            append("PRUEBA V0.33: prueba un frame B002 ya conocido como handshake único y luego como keepalive periódico.")
             async def work():
                 c=None; report=[]; address=self.selected.get("address") or getattr(self.selected.get("device"),"address",None)
                 t0=time.monotonic()
-                DEVICE_NAME="00002a00-0000-1000-8000-00805f9b34fb"
                 B001="0000b001-0000-1000-8000-00805f9b34fb"
+                B002="0000b002-0000-1000-8000-00805f9b34fb"
+                HANDSHAKE=bytes.fromhex("00ff000101150000010010000000010000000000")
                 def emit(m):
                     stamp=time.monotonic()-t0
                     line=f"+{stamp:06.2f}s · {m}"
                     report.append(line)
                     self.root.after(0,lambda x=line:(append(x),self.status.set(x)))
-                async def connect_fresh(label,window=75):
+                async def connect_fresh(label,window=80):
                     deadline=time.monotonic()+window
                     attempt=0
                     while time.monotonic()<deadline:
@@ -71,84 +76,88 @@ new_ota = '''        def ota_lab():
                     if client:
                         try: await asyncio.wait_for(client.disconnect(),timeout=4)
                         except Exception: pass
+                async def subscribe_b001(client, bucket, label):
+                    def cb(sender,data):
+                        h=bytes(data).hex()
+                        bucket.append((time.monotonic()-t0,h))
+                        self.root.after(0,lambda x=h,l=label:append(l+" RX "+x))
+                    await asyncio.wait_for(client.start_notify(B001,cb),timeout=5)
+                    emit(label+" · B001 NOTIFY habilitado")
+                async def send_handshake(client,label):
+                    await asyncio.wait_for(client.write_gatt_char(B002,HANDSHAKE,response=False),timeout=4)
+                    emit(label+" · TX B002 "+HANDSHAKE.hex())
 
-                phase_a_survived=False; phase_b_survived=False; b001_events=[]
+                one_shot_survived=False; periodic_survived=False
+                rx_a=[]; rx_b=[]
                 try:
-                    emit("1/7 · FASE A: conectar y mantener tráfico inocuo leyendo Device Name cada 4 s.")
+                    emit("1/8 · FASE A: B001 + UN solo frame B002 conocido, luego 45 s sin más escrituras.")
                     c=await connect_fresh("FASE A CONEXIÓN")
+                    await subscribe_b001(c,rx_a,"FASE A")
+                    await asyncio.sleep(.3)
+                    await send_handshake(c,"FASE A")
                     a_start=time.monotonic()
-                    read_count=0
                     while time.monotonic()-a_start < 45:
+                        await asyncio.sleep(1)
                         if not c.is_connected:
-                            emit(f"FASE A · GATT cayó tras {time.monotonic()-a_start:.2f}s")
+                            emit(f"FASE A · GATT cayó tras {time.monotonic()-a_start:.2f}s · RX={len(rx_a)}")
                             break
-                        try:
-                            data=bytes(await asyncio.wait_for(c.read_gatt_char(DEVICE_NAME),timeout=3))
-                            read_count+=1
-                            emit(f"FASE A · KEEPALIVE READ #{read_count} · {data.hex()} · conectado={c.is_connected}")
-                        except Exception as ex:
-                            emit("FASE A · READ ERROR · "+type(ex).__name__+": "+str(ex))
-                            if not c.is_connected:
-                                break
-                        await asyncio.sleep(4)
-                    phase_a_survived=bool(c and c.is_connected and time.monotonic()-a_start>=40)
-                    emit("2/7 · RESULTADO FASE A · "+("SOBREVIVIÓ" if phase_a_survived else "SE DESCONECTÓ"))
+                        elapsed=int(time.monotonic()-a_start)
+                        if elapsed and elapsed%10==0:
+                            emit(f"FASE A · {elapsed}s conectado · RX={len(rx_a)}")
+                            await asyncio.sleep(.15)
+                    one_shot_survived=bool(c and c.is_connected and time.monotonic()-a_start>=40)
+                    emit("2/8 · RESULTADO FASE A · "+("SOBREVIVIÓ" if one_shot_survived else "SE DESCONECTÓ"))
+                    if c and c.is_connected:
+                        try: await c.stop_notify(B001)
+                        except Exception: pass
                     await disconnect_clean(c); c=None
                     await asyncio.sleep(2)
 
-                    emit("3/7 · FASE B: reconectar, suscribirse SOLO a B001 y quedar en reposo 45 s.")
+                    emit("3/8 · FASE B: reconectar y reenviar el mismo frame B002 cada 5 s durante 45 s.")
                     c=await connect_fresh("FASE B CONEXIÓN")
-                    def b001_cb(sender,data):
-                        h=bytes(data).hex(); b001_events.append((time.monotonic()-t0,h))
-                        self.root.after(0,lambda x=h:append("B001 RX "+x))
-                    try:
-                        await asyncio.wait_for(c.start_notify(B001,b001_cb),timeout=5)
-                        emit("FASE B · B001 NOTIFY habilitado")
-                    except Exception as ex:
-                        emit("FASE B · B001 NOTIFY ERROR · "+type(ex).__name__+": "+str(ex))
-                    b_start=time.monotonic()
+                    await subscribe_b001(c,rx_b,"FASE B")
+                    b_start=time.monotonic(); tx_count=0
                     while time.monotonic()-b_start < 45:
-                        await asyncio.sleep(1)
                         if not c.is_connected:
-                            emit(f"FASE B · GATT cayó tras {time.monotonic()-b_start:.2f}s · eventos={len(b001_events)}")
+                            emit(f"FASE B · GATT cayó tras {time.monotonic()-b_start:.2f}s · TX={tx_count} · RX={len(rx_b)}")
                             break
-                        elapsed=int(time.monotonic()-b_start)
-                        if elapsed and elapsed%10==0:
-                            emit(f"FASE B · {elapsed}s · conectado · eventos={len(b001_events)}")
-                            await asyncio.sleep(.2)
-                    phase_b_survived=bool(c and c.is_connected and time.monotonic()-b_start>=40)
-                    emit("4/7 · RESULTADO FASE B · "+("SOBREVIVIÓ" if phase_b_survived else "SE DESCONECTÓ"))
+                        await send_handshake(c,f"FASE B KEEPALIVE #{tx_count+1}")
+                        tx_count+=1
+                        for _ in range(5):
+                            await asyncio.sleep(1)
+                            if not c.is_connected:
+                                break
+                    periodic_survived=bool(c and c.is_connected and time.monotonic()-b_start>=40)
+                    emit("4/8 · RESULTADO FASE B · "+("SOBREVIVIÓ" if periodic_survived else "SE DESCONECTÓ"))
                     if c and c.is_connected:
                         try: await c.stop_notify(B001)
                         except Exception: pass
                     await disconnect_clean(c); c=None
 
-                    emit("5/7 · INTERPRETACIÓN AUTOMÁTICA")
-                    if phase_a_survived and not phase_b_survived:
-                        emit("LECTURAS periódicas mantienen vivo GATT; suscribirse a B001 por sí solo NO.")
-                    elif phase_b_survived and not phase_a_survived:
-                        emit("B001 NOTIFY mantiene vivo GATT; las lecturas periódicas NO.")
-                    elif phase_a_survived and phase_b_survived:
-                        emit("Ambas formas mantienen vivo GATT: existe timeout de inactividad y cualquier tráfico/CCCD puede evitarlo.")
+                    emit("5/8 · INTERPRETACIÓN AUTOMÁTICA")
+                    if one_shot_survived:
+                        emit("El frame B002 conocido funciona como handshake suficiente para sostener la sesión.")
+                    elif periodic_survived:
+                        emit("El frame B002 conocido funciona como keepalive periódico, no como handshake único.")
                     else:
-                        emit("Ninguna fase mantuvo GATT: probablemente hace falta handshake de aplicación por B002 o el reloj fuerza rotación de sesión.")
-
-                    emit("6/7 · EVENTOS B001="+str(b001_events))
-                    emit("7/7 · PRUEBA V0.32 FINALIZADA · no se escribió FFC1 ni se transfirió firmware.")
+                        emit("El frame B002 conocido recibe/permite tráfico pero NO sostiene la sesión: necesitamos identificar el handshake exacto de la app.")
+                    emit("6/8 · RX FASE A="+str(rx_a))
+                    emit("7/8 · RX FASE B="+str(rx_b))
+                    emit("8/8 · PRUEBA V0.33 FINALIZADA · no se escribió FFC1 ni se transfirió firmware.")
                 except Exception as ex:
-                    emit("PRUEBA V0.32 ERROR: "+type(ex).__name__+": "+str(ex))
+                    emit("PRUEBA V0.33 ERROR: "+type(ex).__name__+": "+str(ex))
                 finally:
                     await disconnect_clean(c)
                 return report
-            self.run_async(asyncio.wait_for(work(),timeout=230),lambda r,e:append("PRUEBA V0.32 WATCHDOG: "+repr(e)) if e else append("PRUEBA V0.32 FINALIZADA"))
+            self.run_async(asyncio.wait_for(work(),timeout=260),lambda r,e:append("PRUEBA V0.33 WATCHDOG: "+repr(e)) if e else append("PRUEBA V0.33 FINALIZADA"))
 '''
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.32 LISTA · 1º PRUEBA V0.32; 2º COPIAR DIAGNÓSTICO. La prueba decide si el keepalive es tráfico, B001 o un handshake B002.")'
+new_ready='append("V0.33 LISTA · 1º PRUEBA V0.33; 2º COPIAR DIAGNÓSTICO. Prueba handshake B002 único vs keepalive periódico.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.32 aplicado")
+print("build patch v0.33 aplicado")
