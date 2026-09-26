@@ -115,7 +115,7 @@ new_ota = '''        def ota_lab():
                             if not ch:
                                 emit(label+" · no presente"); continue
                             raw=bytes(await asyncio.wait_for(c.read_gatt_char(ch),timeout=4))
-                            txt=raw.decode("utf-8",errors="replace").strip("\x00")
+                            txt=raw.decode("utf-8",errors="replace").strip(chr(0))
                             emit(label+f" · hex={raw.hex()} · texto={txt!r}")
                         except Exception as ex:
                             emit(label+" · ERROR "+type(ex).__name__+": "+str(ex))
