@@ -1,6 +1,6 @@
 {
-  "version": "0.38.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.38.0/RelojLab.exe",
-  "sha256": "b9f43473054e34b290bdb179d68c9332bbae3c09548147ecfbba4ddf06c497bd",
-  "notes": "V0.38: OP05 estable + mapa seguro FFC1 06-0F. Copiar diagnóstico permanece como segundo botón."
+  "notes": "V0.39: mapa completo FFC1 08-0F + patrón request/response. Copiar diagnóstico permanece como segundo botón.",
+  "sha256": "4cbc297e151fac0834703d96ebeb22dc22055b5ad64c0008ec008f7cd44b99c0",
+  "version": "0.39.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.39.0/RelojLab.exe"
 }
