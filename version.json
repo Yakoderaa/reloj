@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.32.0/RelojLab.exe",
-  "notes": "V0.32: prueba A/B de keepalive BLE. Copiar diagnóstico permanece como segundo botón.",
-  "sha256": "a79216cdeba8473ed032d40cb9307d0e6cc9f4aabc31e0e85a194a0685c8c735",
-  "version": "0.32.0"
+  "version": "0.33.0",
+  "sha256": "0c0d171c6c54c9d161ee47dcb46e7c721be2baa75939e8c6922b97a1b66e81af",
+  "notes": "V0.33: prueba handshake/keepalive B002. Copiar diagnóstico permanece como segundo botón.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.33.0/RelojLab.exe"
 }
