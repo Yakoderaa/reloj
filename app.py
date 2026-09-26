@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue
 
-APP_VERSION="0.18.0"
+APP_VERSION="0.19.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.18"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.19"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -31,7 +31,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.18 · GATT recuperable + laboratorio OTA").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.19 · mapa de reinicio OTA + fingerprint post-01").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -594,52 +594,81 @@ class App:
             self.run_async(asyncio.wait_for(work(),timeout=190),lambda r,e:append("HUELLA OTA WATCHDOG: "+repr(e)) if e else append("HUELLA OTA V0.16 FINALIZADA"))
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab():
-            append("LAB OTA V0.18: primero recupera GATT; sólo después prueba handshake mínimo. Sin bloques de firmware.")
+            append("MAPA OTA V0.19: reproduce únicamente FFC1=01, captura respuesta y reescanea el reloj tras el reinicio.")
             async def work():
-                c=None; rx=[]; report=[]
+                c=None; rx=[]; report=[]; address=self.selected.get("address") or getattr(self.selected.get("device"),"address",None)
                 def emit(m):
                     report.append(m); self.root.after(0,lambda x=m:(append(x),self.status.set(x)))
                 try:
-                    emit("1/6 · Recuperando conexión GATT con las 4 estrategias validadas…")
+                    emit("1/7 · Recuperando GATT con las estrategias validadas…")
                     c,n=await asyncio.wait_for(self.connect_retry(4,emit),timeout=165)
-                    emit(f"GATT ABIERTO · estrategia {n}. Mantengo esta misma sesión para OTA.")
-                    emit("2/6 · Suscribiendo FFC2 antes de cualquier TX…")
+                    emit(f"GATT ABIERTO · estrategia {n}")
+                    before_services=sorted(str(x.uuid) for x in c.services)
+                    emit("2/7 · Huella previa: "+str(len(before_services))+" servicios · MTU="+str(getattr(c,"mtu_size","?")))
+                    emit("3/7 · Suscribiendo FFC2 antes del único comando…")
                     def cb(sender,data):
                         h=bytes(data).hex(); rx.append((time.time(),h))
                         self.root.after(0,lambda x=h:append("FFC2 RX "+x))
                     await asyncio.wait_for(c.start_notify("f000ffc2-0451-4000-b000-000000000000",cb),timeout=8)
-                    await asyncio.sleep(2)
-                    emit("3/6 · Baseline FFC2="+str(len(rx))+" paquetes.")
-                    probes=[b"\x00",b"\x01",b"\x00\x00",b"\x01\x00"]
-                    emit("4/6 · Handshake mínimo: "+str(len(probes))+" candidatos; stop ante RX o desconexión.")
-                    for idx,p in enumerate(probes,1):
-                        if not c.is_connected:
-                            emit("DESCONEXIÓN/REBOOT antes de TX "+str(idx)); break
-                        before=len(rx)
-                        emit("TX FFC1 "+str(idx)+"/"+str(len(probes))+" · "+p.hex())
+                    await asyncio.sleep(1)
+                    emit("4/7 · TX ÚNICO FFC1 · 01")
+                    await asyncio.wait_for(c.write_gatt_char("f000ffc1-0451-4000-b000-000000000000",b"\x01",response=False),timeout=4)
+                    for _ in range(24):
+                        await asyncio.sleep(.25)
+                        if rx or not c.is_connected:break
+                    if rx:
+                        emit("RESPUESTA FFC2="+rx[-1][1])
+                    else:emit("Sin respuesta FFC2 en la ventana inicial.")
+                    # Give the device time to transition/reboot; do not send anything else.
+                    emit("5/7 · Esperando transición/reinicio sin más escrituras…")
+                    await asyncio.sleep(4)
+                    was_connected=bool(c.is_connected)
+                    emit("Estado tras comando: connected="+str(was_connected))
+                    try:await asyncio.wait_for(c.disconnect(),timeout=4)
+                    except:pass
+                    c=None
+                    emit("6/7 · Reescaneando durante 25 s para detectar modo normal/bootloader…")
+                    seen={}
+                    deadline=time.monotonic()+25
+                    while time.monotonic()<deadline:
                         try:
-                            await asyncio.wait_for(c.write_gatt_char("f000ffc1-0451-4000-b000-000000000000",p,response=False),timeout=4)
+                            found=await asyncio.wait_for(BleakScanner.discover(timeout=4,return_adv=True),timeout=6)
+                            items=found.values() if isinstance(found,dict) else []
+                            for dev,adv in items:
+                                name=(getattr(dev,"name",None) or getattr(adv,"local_name",None) or "")
+                                addr=getattr(dev,"address",None)
+                                uuids=sorted(getattr(adv,"service_uuids",None) or [])
+                                mfg={str(k):bytes(v).hex() for k,v in (getattr(adv,"manufacturer_data",None) or {}).items()}
+                                if addr==address or name or any("ffc0" in u.lower() for u in uuids):
+                                    seen[addr or name]=(name,addr,uuids,mfg)
                         except Exception as ex:
-                            emit("TX ERROR "+p.hex()+": "+repr(ex)); break
-                        for _ in range(8):
-                            await asyncio.sleep(.25)
-                            if len(rx)>before or not c.is_connected:break
-                        if not c.is_connected:
-                            emit("DESCONEXIÓN/REBOOT inmediatamente después de "+p.hex()); break
-                        if len(rx)>before:
-                            emit("RESPUESTA OTA tras "+p.hex()+" · sondeo detenido.")
-                            break
-                    emit("5/6 · RX FFC2 total="+str(len(rx)))
-                    for n,(ts,h) in enumerate(rx,1):emit("RX#"+str(n)+" "+h)
-                    emit("6/6 · LAB OTA V0.18 FINALIZADO · sin transferencia de imagen/flash.")
-                except Exception as ex:emit("LAB OTA ERROR: "+type(ex).__name__+": "+str(ex))
+                            emit("SCAN parcial: "+type(ex).__name__+": "+str(ex))
+                        await asyncio.sleep(.5)
+                    emit("7/7 · Dispositivos relevantes post-01="+str(len(seen)))
+                    for name,addr,uuids,mfg in seen.values():
+                        emit("POST01 name="+repr(name)+" addr="+str(addr)+" services="+str(uuids)+" mfg="+str(mfg))
+                    # Reconnect to anything matching the original address to fingerprint post-transition GATT.
+                    target=None
+                    try:target=await asyncio.wait_for(BleakScanner.find_device_by_address(address,timeout=8),timeout=10)
+                    except:pass
+                    if target:
+                        try:
+                            c=BleakClient(target,timeout=20)
+                            await asyncio.wait_for(c.connect(),timeout=25)
+                            post=sorted(str(x.uuid) for x in c.services)
+                            emit("POST01 GATT services="+str(post))
+                            emit("CAMBIO GATT="+str(post!=before_services))
+                        except Exception as ex:emit("POST01 GATT no accesible: "+repr(ex))
+                    else:emit("POST01: dirección original no reapareció en la ventana final.")
+                    emit("MAPA OTA V0.19 FINALIZADO · no se transfirió firmware.")
+                except Exception as ex:emit("MAPA OTA ERROR: "+type(ex).__name__+": "+str(ex))
                 finally:
                     if c:
                         try:await asyncio.wait_for(c.disconnect(),timeout=5)
                         except:pass
                 return report
-            self.run_async(asyncio.wait_for(work(),timeout=190),lambda r,e:append("LAB OTA WATCHDOG: "+repr(e)) if e else append("LAB OTA V0.18 FINALIZADO"))
-        ttk.Button(row,text="LAB OTA ACTIVO",command=ota_lab).pack(side="left",padx=4)
+            self.run_async(asyncio.wait_for(work(),timeout=235),lambda r,e:append("MAPA OTA WATCHDOG: "+repr(e)) if e else append("MAPA OTA V0.19 FINALIZADO"))
+        ttk.Button(row,text="MAPEAR REINICIO OTA",command=ota_lab).pack(side="left",padx=4)
 
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
