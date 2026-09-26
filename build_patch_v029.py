@@ -3,8 +3,8 @@ from pathlib import Path
 p = Path("app.py")
 s = p.read_text(encoding="utf-8")
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.43.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.43")', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.44.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.44")', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -20,7 +20,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="PRUEBA V0.43 - PREFIJOS 08-0D")
+        primary_test=ttk.Button(row,text="PRUEBA V0.44 - CONTEXTO DE 0C")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -32,10 +32,10 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("PRUEBA V0.43 NO INICIADA · Bluetooth ocupado. Esperá a que termine y volvé a pulsar el primer botón.")
-                self.status.set("Bluetooth ocupado; esperá y volvé a pulsar PRUEBA V0.43.")
+                append("PRUEBA V0.44 NO INICIADA · Bluetooth ocupado. Esperá a que termine y volvé a pulsar el primer botón.")
+                self.status.set("Bluetooth ocupado; esperá y volvé a pulsar PRUEBA V0.44.")
                 return
-            append("PRUEBA V0.43: busca el prefijo mínimo de 08→0D que reproduce la caída diferida.")
+            append("PRUEBA V0.44: busca el contexto mínimo que hace peligroso OP0C, empezando por 0B→0C.")
             async def work():
                 c=None; report=[]; address=self.selected.get("address") or getattr(self.selected.get("device"),"address",None)
                 t0=time.monotonic()
@@ -154,54 +154,69 @@ new_ota = '''        def ota_lab():
                         await asyncio.sleep(.15)
                     return seen
 
-                prefixes=[
-                    ("PREFIJO 08-0A",list(range(8,11))),
-                    ("PREFIJO 08-0B",list(range(8,12))),
-                    ("PREFIJO 08-0C",list(range(8,13))),
-                    ("PREFIJO 08-0D",list(range(8,14))),
+                cases=[
+                    ("CONTROL 0B→0B",[0x0B,0x0B]),
+                    ("CASO 1 · 0B→0C",[0x0B,0x0C]),
+                    ("CASO 2 · 0A→0B→0C",[0x0A,0x0B,0x0C]),
+                    ("CASO 3 · 09→0A→0B→0C",[0x09,0x0A,0x0B,0x0C]),
+                    ("CASO 4 · 08→09→0A→0B→0C",[0x08,0x09,0x0A,0x0B,0x0C]),
                 ]
                 summary=[]; trigger=None; adv=[]
                 try:
-                    emit("1/8 · Cada prefijo usa una sesión nueva, mismo handshake y mismo ritmo de 2.5 s.")
-                    for idx,(label,ops) in enumerate(prefixes,1):
-                        emit(f"2/8 · FASE {idx}/4 · {label} · ops="+str([f"{x:02X}" for x in ops]))
+                    emit("1/9 · V0.43 demostró: 08→0B estable; 08→0C cae. Ahora minimizo el contexto previo a OP0C.")
+                    for idx,(label,ops) in enumerate(cases,1):
+                        emit(f"2/9 · FASE {idx}/5 · {label} · ops="+str([f"{x:02X}" for x in ops]))
                         c,b_rx,f_rx,current=await setup_session(label)
                         results,lost=await run_prefix(c,label,ops,f_rx,current,2.5)
                         summary.append((label,results,lost))
                         emit(label+" · caída="+str(lost))
-                        if lost is not None:
+                        if idx==1 and lost is not None:
                             trigger=(label,ops,lost)
-                            emit("PREFIJO DISPARADOR ENCONTRADO · "+str(trigger))
+                            emit("CONTROL INESPERADO · 0B→0B también provoca caída; no atribuyo todavía el efecto a 0C.")
+                            c=None
+                            adv=await scan_after("POST-"+label,20)
+                            break
+                        if idx>1 and lost is not None:
+                            trigger=(label,ops,lost)
+                            emit("CONTEXTO MÍNIMO DISPARADOR · "+str(trigger))
                             c=None
                             adv=await scan_after("POST-"+label,20)
                             break
                         await disconnect_clean(c); c=None
                         await asyncio.sleep(2)
 
-                    emit("3/8 · RESUMEN PREFIJOS="+str(summary))
-                    emit("4/8 · TRIGGER="+str(trigger))
-                    if trigger:
-                        emit("5/8 · ADV POST-TRIGGER="+str(adv))
-                        emit("6/8 · El primer prefijo que cae acota la orden necesaria; la próxima versión aislará el último opcode añadido.")
+                    emit("3/9 · RESUMEN CASOS="+str(summary))
+                    emit("4/9 · TRIGGER="+str(trigger))
+                    if trigger and trigger[0]=="CASO 1 · 0B→0C":
+                        emit("5/9 · RESULTADO FUERTE · 0B→0B sobrevivió y 0B→0C cayó: la transición 0B→0C es suficiente.")
+                    elif trigger and trigger[0].startswith("CASO 2"):
+                        emit("5/9 · RESULTADO · 0B→0C solo no basta; hace falta al menos el contexto 0A→0B→0C.")
+                    elif trigger and trigger[0].startswith("CASO 3"):
+                        emit("5/9 · RESULTADO · hace falta al menos el contexto 09→0A→0B→0C.")
+                    elif trigger and trigger[0].startswith("CASO 4"):
+                        emit("5/9 · RESULTADO · el disparador requiere el prefijo completo conocido 08→09→0A→0B→0C.")
+                    elif trigger:
+                        emit("5/9 · RESULTADO · cayó el control 0B→0B; hay estado interno adicional por aislar.")
                     else:
-                        emit("5/8 · Ningún prefijo cayó en 22 s.")
-                        emit("6/8 · La caída V0.42 no se reprodujo; puede depender de estado previo o ser intermitente.")
-                    emit("7/8 · No se escribió FFC2 ni se transfirió firmware.")
-                    emit("8/8 · PRUEBA V0.43 FINALIZADA")
+                        emit("5/9 · RESULTADO · ningún caso reprodujo la caída; el efecto depende de estado previo o es intermitente.")
+                    emit("6/9 · ADV POST-TRIGGER="+str(adv))
+                    emit("7/9 · Cada caso usó sesión nueva, mismo handshake, ritmo 2.5 s y observación 22 s.")
+                    emit("8/9 · No se escribió FFC2 ni se transfirió firmware.")
+                    emit("9/9 · PRUEBA V0.44 FINALIZADA")
                 except Exception as ex:
-                    emit("PRUEBA V0.43 ERROR: "+type(ex).__name__+": "+str(ex))
+                    emit("PRUEBA V0.44 ERROR: "+type(ex).__name__+": "+str(ex))
                 finally:
                     await disconnect_clean(c)
                 return report
-            self.run_async(asyncio.wait_for(work(),timeout=360),lambda r,e:append("PRUEBA V0.43 WATCHDOG: "+repr(e)) if e else append("PRUEBA V0.43 FINALIZADA"))
+            self.run_async(asyncio.wait_for(work(),timeout=360),lambda r,e:append("PRUEBA V0.44 WATCHDOG: "+repr(e)) if e else append("PRUEBA V0.44 FINALIZADA"))
 '''
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.43 LISTA · 1º PRUEBA V0.43; 2º COPIAR DIAGNÓSTICO. Busca el prefijo mínimo de 08→0D que reproduce la caída.")'
+new_ready='append("V0.44 LISTA · 1º PRUEBA V0.44; 2º COPIAR DIAGNÓSTICO. Aísla el contexto mínimo que hace caer GATT al llegar a OP0C.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.43 aplicado")
+print("build patch v0.44 aplicado")
