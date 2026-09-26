@@ -32,3 +32,5 @@ jobs:
 # rebuild v0.20 after regression fixes
 
 # rebuild v0.20 strict compatibility
+
+# rebuild v0.20 syntax fix
