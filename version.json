@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.31.0/RelojLab.exe",
-  "version": "0.31.0",
-  "notes": "V0.31: captura transición boot/app y reconexión GATT inmediata. Copiar diagnóstico permanece como segundo botón.",
-  "sha256": "6501396725409985084b97ed0e94b9b115f8819eabaafa37621bbfc1e46196d6"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.32.0/RelojLab.exe",
+  "notes": "V0.32: prueba A/B de keepalive BLE. Copiar diagnóstico permanece como segundo botón.",
+  "sha256": "a79216cdeba8473ed032d40cb9307d0e6cc9f4aabc31e0e85a194a0685c8c735",
+  "version": "0.32.0"
 }
