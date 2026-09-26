@@ -1,6 +1,6 @@
 {
-  "version": "0.33.0",
-  "sha256": "0c0d171c6c54c9d161ee47dcb46e7c721be2baa75939e8c6922b97a1b66e81af",
-  "notes": "V0.33: prueba handshake/keepalive B002. Copiar diagnóstico permanece como segundo botón.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.33.0/RelojLab.exe"
+  "sha256": "b644ba401ad9f2d70a5b387241b2a16098375942844d50ee5a00f2353eae881c",
+  "version": "0.34.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.34.0/RelojLab.exe",
+  "notes": "V0.34: validación FFC1 con sesión B002 viva y rastreo OAD. Copiar diagnóstico permanece como segundo botón."
 }
