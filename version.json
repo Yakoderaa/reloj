@@ -1,6 +1,6 @@
 {
-  "notes": "V0.41: aislamiento OP0D vs OP0C. Copiar diagnóstico permanece como segundo botón.",
-  "sha256": "b2f2b876026ade37e3a663707f1587a0dd51f770b804529f70eae5a8aef256bb",
-  "version": "0.41.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.41.0/RelojLab.exe"
+  "sha256": "8b95ba22b84f69d1f65e0e49c81f7151aaa578897f7ec3fb36a66f3b5911c77d",
+  "notes": "V0.42: control OP0C x6 vs secuencia OP08-OP0D. Copiar diagnóstico permanece como segundo botón.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.42.0/RelojLab.exe",
+  "version": "0.42.0"
 }
