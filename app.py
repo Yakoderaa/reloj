@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue
 
-APP_VERSION="0.20.0"
+APP_VERSION="0.21.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V0.20"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V0.21"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -31,7 +31,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V0.20 · recuperación BLE persistente + mapa OTA").pack(side="left",padx=12)
+        ttk.Label(top,text="V0.21 · OTA tolerante a FFC2 + reinicio verificable").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -594,25 +594,39 @@ class App:
             self.run_async(asyncio.wait_for(work(),timeout=190),lambda r,e:append("HUELLA OTA WATCHDOG: "+repr(e)) if e else append("HUELLA OTA V0.16 FINALIZADA"))
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab():
-            append("MAPA OTA V0.19: reproduce únicamente FFC1=01, captura respuesta y reescanea el reloj tras el reinicio.")
+            append("MAPA OTA V0.21: FFC2 es opcional; si Windows rechaza la suscripción, continúa con FFC1=01 y verifica el reinicio por reescaneo.")
             async def work():
                 c=None; rx=[]; report=[]; address=self.selected.get("address") or getattr(self.selected.get("device"),"address",None)
                 def emit(m):
                     report.append(m); self.root.after(0,lambda x=m:(append(x),self.status.set(x)))
                 try:
                     emit("1/7 · Recuperando GATT con 8 estrategias y reintentos Windows…")
-                    c,n=await asyncio.wait_for(self.connect_retry(4,emit),timeout=290)
+                    c,n=await asyncio.wait_for(self.connect_retry(8,emit),timeout=290)
                     emit(f"GATT ABIERTO · estrategia {n}")
                     before_services=sorted(str(x.uuid) for x in c.services)
                     emit("2/7 · Huella previa: "+str(len(before_services))+" servicios · MTU="+str(getattr(c,"mtu_size","?")))
-                    emit("3/7 · Suscribiendo FFC2 antes del único comando…")
+                    emit("3/7 · Intentando FFC2; la captura es opcional y no bloquea el comando…")
                     def cb(sender,data):
                         h=bytes(data).hex(); rx.append((time.time(),h))
                         self.root.after(0,lambda x=h:append("FFC2 RX "+x))
-                    await asyncio.wait_for(c.start_notify("f000ffc2-0451-4000-b000-000000000000",cb),timeout=8)
-                    await asyncio.sleep(1)
+                    notify_ok=False
+                    for attempt in range(2):
+                        try:
+                            await asyncio.wait_for(c.start_notify("f000ffc2-0451-4000-b000-000000000000",cb),timeout=8)
+                            notify_ok=True; emit("FFC2 NOTIFY OK · intento "+str(attempt+1)); break
+                        except Exception as ex:
+                            emit("FFC2 NO DISPONIBLE · intento "+str(attempt+1)+" · "+type(ex).__name__+": "+str(ex))
+                            if not c.is_connected:break
+                            await asyncio.sleep(1)
+                    if not notify_ok:emit("FFC2 omitido: continúo con el comando OTA conocido y verificaré el reinicio por BLE.")
+                    await asyncio.sleep(.5)
                     emit("4/7 · TX ÚNICO FFC1 · 01")
-                    await asyncio.wait_for(c.write_gatt_char("f000ffc1-0451-4000-b000-000000000000",b"\x01",response=False),timeout=4)
+                    try:
+                        await asyncio.wait_for(c.write_gatt_char("f000ffc1-0451-4000-b000-000000000000",b"\x01",response=False),timeout=4)
+                        emit("FFC1=01 enviado.")
+                    except Exception as ex:
+                        # A reboot may tear GATT down before WinRT reports write completion.
+                        emit("FFC1 WRITE terminó con "+type(ex).__name__+": "+str(ex)+" · se verifica igualmente transición/reinicio.")
                     for _ in range(24):
                         await asyncio.sleep(.25)
                         if rx or not c.is_connected:break
@@ -660,14 +674,14 @@ class App:
                             emit("CAMBIO GATT="+str(post!=before_services))
                         except Exception as ex:emit("POST01 GATT no accesible: "+repr(ex))
                     else:emit("POST01: dirección original no reapareció en la ventana final.")
-                    emit("MAPA OTA V0.19 FINALIZADO · no se transfirió firmware.")
+                    emit("MAPA OTA V0.21 FINALIZADO · no se transfirió firmware.")
                 except Exception as ex:emit("MAPA OTA ERROR: "+type(ex).__name__+": "+str(ex))
                 finally:
                     if c:
                         try:await asyncio.wait_for(c.disconnect(),timeout=5)
                         except:pass
                 return report
-            self.run_async(asyncio.wait_for(work(),timeout=235),lambda r,e:append("MAPA OTA WATCHDOG: "+repr(e)) if e else append("MAPA OTA V0.19 FINALIZADO"))
+            self.run_async(asyncio.wait_for(work(),timeout=235),lambda r,e:append("MAPA OTA WATCHDOG: "+repr(e)) if e else append("MAPA OTA V0.21 FINALIZADO"))
         ttk.Button(row,text="MAPEAR REINICIO OTA",command=ota_lab).pack(side="left",padx=4)
 
 
