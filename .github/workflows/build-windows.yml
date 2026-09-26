@@ -34,3 +34,5 @@ jobs:
 # rebuild v0.20 strict compatibility
 
 # rebuild v0.20 syntax fix
+
+# final v0.20 validated connection engine
