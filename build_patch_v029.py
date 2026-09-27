@@ -5,9 +5,9 @@ s = p.read_text(encoding="utf-8")
 
 s = s.replace("import urllib.request, tempfile, os, subprocess, time, hashlib, queue", "import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math", 1)
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.67.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.67")', 1)
-s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.67 · modo esfera única · protocolo ApWatch/WTWD', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.68.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.68")', 1)
+s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.68 · modo esfera única · protocolo ApWatch/WTWD', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -23,7 +23,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="VALIDAR BIG-SEND OFFLINE V0.67")
+        primary_test=ttk.Button(row,text="PROBAR 2 CHUNKS 0x83 V0.68")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -34,9 +34,12 @@ start = s.index("        def ota_lab():")
 end = s.index("        # Bind the already-visible first button now that ota_lab exists.", start)
 
 new_ota = '''        def ota_lab():
-            append("V0.67 · BIG-SEND OFFLINE · divide el zlib completo en mensajes WTWD, reconstruye cada payload desde sus frames y valida round-trip contra el WF original. No escribe al reloj.")
+            if self.ble_busy:
+                append("V0.68 NO INICIADA · Bluetooth ocupado.")
+                return
+            append("V0.68 · SECUENCIA 0x83 MÍNIMA · envía DOS mensajes consecutivos de 11 bytes del mismo zlib (22/22543 bytes), con ACK individual y postcheck. No finaliza ni instala el dial.")
             rep=self.base_report()
-            rep["big_send_offline"]={"phase":"build","candidate":{},"strategies":[],"writes_to_watch":0}
+            rep["two_chunk_probe"]={"phase":"candidate","chunks":[],"payload_bytes_written":0,"dial_sync_writes":0,"destructive_actions":0}
             t0=time.monotonic()
 
             def emit(msg):
@@ -49,17 +52,16 @@ new_ota = '''        def ota_lab():
                 if not os.path.exists(path):raise RuntimeError("Falta single-face-proof-v062.bin")
                 with open(path,"rb") as fh:raw=fh.read()
                 if len(raw)<54 or raw[:2]!=b"WF":raise RuntimeError("WF inválido")
-                packed=zlib.compress(raw,9)
-                return path,raw,packed
+                return path,raw,zlib.compress(raw,9)
 
-            def build_frames(pid,payload):
+            def build(pid,cmd_type,send_type,opcode,payload=b""):
                 payload=bytes(payload);n=len(payload)
-                if n>4855:raise RuntimeError("payload >4855")
+                h=bytearray(20)
                 if n<=10:
-                    h=bytearray(20);h[1]=pid&0xff;h[4]=1;h[5]=0x83;h[8]=n&0xff;h[9]=(n>>8)&0xff;h[10:10+n]=payload
+                    h[1]=pid&255;h[3]=cmd_type;h[4]=send_type;h[5]=opcode;h[8]=n&255;h[9]=(n>>8)&255;h[10:10+n]=payload
                     return [bytes(h)]
-                rem=n-10;frags=rem//19+(1 if rem%19 else 0)
-                h=bytearray(20);h[1]=pid&0xff;h[2]=frags;h[4]=1;h[5]=0x83;h[8]=n&0xff;h[9]=(n>>8)&0xff;h[10:20]=payload[:10]
+                rem=n-10;frags=(rem+18)//19
+                h[1]=pid&255;h[2]=frags;h[3]=cmd_type;h[4]=send_type;h[5]=opcode;h[8]=n&255;h[9]=(n>>8)&255;h[10:20]=payload[:10]
                 out=[bytes(h)];pos=10
                 for i in range(frags):
                     c=bytearray(20);c[0]=i+1
@@ -67,95 +69,122 @@ new_ota = '''        def ota_lab():
                     out.append(bytes(c));pos+=len(part)
                 return out
 
-            def rebuild(frames):
-                h=frames[0];n=h[8]|(h[9]<<8)
-                out=bytearray(h[10:10+min(n,10)])
-                for c in frames[1:]:
-                    need=n-len(out)
-                    if need<=0:break
-                    out.extend(c[1:1+min(19,need)])
-                return bytes(out[:n])
+            def parse(frames):
+                rows=[]
+                for b in frames:
+                    if len(b)>=10 and b[0]==0:
+                        n=b[8]|(b[9]<<8)
+                        rows.append({"opcode":b[5],"send_type":b[4],"payload_hex":b[10:10+min(n,10)].hex(),"payload_length":n})
+                return rows
+
+            def sync_payload():
+                now=int(time.time());off=-time.timezone
+                if time.daylight and time.localtime().tm_isdst:off=-time.altzone
+                tm=now.to_bytes(4,"little")+int(off).to_bytes(4,"little",signed=True)+bytes([0])
+                subs=[
+                    bytes([0x0C,0x00,0x66,0xE8,0x03,0x00,0x00,0x01,0x19,0xAF,0x46,0x00]),
+                    bytes([0x04,0x00,0x67,0x00]),
+                    bytes([12,0,0x68])+tm,
+                    bytes([0x04,0x00,0x6D,0x01]),
+                    bytes([0x04,0x00,0x7A,0x01]),
+                    bytes([0x08,0x00,0x7C,0x01,0xFF,0xFF,0xFF,0xFF]),
+                    bytes([0x05,0x00,0x78,0x01,0x00])
+                ]
+                body=b"".join(subs);total=len(body)+1
+                return bytes([total&255,(total>>8)&255,len(subs)])+body
 
             async def work():
-                import zlib
-                emit("1/6 · Cargando candidato V0.62…")
+                emit("1/10 · Cargando candidato…")
                 path,raw,packed=await asyncio.to_thread(read_candidate)
-                rep["big_send_offline"]["candidate"]={
-                    "path":path,"raw_size":len(raw),"raw_sha256":hashlib.sha256(raw).hexdigest(),
-                    "zlib_size":len(packed),"zlib_sha256":hashlib.sha256(packed).hexdigest()
-                }
+                pieces=[packed[:11],packed[11:22]]
+                rep["two_chunk_probe"]["candidate"]={"path":path,"raw_size":len(raw),"zlib_size":len(packed),"zlib_sha256":hashlib.sha256(packed).hexdigest()}
 
-                emit("2/6 · Probando tamaños de mensaje…")
-                for block in [64,128,256,300,512,1024,2048,4096,4855]:
-                    pieces=[packed[i:i+block] for i in range(0,len(packed),block)]
-                    rebuilt=[]
-                    total_frames=0
-                    message_rows=[]
-                    for idx,piece in enumerate(pieces):
-                        frames=build_frames(idx&0xff,piece)
-                        again=rebuild(frames)
-                        rebuilt.append(again)
-                        total_frames+=len(frames)
-                        if idx<4 or idx==len(pieces)-1:
-                            message_rows.append({"index":idx,"payload_length":len(piece),"frame_count":len(frames),
-                                                 "sha256":hashlib.sha256(piece).hexdigest(),
-                                                 "first_frame_hex":frames[0].hex()})
-                    joined=b"".join(rebuilt)
-                    try:
-                        roundtrip=zlib.decompress(joined)
-                        decompress_ok=roundtrip==raw
-                    except Exception:
-                        decompress_ok=False
-                    row={"block_size":block,"message_count":len(pieces),"total_ble_frames":total_frames,
-                         "zlib_sha256_match":hashlib.sha256(joined).hexdigest()==hashlib.sha256(packed).hexdigest(),
-                         "decompress_matches_wf":decompress_ok,"sample_messages":message_rows}
-                    row["all_pass"]=row["zlib_sha256_match"] and row["decompress_matches_wf"]
-                    rep["big_send_offline"]["strategies"].append(row)
+                c=None;events=[];pid=0
+                try:
+                    emit("2/10 · Conectando…")
+                    c,n=await self.connect_retry(5,emit)
+                    rep["connection"]={"connected":True,"attempts":n}
+                    b001="0000b001-0000-1000-8000-00805f9b34fb";b002="0000b002-0000-1000-8000-00805f9b34fb"
+                    def rx(sender,data):
+                        events.append(bytes(data));emit("B001 RX · "+bytes(data).hex())
+                    await asyncio.wait_for(c.start_notify(b001,rx),timeout=6)
+                    await asyncio.sleep(.3)
 
-                emit("3/6 · Seleccionando estrategia conservadora…")
-                valid=[x for x in rep["big_send_offline"]["strategies"] if x["all_pass"]]
-                if not valid:raise RuntimeError("ninguna estrategia reconstruye el stream")
-                preferred=next((x for x in valid if x["block_size"]==300),valid[0])
-                rep["big_send_offline"]["preferred"]=preferred
-                emit("PREFERIDA · 300 bytes · mensajes="+str(preferred["message_count"])+" · frames="+str(preferred["total_ble_frames"]))
+                    async def tx(op,payload=b"",send_type=1,wait=1.0):
+                        nonlocal pid
+                        start=len(events);frames=build(pid,0,send_type,op,payload)
+                        for fr in frames:
+                            await asyncio.wait_for(c.write_gatt_char(b002,fr,response=False),timeout=5)
+                            await asyncio.sleep(.08)
+                        pid=(pid+1)&255
+                        await asyncio.sleep(wait)
+                        return events[start:],frames
 
-                emit("4/6 · Validando round-trip completo…")
-                rep["big_send_offline"]["all_strategies_pass"]=all(x["all_pass"] for x in rep["big_send_offline"]["strategies"])
-                if not rep["big_send_offline"]["all_strategies_pass"]:raise RuntimeError("alguna estrategia falló")
+                    emit("3/10 · DEVICE_INFO + bind OEM…")
+                    await tx(0x02,b"",3,1.8)
+                    await tx(0x6E,sync_payload(),1,1.4)
+                    await tx(0x1D,bytes([1]),1,.8)
+                    await tx(0x1F,bytes([8]),1,1.4)
 
-                folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","wf-analysis-v067")
-                os.makedirs(folder,exist_ok=True)
-                report_path=os.path.join(folder,"big-send-offline-v067.json")
-                with open(report_path,"w",encoding="utf-8") as fh:
-                    json.dump(rep["big_send_offline"],fh,ensure_ascii=False,indent=2)
-                rep["big_send_offline"]["report_file"]=report_path
-                rep["big_send_offline"]["phase"]="complete"
+                    all_ok=True
+                    for idx,piece in enumerate(pieces,1):
+                        emit(f"{3+idx}/10 · CHUNK {idx}/2 · "+piece.hex())
+                        rx_frames,tx_frames=await tx(0x83,piece,1,4.0)
+                        ack=any(len(x)>=11 and x[0]==0 and x[4]==4 and x[5]==0x83 and x[8]==1 and x[10]==1 for x in rx_frames)
+                        connected=bool(getattr(c,"is_connected",False))
+                        all_ok=all_ok and ack and connected
+                        rep["two_chunk_probe"]["chunks"].append({
+                            "index":idx,"payload_hex":piece.hex(),"tx_frames":[x.hex() for x in tx_frames],
+                            "rx_frames":[x.hex() for x in rx_frames],"ack01":ack,"connected":connected
+                        })
+                        rep["two_chunk_probe"]["payload_bytes_written"]+=len(piece)
+                        rep["two_chunk_probe"]["dial_sync_writes"]+=1
+                        emit("CHUNK "+str(idx)+" · ACK01="+str(ack)+" · conectado="+str(connected))
+                        if not all_ok:break
 
-                emit("5/6 · RESULTADO · todas las estrategias reconstruyen exactamente el mismo zlib/WF.")
-                emit("6/6 · V0.67 FINALIZADA · big-send packetizado offline; 0 escrituras al reloj.")
-                return rep
+                    emit("6/10 · Esperando estabilidad…")
+                    await asyncio.sleep(6)
+                    stable=bool(getattr(c,"is_connected",False))
+                    rep["two_chunk_probe"]["connected_after_sequence"]=stable
+
+                    emit("7/10 · DEVICE_INFO postcheck…")
+                    post_start=len(events)
+                    await tx(0x02,b"",3,2.5)
+                    emit("8/10 · DIAL_INFO postcheck…")
+                    await tx(0x84,b"",3,3.5)
+                    post=events[post_start:]
+                    rep["two_chunk_probe"]["postcheck_rx"]=[x.hex() for x in post]
+                    post_ok=len(post)>0
+                    rep["two_chunk_probe"]["classification"]="two_chunks_accepted" if all_ok and stable and post_ok else "sequence_not_fully_accepted"
+
+                    emit("9/10 · CLASIFICACIÓN · "+rep["two_chunk_probe"]["classification"])
+                    rep["two_chunk_probe"]["phase"]="complete"
+                    emit("10/10 · V0.68 FINALIZADA · enviados 22/"+str(len(packed))+" bytes; sin cierre/finalización.")
+                    return rep
+                finally:
+                    if c:
+                        try:await asyncio.wait_for(c.disconnect(),timeout=5)
+                        except Exception as ex:rep["errors"].append("disconnect: "+repr(ex))
 
             def done(result,error):
                 if error:
                     rep["errors"].append(type(error).__name__+": "+str(error))
-                    rep["big_send_offline"]["phase"]="error"
-                    self.report=rep;self.show()
-                    append("V0.67 FALLÓ · "+repr(error))
+                    rep["two_chunk_probe"]["phase"]="error";self.report=rep;self.show()
+                    append("V0.68 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V0.67 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V0.68 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
-                x=result["big_send_offline"]["preferred"]
-                append("BIG-SEND OFFLINE OK · bloque="+str(x["block_size"])+" · mensajes="+str(x["message_count"])+" · frames="+str(x["total_ble_frames"]))
-                self.status.set("V0.67 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
-            self.run_async(asyncio.wait_for(work(),timeout=60),done)
+                append("SECUENCIA 0x83 · "+result["two_chunk_probe"]["classification"]+" · 22 bytes totales.")
+                self.status.set("V0.68 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
+            self.run_async(asyncio.wait_for(work(),timeout=150),done)
 '''
 
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.67 LISTA · 1º PREPARAR ESFERA ÚNICA V0.67; 2º COPIAR DIAGNÓSTICO. Valida offline la secuencia completa de mensajes 0x83 y reconstrucción exacta del zlib/WF.")'
+new_ready='append("V0.68 LISTA · 1º PREPARAR ESFERA ÚNICA V0.68; 2º COPIAR DIAGNÓSTICO. Prueba dos mensajes 0x83 consecutivos del mismo zlib: 22 bytes totales, ACK individual y postcheck.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
@@ -203,7 +232,7 @@ s=s.replace("    def open_control(self):", '''    async def inspect_gatt_snapsho
     def open_control(self):''',1)
 
 
-# V0.67: do not depend on a second advertising cycle after the first GATT attempt.
+# V0.68: do not depend on a second advertising cycle after the first GATT attempt.
 # Reuse the BLEDevice captured by "Buscar relojes" first; fresh scanning is recovery only.
 _conn_start=s.index("    async def connect_retry(")
 _conn_end=s.index("\n    def diagnose(",_conn_start)
@@ -304,4 +333,4 @@ _new_connect_retry='''    async def connect_retry(self,attempts=5,progress=None)
 s=s[:_conn_start]+_new_connect_retry+s[_conn_end:]
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.67 aplicado")
+print("build patch v0.68 aplicado")
