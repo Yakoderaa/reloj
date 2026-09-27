@@ -5,9 +5,9 @@ s = p.read_text(encoding="utf-8")
 
 s = s.replace("import urllib.request, tempfile, os, subprocess, time, hashlib, queue", "import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math", 1)
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.73.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.73")', 1)
-s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.73 · modo esfera única · protocolo ApWatch/WTWD', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.74.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.74")', 1)
+s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.74 · modo esfera única · protocolo ApWatch/WTWD', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -23,7 +23,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="PROBAR 10 BLOQUES 300B V0.73")
+        primary_test=ttk.Button(row,text="PROBAR 20 BLOQUES 300B V0.74")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -35,11 +35,11 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("V0.73 NO INICIADA · Bluetooth ocupado.")
+                append("V0.74 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V0.73 · DIEZ BLOQUES 300B · prueba 3000 bytes del zlib en diez mensajes consecutivos, exige ACK individual y corta ante cualquier anomalía. Sin cierre de transferencia.")
+            append("V0.74 · VEINTE BLOQUES 300B · prueba 6000 bytes del zlib en veinte mensajes consecutivos, exige ACK individual y corta ante cualquier anomalía. Sin cierre de transferencia.")
             rep=self.base_report()
-            rep["ten_block_probe"]={"phase":"candidate","blocks":[],"payload_bytes_written":0,"dial_sync_writes":0,"destructive_actions":0}
+            rep["twenty_block_probe"]={"phase":"candidate","blocks":[],"payload_bytes_written":0,"dial_sync_writes":0,"destructive_actions":0}
             t0=time.monotonic()
 
             def emit(msg):
@@ -87,14 +87,14 @@ new_ota = '''        def ota_lab():
                 return bytes([total&255,(total>>8)&255,len(subs)])+body
 
             async def work():
-                emit("1/18 · Cargando candidato…")
+                emit("1/28 · Cargando candidato…")
                 path,raw,packed=await asyncio.to_thread(read_candidate)
-                blocks=[packed[i*300:(i+1)*300] for i in range(10)]
-                rep["ten_block_probe"]["candidate"]={"path":path,"raw_size":len(raw),"zlib_size":len(packed),"zlib_sha256":hashlib.sha256(packed).hexdigest()}
+                blocks=[packed[i*300:(i+1)*300] for i in range(20)]
+                rep["twenty_block_probe"]["candidate"]={"path":path,"raw_size":len(raw),"zlib_size":len(packed),"zlib_sha256":hashlib.sha256(packed).hexdigest()}
 
                 c=None;events=[];pid=0
                 try:
-                    emit("2/18 · Conectando…")
+                    emit("2/28 · Conectando…")
                     c,n=await self.connect_retry(5,emit)
                     rep["connection"]={"connected":True,"attempts":n}
                     b001="0000b001-0000-1000-8000-00805f9b34fb"
@@ -114,7 +114,7 @@ new_ota = '''        def ota_lab():
                         await asyncio.sleep(wait)
                         return events[start:],frames
 
-                    emit("3/18 · DEVICE_INFO + bind OEM…")
+                    emit("3/28 · DEVICE_INFO + bind OEM…")
                     await tx(0x02,b"",3,1.8)
                     await tx(0x6E,sync_payload(),1,1.4)
                     await tx(0x1D,bytes([1]),1,.8)
@@ -122,11 +122,11 @@ new_ota = '''        def ota_lab():
 
                     all_ok=True
                     for idx,block in enumerate(blocks,1):
-                        emit(f"{3+idx}/18 · BLOQUE {idx}/10 · 300 bytes")
+                        emit(f"{3+idx}/28 · BLOQUE {idx}/20 · 300 bytes")
                         rx_frames,tx_frames=await tx(0x83,block,1,4.5)
                         ack=any(len(x)>=11 and x[0]==0 and x[4]==4 and x[5]==0x83 and x[8]==1 and x[10]==1 for x in rx_frames)
                         connected=bool(getattr(c,"is_connected",False))
-                        rep["ten_block_probe"]["blocks"].append({
+                        rep["twenty_block_probe"]["blocks"].append({
                             "index":idx,"offset":(idx-1)*300,"length":len(block),
                             "sha256":hashlib.sha256(block).hexdigest(),
                             "frame_count":len(tx_frames),
@@ -135,33 +135,33 @@ new_ota = '''        def ota_lab():
                             "rx":[x.hex() for x in rx_frames],
                             "ack01":ack,"connected":connected
                         })
-                        rep["ten_block_probe"]["payload_bytes_written"]+=len(block)
-                        rep["ten_block_probe"]["dial_sync_writes"]+=1
+                        rep["twenty_block_probe"]["payload_bytes_written"]+=len(block)
+                        rep["twenty_block_probe"]["dial_sync_writes"]+=1
                         all_ok=all_ok and ack and connected
                         emit("BLOQUE "+str(idx)+" · ACK01="+str(ack)+" · conectado="+str(connected))
                         if not all_ok:
                             emit("CORTE DE SEGURIDAD · no se envían más bloques.")
                             break
 
-                    emit("14/18 · Esperando estabilidad…")
+                    emit("24/28 · Esperando estabilidad…")
                     await asyncio.sleep(8.0)
                     stable=bool(getattr(c,"is_connected",False))
-                    rep["ten_block_probe"]["stable_after_wait"]=stable
+                    rep["twenty_block_probe"]["stable_after_wait"]=stable
 
-                    emit("15/18 · DEVICE_INFO postcheck…")
+                    emit("25/28 · DEVICE_INFO postcheck…")
                     post=len(events)
                     await tx(0x02,b"",3,2.5)
-                    emit("16/18 · DIAL_INFO postcheck…")
+                    emit("26/28 · DIAL_INFO postcheck…")
                     await tx(0x84,b"",3,3.5)
                     post_frames=events[post:]
-                    rep["ten_block_probe"]["postcheck_rx"]=[x.hex() for x in post_frames]
-                    sent_all=len(rep["ten_block_probe"]["blocks"])==10
+                    rep["twenty_block_probe"]["postcheck_rx"]=[x.hex() for x in post_frames]
+                    sent_all=len(rep["twenty_block_probe"]["blocks"])==20
                     post_ok=len(post_frames)>0
-                    rep["ten_block_probe"]["classification"]="ten_blocks_accepted" if all_ok and sent_all and stable and post_ok else "ten_blocks_not_fully_accepted"
+                    rep["twenty_block_probe"]["classification"]="twenty_blocks_accepted" if all_ok and sent_all and stable and post_ok else "twenty_blocks_not_fully_accepted"
 
-                    emit("17/18 · CLASIFICACIÓN · "+rep["ten_block_probe"]["classification"])
-                    rep["ten_block_probe"]["phase"]="complete"
-                    emit("18/18 · V0.73 FINALIZADA · enviados "+str(rep["ten_block_probe"]["payload_bytes_written"])+"/"+str(len(packed))+" bytes; sin cierre.")
+                    emit("27/28 · CLASIFICACIÓN · "+rep["twenty_block_probe"]["classification"])
+                    rep["twenty_block_probe"]["phase"]="complete"
+                    emit("28/28 · V0.74 FINALIZADA · enviados "+str(rep["twenty_block_probe"]["payload_bytes_written"])+"/"+str(len(packed))+" bytes; sin cierre.")
                     return rep
                 finally:
                     if c:
@@ -171,22 +171,22 @@ new_ota = '''        def ota_lab():
             def done(result,error):
                 if error:
                     rep["errors"].append(type(error).__name__+": "+str(error))
-                    rep["ten_block_probe"]["phase"]="error";self.report=rep;self.show()
-                    append("V0.73 FALLÓ · "+repr(error))
+                    rep["twenty_block_probe"]["phase"]="error";self.report=rep;self.show()
+                    append("V0.74 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V0.73 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V0.74 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
-                append("DIEZ BLOQUES 300B · "+result["ten_block_probe"]["classification"]+" · enviados "+str(result["ten_block_probe"]["payload_bytes_written"])+" bytes.")
-                self.status.set("V0.73 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
+                append("VEINTE BLOQUES 300B · "+result["twenty_block_probe"]["classification"]+" · enviados "+str(result["twenty_block_probe"]["payload_bytes_written"])+" bytes.")
+                self.status.set("V0.74 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
             self.run_async(asyncio.wait_for(work(),timeout=190),done)
 '''
 
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.73 LISTA · 1º PREPARAR ESFERA ÚNICA V0.73; 2º COPIAR DIAGNÓSTICO. Prueba cinco bloques 0x83 consecutivos de 300 bytes: 3000 bytes totales, ACK individual y corte seguro.")'
+new_ready='append("V0.74 LISTA · 1º PREPARAR ESFERA ÚNICA V0.74; 2º COPIAR DIAGNÓSTICO. Prueba cinco bloques 0x83 consecutivos de 300 bytes: 6000 bytes totales, ACK individual y corte seguro.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
@@ -234,7 +234,7 @@ s=s.replace("    def open_control(self):", '''    async def inspect_gatt_snapsho
     def open_control(self):''',1)
 
 
-# V0.73: do not depend on a second advertising cycle after the first GATT attempt.
+# V0.74: do not depend on a second advertising cycle after the first GATT attempt.
 # Reuse the BLEDevice captured by "Buscar relojes" first; fresh scanning is recovery only.
 _conn_start=s.index("    async def connect_retry(")
 _conn_end=s.index("\n    def diagnose(",_conn_start)
@@ -335,4 +335,4 @@ _new_connect_retry='''    async def connect_retry(self,attempts=5,progress=None)
 s=s[:_conn_start]+_new_connect_retry+s[_conn_end:]
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.73 aplicado")
+print("build patch v0.74 aplicado")
