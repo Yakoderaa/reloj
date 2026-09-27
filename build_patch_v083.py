@@ -41,7 +41,7 @@ new_compress='''            def oem_dial_compress(raw):
                 # Exact GZipUtils.zlib(..., false) parameters from the UtraWatch SDK:
                 # deflater.init(level=6, windowBits=9, memLevel=3, W_ZLIB).
                 import zlib
-                co=zlib.compressobj(level=6,method=zlib.DEFLATED,wbits=9,memLevel=3,zdict=None)
+                co=zlib.compressobj(level=6,method=zlib.DEFLATED,wbits=9,memLevel=3)
                 comp=co.compress(raw)+co.flush()
                 hdr=bytearray(20)
                 total=len(comp)+20
