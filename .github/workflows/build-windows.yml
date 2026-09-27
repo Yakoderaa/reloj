@@ -7,7 +7,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: reloj-release-main-v057
+  group: reloj-release-main-v058
   cancel-in-progress: true
 jobs:
   build:
@@ -19,7 +19,7 @@ jobs:
           python-version: '3.12'
       - name: Verify read-only inventory and cleanup
         run: python -m unittest discover -s tests -p test_inventory.py -v
-      - name: Apply v0.57 source patch
+      - name: Apply v0.58 source patch
         run: python build_patch_v029.py
       - name: Install dependencies
         run: python -m pip install -r requirements.txt pyinstaller==6.22.0
@@ -41,14 +41,14 @@ jobs:
           $releaseTag = "v$releaseVersion"
           gh release view $releaseTag *> $null
           if ($LASTEXITCODE -eq 0) { throw "La versión ya existe; no se reemplazan ejecutables publicados." }
-          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V0.57: corrige el crash por math/entropía y completa de forma resiliente la extracción de recursos WF 240×296; no escribe DIAL_SYNC 0x83."
+          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V0.58: mapea agujas, cuatro dígitos de hora, separador y slots dinámicos del formato WF 240×296; genera blueprint y mantiene DIAL_SYNC 0x83 bloqueado."
           if ($LASTEXITCODE -ne 0) { throw "Falló la publicación del EXE" }
           New-Item -ItemType Directory -Path verified | Out-Null
           gh release download $releaseTag --pattern RelojLab.exe --dir verified
           if ($LASTEXITCODE -ne 0) { throw "No se pudo verificar la descarga publicada" }
           $expectedHash = (Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           if ((Get-FileHash verified/RelojLab.exe -Algorithm SHA256).Hash.ToLower() -ne $expectedHash) { throw "SHA-256 publicado incorrecto" }
-          $metadata = @{version=$releaseVersion; exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe"; sha256=$expectedHash; notes="V0.57: fix de entropía + extracción WF resiliente desde diales OEM 240×296; DIAL_SYNC 0x83 bloqueado."}
+          $metadata = @{version=$releaseVersion; exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe"; sha256=$expectedHash; notes="V0.58: blueprint WF 240×296 con roles estructurales de hora analógica/digital y widgets; DIAL_SYNC 0x83 bloqueado."}
           $metadata | ConvertTo-Json | Set-Content -Encoding utf8NoBOM version.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
