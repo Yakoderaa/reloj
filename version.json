@@ -1,6 +1,6 @@
 {
-  "notes": "V0.68: dos mensajes DIAL_SYNC mínimos consecutivos, 22 bytes totales, con verificación de estabilidad.",
-  "version": "0.68.0",
-  "sha256": "6e3c4f1147ae8776585e53b1cf55dfca398d71607ed5bd8ad2576fc7c56d2884",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.68.0/RelojLab.exe"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.69.0/RelojLab.exe",
+  "notes": "V0.69: primer bloque 0x83 de 300 bytes con ACK y postcheck; sin segundo bloque ni cierre.",
+  "sha256": "b1c9e6a9b7d4d1bf829cc1089481902e05490248ded8b180746bff4f559d615e",
+  "version": "0.69.0"
 }
