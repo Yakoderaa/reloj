@@ -3,9 +3,11 @@ from pathlib import Path
 p = Path("app.py")
 s = p.read_text(encoding="utf-8")
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.56.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.56")', 1)
-s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.56 · modo esfera única · protocolo ApWatch/WTWD', 1)
+s = s.replace("import urllib.request, tempfile, os, subprocess, time, hashlib, queue", "import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math", 1)
+
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.57.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.57")', 1)
+s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.57 · modo esfera única · protocolo ApWatch/WTWD', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -21,7 +23,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="EXTRAER RECURSOS WF V0.56")
+        primary_test=ttk.Button(row,text="EXTRAER RECURSOS WF V0.57")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -33,9 +35,9 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("EXTRACCIÓN V0.56 NO INICIADA · Bluetooth ocupado.")
+                append("EXTRACCIÓN V0.57 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V0.56 · WF CORREGIDO · revalida DEVICE_INFO, descarga diales OEM y usa los offsets correctos de cabecera/descriptores para extraer recursos. NO escribe 0x83.")
+            append("V0.57 · WF CORREGIDO · importa math, tolera fallos de métricas secundarias y completa cabecera/descriptores/recursos de diales OEM. NO escribe 0x83.")
             rep=self.base_report()
             rep["wf_resource_analysis"]={
                 "phase":"identity",
@@ -137,13 +139,16 @@ new_ota = '''        def ota_lab():
 
             def entropy(data):
                 if not data:return 0.0
-                counts=[0]*256
-                for x in data:counts[x]+=1
-                n=len(data);e=0.0
-                for c in counts:
-                    if c:
-                        q=c/n;e-=q*math.log2(q)
-                return round(e,4)
+                try:
+                    counts=[0]*256
+                    for x in data:counts[x]+=1
+                    n=len(data);e=0.0
+                    for c in counts:
+                        if c:
+                            q=c/n;e-=q*math.log2(q)
+                    return round(e,4)
+                except Exception as ex:
+                    return None
 
             def extract_embedded_images(data,folder,prefix):
                 found=[]
@@ -438,7 +443,7 @@ new_ota = '''        def ota_lab():
                         json.dump(rep["wf_resource_analysis"],fh,ensure_ascii=False,indent=2)
                     rep["wf_resource_analysis"]["analysis_file"]=report_path
                     rep["wf_resource_analysis"]["phase"]="complete"
-                    emit("10/10 · V0.56 FINALIZADA · parser corregido + recursos extraídos · 0x83 NO TOCADO.")
+                    emit("10/10 · V0.57 FINALIZADA · parser corregido + recursos extraídos · 0x83 NO TOCADO.")
                     return rep
                 finally:
                     if c:
@@ -450,9 +455,9 @@ new_ota = '''        def ota_lab():
                     rep["errors"].append(type(error).__name__+": "+str(error))
                     rep["wf_resource_analysis"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("EXTRACCIÓN V0.56 FALLÓ · "+repr(error))
+                    append("EXTRACCIÓN V0.57 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V0.56 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V0.57 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
@@ -461,14 +466,14 @@ new_ota = '''        def ota_lab():
                     append("FORMATO WF VALIDADO · cabecera y tabla ya están alineadas. Siguiente paso: identificar visualmente cada recurso/tipo y generar el paquete de nuestra esfera.")
                 else:
                     append("FORMATO WF AÚN TIENE DIFERENCIAS · revisar diagnóstico antes de generar una esfera.")
-                self.status.set("V0.56 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
+                self.status.set("V0.57 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
             self.run_async(asyncio.wait_for(work(),timeout=260),done)
 '''
 
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.56 LISTA · 1º PREPARAR ESFERA ÚNICA V0.56; 2º COPIAR DIAGNÓSTICO. Corrige offsets WF y extrae recursos reales de los .bin oficiales 240×296; 0x83 bloqueado.")'
+new_ready='append("V0.57 LISTA · 1º PREPARAR ESFERA ÚNICA V0.57; 2º COPIAR DIAGNÓSTICO. Corrige el fallo de entropía y completa la extracción de recursos WF 240×296; 0x83 bloqueado.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
@@ -516,7 +521,7 @@ s=s.replace("    def open_control(self):", '''    async def inspect_gatt_snapsho
     def open_control(self):''',1)
 
 
-# V0.56: do not depend on a second advertising cycle after the first GATT attempt.
+# V0.57: do not depend on a second advertising cycle after the first GATT attempt.
 # Reuse the BLEDevice captured by "Buscar relojes" first; fresh scanning is recovery only.
 _conn_start=s.index("    async def connect_retry(")
 _conn_end=s.index("\n    def diagnose(",_conn_start)
@@ -617,4 +622,4 @@ _new_connect_retry='''    async def connect_retry(self,attempts=5,progress=None)
 s=s[:_conn_start]+_new_connect_retry+s[_conn_end:]
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.56 aplicado")
+print("build patch v0.57 aplicado")
