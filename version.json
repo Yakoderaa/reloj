@@ -1,6 +1,6 @@
 {
-  "sha256": "f8d510e79a2a58d0a0dad763e3feb7b397c7dc52e7cb39a4533740320cf772d4",
-  "notes": "V0.84: esfera dinámica basada en la foto objetivo, instalada en MARKET con analógico/hora/pasos/pulso; actualizaciones futuras desde Buscar actualización.",
-  "version": "0.84.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.84.0/RelojLab.exe"
+  "sha256": "c491e63cef35a06c7ec90d562b994dd782b90e71f7232311fc19f2ce2b96a84e",
+  "notes": "V0.85: esfera objetivo confirmada enviada realmente a MARKET con activación verificada y reintentos; actualizaciones futuras desde Buscar actualización.",
+  "version": "0.85.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.85.0/RelojLab.exe"
 }
