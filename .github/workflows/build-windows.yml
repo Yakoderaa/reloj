@@ -7,7 +7,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: reloj-release-main-v050
+  group: reloj-release-main-v051
   cancel-in-progress: true
 jobs:
   build:
@@ -19,7 +19,7 @@ jobs:
           python-version: '3.12'
       - name: Verify read-only inventory and cleanup
         run: python -m unittest discover -s tests -p test_inventory.py -v
-      - name: Apply v0.50 source patch
+      - name: Apply v0.51 source patch
         run: python build_patch_v029.py
       - name: Install dependencies
         run: python -m pip install -r requirements.txt pyinstaller==6.22.0
@@ -41,14 +41,14 @@ jobs:
           $releaseTag = "v$releaseVersion"
           gh release view $releaseTag *> $null
           if ($LASTEXITCODE -eq 0) { throw "La versión ya existe; no se reemplazan ejecutables publicados." }
-          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V0.50: corrige la conexión GATT reutilizando DEVICE/ADDRESS aunque el reloj deje de anunciarse y luego consulta DEVICE_INFO 0x02 y DIAL_INFO 0x84."
+          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V0.51: captura un cambio manual de esfera y compara DEVICE_INFO 0x02 + DIAL_INFO 0x84 antes/después, registrando tráfico B001 sin escrituras desconocidas."
           if ($LASTEXITCODE -ne 0) { throw "Falló la publicación del EXE" }
           New-Item -ItemType Directory -Path verified | Out-Null
           gh release download $releaseTag --pattern RelojLab.exe --dir verified
           if ($LASTEXITCODE -ne 0) { throw "No se pudo verificar la descarga publicada" }
           $expectedHash = (Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           if ((Get-FileHash verified/RelojLab.exe -Algorithm SHA256).Hash.ToLower() -ne $expectedHash) { throw "SHA-256 publicado incorrecto" }
-          $metadata = @{version=$releaseVersion; exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe"; sha256=$expectedHash; notes="V0.50: conexión GATT robusta para Esfera Única; usa DEVICE + CACHE OFF/ON y ADDRESS + CACHE OFF/ON antes de exigir un nuevo advertising."}
+          $metadata = @{version=$releaseVersion; exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe"; sha256=$expectedHash; notes="V0.51: captura controlada del cambio manual de esfera; compara picture_id/font_id y DIAL_INFO antes/después y registra tráfico espontáneo."}
           $metadata | ConvertTo-Json | Set-Content -Encoding utf8NoBOM version.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
