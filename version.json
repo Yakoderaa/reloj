@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.64.0/RelojLab.exe",
-  "sha256": "8da2fe3b2f191c8fa1f87fa7d95d6e7fd411f87710cc78858b46d1ce3656e7f8",
-  "notes": "V0.64: aislamiento FFC0 vs WTWD + segmentación WF offline; sin FFC1/0x83.",
-  "version": "0.64.0"
+  "notes": "V0.65: handshake DIAL_SYNC 0x83 cero-bytes con verificación post-probe; 0 bytes de dial.",
+  "sha256": "4db21d654c3aba5228df69c69b8e1d37d6a64ea5429f522f7a8b51394c4cf4a3",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.65.0/RelojLab.exe",
+  "version": "0.65.0"
 }
