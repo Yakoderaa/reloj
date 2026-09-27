@@ -1,6 +1,6 @@
 {
-  "notes": "V0.61: mapa WF normalizado + manifiesto de esfera única con donantes OEM; DIAL_SYNC 0x83 bloqueado.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.61.0/RelojLab.exe",
-  "version": "0.61.0",
-  "sha256": "153e97921aba105daebba548b3a6e299b8031955433310c84d76955d483a8bf8"
+  "version": "0.62.0",
+  "sha256": "5b8461512087d04932383426ed4726ab92dda36c04ad69cabcc80a01dd9b7b69",
+  "notes": "V0.62: candidato WF offline construido y validado con donantes OEM; ninguna escritura al reloj.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.62.0/RelojLab.exe"
 }
