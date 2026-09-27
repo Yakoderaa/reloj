@@ -13,67 +13,24 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Download ParTool and collect OEM dial corpus
+      - name: Inspect Veepoo UI enum and ParTool
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
-          $url = "https://raw.githubusercontent.com/HBandSDK/Android_Ble_SDK/add57a049a916c210c5463a66b097ad94265e481/android_sdk_source/jar_core/abpartool-release.aar"
-          Invoke-WebRequest -Uri $url -OutFile abpartool-release.aar
           New-Item -ItemType Directory -Path out | Out-Null
-          Copy-Item abpartool-release.aar out/abpartool.zip
-          Expand-Archive out/abpartool.zip -DestinationPath out/aar
-          jar tf out/aar/classes.jar | Out-File -Encoding utf8 out/classes.txt
-          $classes = Get-Content out/classes.txt | Where-Object { $_ -like "*.class" -and $_ -notlike "*$*" } | ForEach-Object { $_.Replace("/",".").Replace(".class","") }
-          "===== CLASSES =====" | Out-File -Encoding utf8 out/javap.txt
-          foreach ($c in $classes) {
-            "===== $c =====" | Out-File -Append -Encoding utf8 out/javap.txt
-            javap -classpath out/aar/classes.jar -p -c -s $c 2>&1 | Out-File -Append -Encoding utf8 out/javap.txt
-          }
-          Get-FileHash abpartool-release.aar -Algorithm SHA256 | Format-List | Out-File -Encoding utf8 out/sha256.txt
-          New-Item -ItemType Directory -Path out/all-dials | Out-Null
-          @'
-          import json, urllib.request, urllib.parse, os, time, sys
-          try: sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-          except Exception: pass
-          base="https://wr.watchhealth.com.cn/app-halfwit/app-dial/getDialList"
-          items={}
-          for page in range(1,8):
-              url=f"{base}?currentPage={page}&pageSize=20&watchId=102"
-              try:
-                  with urllib.request.urlopen(url,timeout=12) as r:
-                      obj=json.load(r)
-              except Exception as e:
-                  print("catalog",page,"ERR",repr(e)); continue
-              rows=obj.get("data") or []
-              print("catalog",page,"rows",len(rows))
-              if not rows: break
-              for x in rows:
-                  if str(x.get("resolution",""))=="240*296" and x.get("dialFile"):
-                      items[str(x.get("dialId") or x.get("id"))]=x
-              time.sleep(.2)
-          vals=list(items.values())
-          os.makedirs("out/all-dials",exist_ok=True)
-          with open("out/all-dials/catalog.json","w",encoding="utf-8") as f:
-              json.dump(vals,f,ensure_ascii=False,indent=2)
-          print("unique 240x296",len(vals))
-          for i,x in enumerate(vals):
-              did=str(x.get("dialId") or x.get("id") or i)
-              for key,suffix in [("previewImg","-preview.png"),("dialFile",".bin")]:
-                  url=x.get(key)
-                  if not url: continue
-                  path=f"out/all-dials/dial-{did}{suffix}"
-                  try:
-                      req=urllib.request.Request(url,headers={"User-Agent":"RelojLabResearch/1"})
-                      with urllib.request.urlopen(req,timeout=15) as r, open(path,"wb") as f:
-                          f.write(r.read())
-                      print("OK",did,key,os.path.getsize(path))
-                  except Exception as e:
-                      print("ERR",did,key,ascii(repr(e)))
-          '@ | Set-Content -Encoding utf8 collect.py
-          python collect.py
+          $vp = "https://raw.githubusercontent.com/HBandSDK/Android_Ble_SDK/add57a049a916c210c5463a66b097ad94265e481/android_sdk_source/jar_core/vpprotocol-2.3.85.15.aar"
+          $par = "https://raw.githubusercontent.com/HBandSDK/Android_Ble_SDK/add57a049a916c210c5463a66b097ad94265e481/android_sdk_source/jar_core/abpartool-release.aar"
+          Invoke-WebRequest -Uri $vp -OutFile vpprotocol.aar
+          Invoke-WebRequest -Uri $par -OutFile abpartool.aar
+          Copy-Item vpprotocol.aar out/vpprotocol.zip
+          Copy-Item abpartool.aar out/abpartool.zip
+          Expand-Archive out/vpprotocol.zip -DestinationPath out/vp
+          Expand-Archive out/abpartool.zip -DestinationPath out/par
+          javap -classpath out/vp/classes.jar -p -c -s com.veepoo.protocol.model.enums.EWatchUIElementType | Out-File -Encoding utf8 out/EWatchUIElementType.txt
+          javap -classpath out/vp/classes.jar -p -c -s com.veepoo.protocol.model.enums.EWatchUIElementPosition | Out-File -Encoding utf8 out/EWatchUIElementPosition.txt
+          javap -classpath out/par/classes.jar -p -c -s com.bluetrum.abpartool.ParTool | Out-File -Encoding utf8 out/ParTool.txt
+          Get-FileHash vpprotocol.aar -Algorithm SHA256 | Format-List | Out-File -Encoding utf8 out/vpprotocol-sha256.txt
+          Get-FileHash abpartool.aar -Algorithm SHA256 | Format-List | Out-File -Encoding utf8 out/abpartool-sha256.txt
       - uses: actions/upload-artifact@v4
         with:
           name: abpartool-research
