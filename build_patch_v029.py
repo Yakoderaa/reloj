@@ -5,9 +5,9 @@ s = p.read_text(encoding="utf-8")
 
 s = s.replace("import urllib.request, tempfile, os, subprocess, time, hashlib, queue", "import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math", 1)
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.57.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.57")', 1)
-s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.57 · modo esfera única · protocolo ApWatch/WTWD', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.58.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.58")', 1)
+s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.58 · modo esfera única · protocolo ApWatch/WTWD', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -23,7 +23,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="EXTRAER RECURSOS WF V0.57")
+        primary_test=ttk.Button(row,text="CONSTRUIR BLUEPRINT WF V0.58")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -35,9 +35,9 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("EXTRACCIÓN V0.57 NO INICIADA · Bluetooth ocupado.")
+                append("EXTRACCIÓN V0.58 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V0.57 · WF CORREGIDO · importa math, tolera fallos de métricas secundarias y completa cabecera/descriptores/recursos de diales OEM. NO escribe 0x83.")
+            append("V0.58 · BLUEPRINT WF · valida el formato ya descubierto, identifica reloj analógico + hora digital + widgets y genera el plano de nuestra esfera. NO escribe 0x83.")
             rep=self.base_report()
             rep["wf_resource_analysis"]={
                 "phase":"identity",
@@ -91,14 +91,14 @@ new_ota = '''        def ota_lab():
             def http_json(url):
                 req=urllib.request.Request(url,headers={
                     "Accept":"application/json,text/plain,*/*",
-                    "User-Agent":"RelojLab/0.56 Windows; WF resource research"
+                    "User-Agent":"RelojLab/0.58 Windows; WF resource research"
                 })
                 with urllib.request.urlopen(req,timeout=10) as r:
                     raw=r.read(2*1024*1024)
                 return json.loads(raw.decode("utf-8","replace"))
 
             def download_bytes(url,max_bytes=32*1024*1024):
-                req=urllib.request.Request(url,headers={"Accept":"*/*","User-Agent":"RelojLab/0.56 Windows"})
+                req=urllib.request.Request(url,headers={"Accept":"*/*","User-Agent":"RelojLab/0.58 Windows"})
                 with urllib.request.urlopen(req,timeout=18) as r:
                     data=r.read(max_bytes+1)
                 if len(data)>max_bytes:
@@ -185,13 +185,31 @@ new_ota = '''        def ota_lab():
                 return found
 
             def role_hint(type_code,fields):
-                # Conservative labels: only strong geometric/sequence clues.
-                if type_code in (0x0501,0x0601,0x0701) and fields["x"]==120 and fields["y"]==148:
-                    return "analog_hand_candidate"
+                # V0.58: roles supported by repeated geometry/frame-count evidence.
+                if type_code==0x0501 and fields["x"]==120 and fields["y"]==148:
+                    return "analog_hand_A"
+                if type_code==0x0601 and fields["x"]==120 and fields["y"]==148:
+                    return "analog_hand_B"
+                if type_code==0x0701 and fields["x"]==120 and fields["y"]==148:
+                    return "analog_hand_C"
+                if type_code==0x0804 and fields["frame_count_like"]==10:
+                    return "time_digit_1"
+                if type_code==0x0904 and fields["frame_count_like"]==10:
+                    return "time_digit_2"
+                if type_code==0x0A04 and fields["frame_count_like"]==10:
+                    return "time_digit_3"
+                if type_code==0x0B04 and fields["frame_count_like"]==10:
+                    return "time_digit_4"
+                if type_code==0x1002:
+                    return "time_separator_or_static_layer"
                 if type_code==0x0105 and fields["width_like"] in range(16,81) and fields["height_like"] in range(16,81):
-                    return "widget_icon_candidate"
-                if type_code in (0x1002,0x1102):
-                    return "image_layer_candidate"
+                    return "dynamic_widget_slot"
+                if type_code==0x0304 and fields["frame_count_like"]==10:
+                    return "upper_numeric_10_state"
+                if type_code==0x0404 and fields["frame_count_like"]==7:
+                    return "upper_categorical_7_state"
+                if type_code==0x1102:
+                    return "base_image_layer"
                 return None
 
             def parse_wf(data,url,name,folder):
@@ -361,7 +379,7 @@ new_ota = '''        def ota_lab():
                     if len(chosen)<3:raise RuntimeError("menos de 3 diales compatibles")
                     emit("CATÁLOGO · candidatos="+str(len(chosen)))
 
-                    folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","wf-analysis-v056")
+                    folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","wf-analysis-v058")
                     os.makedirs(folder,exist_ok=True)
                     rep["wf_resource_analysis"]["output_folder"]=folder
 
@@ -432,18 +450,91 @@ new_ota = '''        def ota_lab():
                         row["resource_lengths"]=sorted(set(row["resource_lengths"]))
                     rep["wf_resource_analysis"]["cross_file"]=cross
 
+                    # Build a non-destructive blueprint from the exact structures confirmed in V0.57.
+                    analog_template=None
+                    for f in files:
+                        codes={d.get("type_code") for d in f.get("descriptors",[])}
+                        if {0x0501,0x0601,0x0701}.issubset(codes):
+                            analog_template=f
+                            break
+
+                    type_roles={
+                        "0x0501":{"role":"analog_hand_A","confidence":"high","reason":"centered at 120,148 on analog OEM dial"},
+                        "0x0601":{"role":"analog_hand_B","confidence":"high","reason":"centered at 120,148 on analog OEM dial"},
+                        "0x0701":{"role":"analog_hand_C","confidence":"high","reason":"centered at 120,148 on analog OEM dial"},
+                        "0x0804":{"role":"time_digit_1","confidence":"high","reason":"10-state glyph sequence in four-digit time row"},
+                        "0x0904":{"role":"time_digit_2","confidence":"high","reason":"10-state glyph sequence in four-digit time row"},
+                        "0x1002":{"role":"time_separator_or_static_layer","confidence":"medium","reason":"single-frame layer centered between hour/minute digit pairs"},
+                        "0x0A04":{"role":"time_digit_3","confidence":"high","reason":"10-state glyph sequence in four-digit time row"},
+                        "0x0B04":{"role":"time_digit_4","confidence":"high","reason":"10-state glyph sequence in four-digit time row"},
+                        "0x0105":{"role":"dynamic_widget_slot","confidence":"high","reason":"50–56 px square slots with changing arg2 IDs"},
+                        "0x0304":{"role":"upper_numeric_10_state","confidence":"medium","reason":"10-state field repeated on OEM dials"},
+                        "0x0404":{"role":"upper_categorical_7_state","confidence":"medium","reason":"7-state field repeated on OEM dials"},
+                        "0x1102":{"role":"base_image_layer","confidence":"high","reason":"single centered base layer present in every sampled dial"}
+                    }
+                    observed_widget_ids=sorted({
+                        d.get("arg2") for f in files for d in f.get("descriptors",[])
+                        if d.get("type_code")==0x0105
+                    })
+                    blueprint={
+                        "schema":"relojlab-wf-blueprint-v1",
+                        "app_version":"0.58.0",
+                        "screen":{"width":240,"height":296,"center":[120,148]},
+                        "target_design":{
+                            "background":"black",
+                            "analog_center":[120,148],
+                            "digital_time":{"placement":"upper_left","curved_requested":True},
+                            "battery":{"placement":"upper_right","dynamic":True},
+                            "steps":{"placement":"lower_left","dynamic":True},
+                            "heart_rate":{"placement":"lower_right","dynamic":True}
+                        },
+                        "format":{
+                            "magic":"WF","version_le":1026,
+                            "descriptor_start":54,"descriptor_size":20,
+                            "header_fields":{"width":42,"height":44,"element_count":46,"file_size":48,"resource_base":52}
+                        },
+                        "type_roles":type_roles,
+                        "observed_widget_arg2_ids":observed_widget_ids,
+                        "widget_arg2_meanings_confirmed":False,
+                        "analog_template":{
+                            "dial_id":analog_template.get("dial_id") if analog_template else None,
+                            "name":analog_template.get("name") if analog_template else None,
+                            "sha256":analog_template.get("sha256") if analog_template else None,
+                            "descriptors":[d for d in (analog_template.get("descriptors",[]) if analog_template else [])
+                                           if d.get("type_code") in (0x0501,0x0601,0x0701,0x0105,0x1102)]
+                        },
+                        "par_encoder":{
+                            "class":"com.bluetrum.abpartool.ParTool",
+                            "native_api":"rawToPar(byte[], int width, int height, boolean, boolean, boolean)",
+                            "bitmap_api":"bitmapToPar(Bitmap, boolean, boolean, boolean)",
+                            "decode_api_found":False,
+                            "status":"encoder identified; boolean flag meanings still need isolation"
+                        },
+                        "safe_to_transmit":False,
+                        "blocking_unknowns":[
+                            "map exact arg2 IDs for battery/steps/heart-rate",
+                            "isolate ParTool boolean flags / exact PAR resource encoding",
+                            "rebuild resources and verify file-size/pointers before any 0x83 write"
+                        ]
+                    }
+                    rep["wf_resource_analysis"]["blueprint"]=blueprint
+                    blueprint_path=os.path.join(folder,"wf-blueprint-v058.json")
+                    with open(blueprint_path,"w",encoding="utf-8") as fh:
+                        json.dump(blueprint,fh,ensure_ascii=False,indent=2)
+                    rep["wf_resource_analysis"]["blueprint_file"]=blueprint_path
+
                     emit("6/10 · VALIDACIÓN CABECERA · 0x2A=ancho, 0x2C=alto, 0x2E=cantidad, 0x30=tamaño, 0x34=base recursos relativa a 'WF'.")
                     emit("7/10 · DESCRIPTOR · 20 bytes: mode/type/frame-like/x/y/width-like/height-like/arg2/arg3/puntero-u16.")
-                    emit("8/10 · Tipos detectados="+", ".join(sorted(cross["type_map"].keys())))
-                    analog=[k for k,v in cross["type_map"].items() if "analog_hand_candidate" in v.get("role_hints",[])]
-                    emit("9/10 · candidatos agujas analógicas="+str(analog)+" · imágenes OEM extraídas a "+folder)
+                    emit("8/10 · ROLES · hora digital=0x0804/0x0904/0x0A04/0x0B04 · separador=0x1002 · widget=0x0105")
+                    analog=[k for k,v in cross["type_map"].items() if any(str(h).startswith("analog_hand_") for h in v.get("role_hints",[]))]
+                    emit("9/10 · AGUJAS="+str(analog)+" · widget arg2 observados="+str(observed_widget_ids)+" · blueprint="+blueprint_path)
 
-                    report_path=os.path.join(folder,"wf-analysis-v056.json")
+                    report_path=os.path.join(folder,"wf-analysis-v058.json")
                     with open(report_path,"w",encoding="utf-8") as fh:
                         json.dump(rep["wf_resource_analysis"],fh,ensure_ascii=False,indent=2)
                     rep["wf_resource_analysis"]["analysis_file"]=report_path
                     rep["wf_resource_analysis"]["phase"]="complete"
-                    emit("10/10 · V0.57 FINALIZADA · parser corregido + recursos extraídos · 0x83 NO TOCADO.")
+                    emit("10/10 · V0.58 FINALIZADA · blueprint estructural generado · 0x83 NO TOCADO.")
                     return rep
                 finally:
                     if c:
@@ -455,25 +546,25 @@ new_ota = '''        def ota_lab():
                     rep["errors"].append(type(error).__name__+": "+str(error))
                     rep["wf_resource_analysis"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("EXTRACCIÓN V0.57 FALLÓ · "+repr(error))
+                    append("EXTRACCIÓN V0.58 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V0.57 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V0.58 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
                 x=result.get("wf_resource_analysis",{}).get("cross_file",{})
                 if x.get("all_valid_wf") and x.get("all_240x296") and x.get("all_declared_sizes_match") and x.get("all_resource_bases_match_descriptor_end"):
-                    append("FORMATO WF VALIDADO · cabecera y tabla ya están alineadas. Siguiente paso: identificar visualmente cada recurso/tipo y generar el paquete de nuestra esfera.")
+                    append("BLUEPRINT WF GENERADO · agujas + cuatro dígitos de hora + separador + slots de widget ya están mapeados. Falta resolver los IDs exactos de batería/pasos/pulso y el encoder PAR antes de escribir 0x83.")
                 else:
                     append("FORMATO WF AÚN TIENE DIFERENCIAS · revisar diagnóstico antes de generar una esfera.")
-                self.status.set("V0.57 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
+                self.status.set("V0.58 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
             self.run_async(asyncio.wait_for(work(),timeout=260),done)
 '''
 
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.57 LISTA · 1º PREPARAR ESFERA ÚNICA V0.57; 2º COPIAR DIAGNÓSTICO. Corrige el fallo de entropía y completa la extracción de recursos WF 240×296; 0x83 bloqueado.")'
+new_ready='append("V0.58 LISTA · 1º PREPARAR ESFERA ÚNICA V0.58; 2º COPIAR DIAGNÓSTICO. Mapea agujas, cuatro dígitos de hora, separador y slots de widgets; genera blueprint 240×296; 0x83 bloqueado.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
@@ -521,7 +612,7 @@ s=s.replace("    def open_control(self):", '''    async def inspect_gatt_snapsho
     def open_control(self):''',1)
 
 
-# V0.57: do not depend on a second advertising cycle after the first GATT attempt.
+# V0.58: do not depend on a second advertising cycle after the first GATT attempt.
 # Reuse the BLEDevice captured by "Buscar relojes" first; fresh scanning is recovery only.
 _conn_start=s.index("    async def connect_retry(")
 _conn_end=s.index("\n    def diagnose(",_conn_start)
@@ -622,4 +713,4 @@ _new_connect_retry='''    async def connect_retry(self,attempts=5,progress=None)
 s=s[:_conn_start]+_new_connect_retry+s[_conn_end:]
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.57 aplicado")
+print("build patch v0.58 aplicado")
