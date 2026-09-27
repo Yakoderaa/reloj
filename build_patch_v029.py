@@ -5,9 +5,9 @@ s = p.read_text(encoding="utf-8")
 
 s = s.replace("import urllib.request, tempfile, os, subprocess, time, hashlib, queue", "import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math", 1)
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.68.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.68")', 1)
-s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.68 · modo esfera única · protocolo ApWatch/WTWD', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.69.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.69")', 1)
+s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.69 · modo esfera única · protocolo ApWatch/WTWD', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -23,7 +23,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="PROBAR 2 CHUNKS 0x83 V0.68")
+        primary_test=ttk.Button(row,text="PROBAR BLOQUE 300B V0.69")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -35,11 +35,11 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("V0.68 NO INICIADA · Bluetooth ocupado.")
+                append("V0.69 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V0.68 · SECUENCIA 0x83 MÍNIMA · envía DOS mensajes consecutivos de 11 bytes del mismo zlib (22/22543 bytes), con ACK individual y postcheck. No finaliza ni instala el dial.")
+            append("V0.69 · BLOQUE 300B · envía sólo el primer bloque de 300 bytes del zlib del candidato, espera ACK 0x83 y hace postcheck. No envía bloques posteriores ni cierre.")
             rep=self.base_report()
-            rep["two_chunk_probe"]={"phase":"candidate","chunks":[],"payload_bytes_written":0,"dial_sync_writes":0,"destructive_actions":0}
+            rep["block300_probe"]={"phase":"candidate","payload_bytes_written":0,"dial_sync_writes":0,"destructive_actions":0}
             t0=time.monotonic()
 
             def emit(msg):
@@ -52,10 +52,12 @@ new_ota = '''        def ota_lab():
                 if not os.path.exists(path):raise RuntimeError("Falta single-face-proof-v062.bin")
                 with open(path,"rb") as fh:raw=fh.read()
                 if len(raw)<54 or raw[:2]!=b"WF":raise RuntimeError("WF inválido")
-                return path,raw,zlib.compress(raw,9)
+                packed=zlib.compress(raw,9)
+                return path,raw,packed
 
             def build(pid,cmd_type,send_type,opcode,payload=b""):
                 payload=bytes(payload);n=len(payload)
+                if n>4855:raise RuntimeError("payload > 4855")
                 h=bytearray(20)
                 if n<=10:
                     h[1]=pid&255;h[3]=cmd_type;h[4]=send_type;h[5]=opcode;h[8]=n&255;h[9]=(n>>8)&255;h[10:10+n]=payload
@@ -68,14 +70,6 @@ new_ota = '''        def ota_lab():
                     part=payload[pos:pos+19];c[1:1+len(part)]=part
                     out.append(bytes(c));pos+=len(part)
                 return out
-
-            def parse(frames):
-                rows=[]
-                for b in frames:
-                    if len(b)>=10 and b[0]==0:
-                        n=b[8]|(b[9]<<8)
-                        rows.append({"opcode":b[5],"send_type":b[4],"payload_hex":b[10:10+min(n,10)].hex(),"payload_length":n})
-                return rows
 
             def sync_payload():
                 now=int(time.time());off=-time.timezone
@@ -94,14 +88,15 @@ new_ota = '''        def ota_lab():
                 return bytes([total&255,(total>>8)&255,len(subs)])+body
 
             async def work():
-                emit("1/10 · Cargando candidato…")
+                emit("1/9 · Cargando candidato…")
                 path,raw,packed=await asyncio.to_thread(read_candidate)
-                pieces=[packed[:11],packed[11:22]]
-                rep["two_chunk_probe"]["candidate"]={"path":path,"raw_size":len(raw),"zlib_size":len(packed),"zlib_sha256":hashlib.sha256(packed).hexdigest()}
+                payload=packed[:300]
+                rep["block300_probe"]["candidate"]={"path":path,"raw_size":len(raw),"zlib_size":len(packed),"zlib_sha256":hashlib.sha256(packed).hexdigest()}
+                rep["block300_probe"]["payload_sha256"]=hashlib.sha256(payload).hexdigest()
 
                 c=None;events=[];pid=0
                 try:
-                    emit("2/10 · Conectando…")
+                    emit("2/9 · Conectando…")
                     c,n=await self.connect_retry(5,emit)
                     rep["connection"]={"connected":True,"attempts":n}
                     b001="0000b001-0000-1000-8000-00805f9b34fb";b002="0000b002-0000-1000-8000-00805f9b34fb"
@@ -120,46 +115,43 @@ new_ota = '''        def ota_lab():
                         await asyncio.sleep(wait)
                         return events[start:],frames
 
-                    emit("3/10 · DEVICE_INFO + bind OEM…")
+                    emit("3/9 · DEVICE_INFO + bind OEM…")
                     await tx(0x02,b"",3,1.8)
                     await tx(0x6E,sync_payload(),1,1.4)
                     await tx(0x1D,bytes([1]),1,.8)
                     await tx(0x1F,bytes([8]),1,1.4)
 
-                    all_ok=True
-                    for idx,piece in enumerate(pieces,1):
-                        emit(f"{3+idx}/10 · CHUNK {idx}/2 · "+piece.hex())
-                        rx_frames,tx_frames=await tx(0x83,piece,1,4.0)
-                        ack=any(len(x)>=11 and x[0]==0 and x[4]==4 and x[5]==0x83 and x[8]==1 and x[10]==1 for x in rx_frames)
-                        connected=bool(getattr(c,"is_connected",False))
-                        all_ok=all_ok and ack and connected
-                        rep["two_chunk_probe"]["chunks"].append({
-                            "index":idx,"payload_hex":piece.hex(),"tx_frames":[x.hex() for x in tx_frames],
-                            "rx_frames":[x.hex() for x in rx_frames],"ack01":ack,"connected":connected
-                        })
-                        rep["two_chunk_probe"]["payload_bytes_written"]+=len(piece)
-                        rep["two_chunk_probe"]["dial_sync_writes"]+=1
-                        emit("CHUNK "+str(idx)+" · ACK01="+str(ack)+" · conectado="+str(connected))
-                        if not all_ok:break
+                    emit("4/9 · 0x83 · primer bloque 300 bytes · 17 frames BLE…")
+                    rx_frames,tx_frames=await tx(0x83,payload,1,6.0)
+                    ack=any(len(x)>=11 and x[0]==0 and x[4]==4 and x[5]==0x83 and x[8]==1 and x[10]==1 for x in rx_frames)
+                    connected=bool(getattr(c,"is_connected",False))
+                    rep["block300_probe"]["tx_frames"]=[x.hex() for x in tx_frames]
+                    rep["block300_probe"]["rx_frames"]=[x.hex() for x in rx_frames]
+                    rep["block300_probe"]["frame_count"]=len(tx_frames)
+                    rep["block300_probe"]["ack01"]=ack
+                    rep["block300_probe"]["connected_after_block"]=connected
+                    rep["block300_probe"]["payload_bytes_written"]=len(payload)
+                    rep["block300_probe"]["dial_sync_writes"]=1
+                    emit("BLOQUE · ACK01="+str(ack)+" · conectado="+str(connected))
 
-                    emit("6/10 · Esperando estabilidad…")
-                    await asyncio.sleep(6)
+                    emit("5/9 · Esperando estabilidad…")
+                    await asyncio.sleep(6.0)
                     stable=bool(getattr(c,"is_connected",False))
-                    rep["two_chunk_probe"]["connected_after_sequence"]=stable
+                    rep["block300_probe"]["stable_after_wait"]=stable
 
-                    emit("7/10 · DEVICE_INFO postcheck…")
-                    post_start=len(events)
+                    emit("6/9 · DEVICE_INFO postcheck…")
+                    post=len(events)
                     await tx(0x02,b"",3,2.5)
-                    emit("8/10 · DIAL_INFO postcheck…")
+                    emit("7/9 · DIAL_INFO postcheck…")
                     await tx(0x84,b"",3,3.5)
-                    post=events[post_start:]
-                    rep["two_chunk_probe"]["postcheck_rx"]=[x.hex() for x in post]
-                    post_ok=len(post)>0
-                    rep["two_chunk_probe"]["classification"]="two_chunks_accepted" if all_ok and stable and post_ok else "sequence_not_fully_accepted"
+                    post_frames=events[post:]
+                    rep["block300_probe"]["postcheck_rx"]=[x.hex() for x in post_frames]
+                    post_ok=len(post_frames)>0
+                    rep["block300_probe"]["classification"]="block300_accepted" if ack and stable and post_ok else "block300_not_fully_accepted"
 
-                    emit("9/10 · CLASIFICACIÓN · "+rep["two_chunk_probe"]["classification"])
-                    rep["two_chunk_probe"]["phase"]="complete"
-                    emit("10/10 · V0.68 FINALIZADA · enviados 22/"+str(len(packed))+" bytes; sin cierre/finalización.")
+                    emit("8/9 · CLASIFICACIÓN · "+rep["block300_probe"]["classification"])
+                    rep["block300_probe"]["phase"]="complete"
+                    emit("9/9 · V0.69 FINALIZADA · enviados 300/"+str(len(packed))+" bytes; no hubo segundo bloque ni cierre.")
                     return rep
                 finally:
                     if c:
@@ -169,22 +161,22 @@ new_ota = '''        def ota_lab():
             def done(result,error):
                 if error:
                     rep["errors"].append(type(error).__name__+": "+str(error))
-                    rep["two_chunk_probe"]["phase"]="error";self.report=rep;self.show()
-                    append("V0.68 FALLÓ · "+repr(error))
+                    rep["block300_probe"]["phase"]="error";self.report=rep;self.show()
+                    append("V0.69 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V0.68 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V0.69 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
-                append("SECUENCIA 0x83 · "+result["two_chunk_probe"]["classification"]+" · 22 bytes totales.")
-                self.status.set("V0.68 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
+                append("BLOQUE 300B · "+result["block300_probe"]["classification"]+" · enviados 300 bytes.")
+                self.status.set("V0.69 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
             self.run_async(asyncio.wait_for(work(),timeout=150),done)
 '''
 
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.68 LISTA · 1º PREPARAR ESFERA ÚNICA V0.68; 2º COPIAR DIAGNÓSTICO. Prueba dos mensajes 0x83 consecutivos del mismo zlib: 22 bytes totales, ACK individual y postcheck.")'
+new_ready='append("V0.69 LISTA · 1º PREPARAR ESFERA ÚNICA V0.69; 2º COPIAR DIAGNÓSTICO. Prueba el primer bloque de 300 bytes por 0x83, espera ACK y verifica estabilidad/postcheck.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
@@ -232,7 +224,7 @@ s=s.replace("    def open_control(self):", '''    async def inspect_gatt_snapsho
     def open_control(self):''',1)
 
 
-# V0.68: do not depend on a second advertising cycle after the first GATT attempt.
+# V0.69: do not depend on a second advertising cycle after the first GATT attempt.
 # Reuse the BLEDevice captured by "Buscar relojes" first; fresh scanning is recovery only.
 _conn_start=s.index("    async def connect_retry(")
 _conn_end=s.index("\n    def diagnose(",_conn_start)
@@ -333,4 +325,4 @@ _new_connect_retry='''    async def connect_retry(self,attempts=5,progress=None)
 s=s[:_conn_start]+_new_connect_retry+s[_conn_end:]
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.68 aplicado")
+print("build patch v0.69 aplicado")
