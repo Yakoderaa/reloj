@@ -5,9 +5,9 @@ s = p.read_text(encoding="utf-8")
 
 s = s.replace("import urllib.request, tempfile, os, subprocess, time, hashlib, queue", "import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math", 1)
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.70.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.70")', 1)
-s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.70 · modo esfera única · protocolo ApWatch/WTWD', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.71.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.71")', 1)
+s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.71 · modo esfera única · protocolo ApWatch/WTWD', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -23,7 +23,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="PROBAR 2 BLOQUES 300B V0.70")
+        primary_test=ttk.Button(row,text="VERIFICAR ESTADO POST-0x83 V0.71")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -35,128 +35,72 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("V0.70 NO INICIADA · Bluetooth ocupado.")
+                append("V0.71 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V0.70 · DOS BLOQUES 300B · envía los primeros 600 bytes del zlib como 2 mensajes 0x83 consecutivos de 300 bytes, con ACK individual y postcheck. No finaliza el dial.")
+            append("V0.71 · ESTADO POST-0x83 · reconecta limpio, escucha tráfico pasivo y consulta DEVICE_INFO/DIAL_INFO. No envía ningún 0x83 ni datos de dial.")
             rep=self.base_report()
-            rep["two_block300_probe"]={"phase":"candidate","blocks":[],"payload_bytes_written":0,"dial_sync_writes":0,"destructive_actions":0}
+            rep["post_83_state"]={"phase":"connect","b001_rx":[],"ffc2_rx":[],"queries":[],"dial_sync_writes":0,"dial_payload_bytes_written":0,"destructive_actions":0}
             t0=time.monotonic()
 
             def emit(msg):
                 line=f"+{time.monotonic()-t0:06.2f}s · {msg}"
                 self.ui_queue.put(lambda x=line:(append(x),self.status.set(x)))
 
-            def read_candidate():
-                import zlib
-                path=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","wf-analysis-v062","single-face-proof-v062.bin")
-                if not os.path.exists(path):raise RuntimeError("Falta single-face-proof-v062.bin")
-                with open(path,"rb") as fh:raw=fh.read()
-                if len(raw)<54 or raw[:2]!=b"WF":raise RuntimeError("WF inválido")
-                packed=zlib.compress(raw,9)
-                return path,raw,packed
-
-            def build(pid,cmd_type,send_type,opcode,payload=b""):
-                payload=bytes(payload);n=len(payload)
-                if n>4855:raise RuntimeError("payload > 4855")
-                h=bytearray(20)
-                if n<=10:
-                    h[1]=pid&255;h[3]=cmd_type;h[4]=send_type;h[5]=opcode;h[8]=n&255;h[9]=(n>>8)&255;h[10:10+n]=payload
-                    return [bytes(h)]
-                rem=n-10;frags=(rem+18)//19
-                h[1]=pid&255;h[2]=frags;h[3]=cmd_type;h[4]=send_type;h[5]=opcode;h[8]=n&255;h[9]=(n>>8)&255;h[10:20]=payload[:10]
-                out=[bytes(h)];pos=10
-                for i in range(frags):
-                    c=bytearray(20);c[0]=i+1
-                    part=payload[pos:pos+19];c[1:1+len(part)]=part
-                    out.append(bytes(c));pos+=len(part)
-                return out
-
-            def sync_payload():
-                now=int(time.time());off=-time.timezone
-                if time.daylight and time.localtime().tm_isdst:off=-time.altzone
-                tm=now.to_bytes(4,"little")+int(off).to_bytes(4,"little",signed=True)+bytes([0])
-                subs=[
-                    bytes([0x0C,0x00,0x66,0xE8,0x03,0x00,0x00,0x01,0x19,0xAF,0x46,0x00]),
-                    bytes([0x04,0x00,0x67,0x00]),
-                    bytes([12,0,0x68])+tm,
-                    bytes([0x04,0x00,0x6D,0x01]),
-                    bytes([0x04,0x00,0x7A,0x01]),
-                    bytes([0x08,0x00,0x7C,0x01,0xFF,0xFF,0xFF,0xFF]),
-                    bytes([0x05,0x00,0x78,0x01,0x00])
-                ]
-                body=b"".join(subs);total=len(body)+1
-                return bytes([total&255,(total>>8)&255,len(subs)])+body
+            def build_request(pid,opcode):
+                pkt=bytearray(20)
+                pkt[1]=pid&255;pkt[4]=3;pkt[5]=opcode&255
+                return bytes(pkt)
 
             async def work():
-                emit("1/10 · Cargando candidato…")
-                path,raw,packed=await asyncio.to_thread(read_candidate)
-                blocks=[packed[:300],packed[300:600]]
-                rep["two_block300_probe"]["candidate"]={"path":path,"raw_size":len(raw),"zlib_size":len(packed),"zlib_sha256":hashlib.sha256(packed).hexdigest()}
-
-                c=None;events=[];pid=0
+                c=None
                 try:
-                    emit("2/10 · Conectando…")
+                    emit("1/7 · Conectando con sesión limpia…")
                     c,n=await self.connect_retry(5,emit)
                     rep["connection"]={"connected":True,"attempts":n}
-                    b001="0000b001-0000-1000-8000-00805f9b34fb";b002="0000b002-0000-1000-8000-00805f9b34fb"
-                    def rx(sender,data):
-                        events.append(bytes(data));emit("B001 RX · "+bytes(data).hex())
-                    await asyncio.wait_for(c.start_notify(b001,rx),timeout=6)
-                    await asyncio.sleep(.3)
+                    b001="0000b001-0000-1000-8000-00805f9b34fb"
+                    b002="0000b002-0000-1000-8000-00805f9b34fb"
+                    ffc2="f000ffc2-0451-4000-b000-000000000000"
 
-                    async def tx(op,payload=b"",send_type=1,wait=1.0):
-                        nonlocal pid
-                        start=len(events);frames=build(pid,0,send_type,op,payload)
-                        for fr in frames:
-                            await asyncio.wait_for(c.write_gatt_char(b002,fr,response=False),timeout=5)
-                            await asyncio.sleep(.08)
-                        pid=(pid+1)&255
-                        await asyncio.sleep(wait)
-                        return events[start:],frames
+                    def rx_b001(sender,data):
+                        h=bytes(data).hex();rep["post_83_state"]["b001_rx"].append(h);emit("B001 RX · "+h)
+                    def rx_ffc2(sender,data):
+                        h=bytes(data).hex();rep["post_83_state"]["ffc2_rx"].append(h);emit("FFC2 RX · "+h)
 
-                    emit("3/10 · DEVICE_INFO + bind OEM…")
-                    await tx(0x02,b"",3,1.8)
-                    await tx(0x6E,sync_payload(),1,1.4)
-                    await tx(0x1D,bytes([1]),1,.8)
-                    await tx(0x1F,bytes([8]),1,1.4)
+                    await asyncio.wait_for(c.start_notify(b001,rx_b001),timeout=6)
+                    try:
+                        await asyncio.wait_for(c.start_notify(ffc2,rx_ffc2),timeout=6)
+                        rep["post_83_state"]["ffc2_subscribed"]=True
+                    except Exception as ex:
+                        rep["post_83_state"]["ffc2_subscribed"]=False
+                        rep["post_83_state"]["ffc2_error"]=type(ex).__name__+": "+str(ex)
 
-                    all_ok=True
-                    for idx,block in enumerate(blocks,1):
-                        emit(f"{3+idx}/10 · BLOQUE {idx}/2 · 300 bytes · 17 frames BLE")
-                        rx_frames,tx_frames=await tx(0x83,block,1,5.0)
-                        ack=any(len(x)>=11 and x[0]==0 and x[4]==4 and x[5]==0x83 and x[8]==1 and x[10]==1 for x in rx_frames)
-                        connected=bool(getattr(c,"is_connected",False))
-                        row={
-                            "index":idx,"offset":(idx-1)*300,"payload_length":len(block),
-                            "payload_sha256":hashlib.sha256(block).hexdigest(),
-                            "tx_frames":[x.hex() for x in tx_frames],"rx_frames":[x.hex() for x in rx_frames],
-                            "frame_count":len(tx_frames),"ack01":ack,"connected":connected
-                        }
-                        rep["two_block300_probe"]["blocks"].append(row)
-                        rep["two_block300_probe"]["payload_bytes_written"]+=len(block)
-                        rep["two_block300_probe"]["dial_sync_writes"]+=1
-                        all_ok=all_ok and ack and connected
-                        emit("BLOQUE "+str(idx)+" · ACK01="+str(ack)+" · conectado="+str(connected))
-                        if not all_ok:break
+                    emit("2/7 · Escucha pasiva 8 s…")
+                    await asyncio.sleep(8.0)
 
-                    emit("6/10 · Esperando estabilidad…")
-                    await asyncio.sleep(7.0)
-                    stable=bool(getattr(c,"is_connected",False))
-                    rep["two_block300_probe"]["stable_after_wait"]=stable
+                    emit("3/7 · DEVICE_INFO 0x02…")
+                    pkt=build_request(0,0x02)
+                    rep["post_83_state"]["queries"].append({"label":"DEVICE_INFO","hex":pkt.hex()})
+                    await asyncio.wait_for(c.write_gatt_char(b002,pkt,response=False),timeout=5)
+                    await asyncio.sleep(4.0)
 
-                    emit("7/10 · DEVICE_INFO postcheck…")
-                    post=len(events)
-                    await tx(0x02,b"",3,2.5)
-                    emit("8/10 · DIAL_INFO postcheck…")
-                    await tx(0x84,b"",3,3.5)
-                    post_frames=events[post:]
-                    rep["two_block300_probe"]["postcheck_rx"]=[x.hex() for x in post_frames]
-                    post_ok=len(post_frames)>0
-                    rep["two_block300_probe"]["classification"]="two_blocks300_accepted" if all_ok and stable and post_ok else "two_blocks300_not_fully_accepted"
+                    emit("4/7 · DIAL_INFO 0x84…")
+                    pkt=build_request(1,0x84)
+                    rep["post_83_state"]["queries"].append({"label":"DIAL_INFO","hex":pkt.hex()})
+                    await asyncio.wait_for(c.write_gatt_char(b002,pkt,response=False),timeout=5)
+                    await asyncio.sleep(5.0)
 
-                    emit("9/10 · CLASIFICACIÓN · "+rep["two_block300_probe"]["classification"])
-                    rep["two_block300_probe"]["phase"]="complete"
-                    emit("10/10 · V0.70 FINALIZADA · enviados 600/"+str(len(packed))+" bytes; sin tercer bloque ni cierre.")
+                    emit("5/7 · Escucha final 8 s…")
+                    await asyncio.sleep(8.0)
+                    rep["post_83_state"]["connected_end"]=bool(getattr(c,"is_connected",False))
+                    rep["post_83_state"]["summary"]={
+                        "b001_frames":len(rep["post_83_state"]["b001_rx"]),
+                        "ffc2_frames":len(rep["post_83_state"]["ffc2_rx"]),
+                        "no_dial_sync_sent":True
+                    }
+
+                    emit("6/7 · RESULTADO · B001="+str(len(rep["post_83_state"]["b001_rx"]))+" · FFC2="+str(len(rep["post_83_state"]["ffc2_rx"]))+" · conectado="+str(rep["post_83_state"]["connected_end"]))
+                    rep["post_83_state"]["phase"]="complete"
+                    emit("7/7 · V0.71 FINALIZADA · estado post-0x83 verificado sin enviar datos de dial.")
                     return rep
                 finally:
                     if c:
@@ -166,22 +110,22 @@ new_ota = '''        def ota_lab():
             def done(result,error):
                 if error:
                     rep["errors"].append(type(error).__name__+": "+str(error))
-                    rep["two_block300_probe"]["phase"]="error";self.report=rep;self.show()
-                    append("V0.70 FALLÓ · "+repr(error))
+                    rep["post_83_state"]["phase"]="error";self.report=rep;self.show()
+                    append("V0.71 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V0.70 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V0.71 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
-                append("DOS BLOQUES 300B · "+result["two_block300_probe"]["classification"]+" · enviados 600 bytes.")
-                self.status.set("V0.70 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
-            self.run_async(asyncio.wait_for(work(),timeout=160),done)
+                append("POST-0x83 · sesión limpia verificada · no se enviaron datos de dial.")
+                self.status.set("V0.71 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
+            self.run_async(asyncio.wait_for(work(),timeout=120),done)
 '''
 
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.70 LISTA · 1º PREPARAR ESFERA ÚNICA V0.70; 2º COPIAR DIAGNÓSTICO. Prueba dos bloques 0x83 consecutivos de 300 bytes: 600 bytes totales, ACK individual y postcheck.")'
+new_ready='append("V0.71 LISTA · 1º PREPARAR ESFERA ÚNICA V0.71; 2º COPIAR DIAGNÓSTICO. Reconecta limpio y verifica estado tras pruebas 0x83 previas; sin enviar ningún dato de dial.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
@@ -229,7 +173,7 @@ s=s.replace("    def open_control(self):", '''    async def inspect_gatt_snapsho
     def open_control(self):''',1)
 
 
-# V0.70: do not depend on a second advertising cycle after the first GATT attempt.
+# V0.71: do not depend on a second advertising cycle after the first GATT attempt.
 # Reuse the BLEDevice captured by "Buscar relojes" first; fresh scanning is recovery only.
 _conn_start=s.index("    async def connect_retry(")
 _conn_end=s.index("\n    def diagnose(",_conn_start)
@@ -330,4 +274,4 @@ _new_connect_retry='''    async def connect_retry(self,attempts=5,progress=None)
 s=s[:_conn_start]+_new_connect_retry+s[_conn_end:]
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.70 aplicado")
+print("build patch v0.71 aplicado")
