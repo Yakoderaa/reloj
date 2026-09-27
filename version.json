@@ -1,6 +1,6 @@
 {
-  "version": "0.82.0",
-  "notes": "V0.82: transferencia real de esfera con estado OEM obligatorio y selección CUSTOMIZE verificada; actualizaciones futuras desde Buscar actualización.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.82.0/RelojLab.exe",
-  "sha256": "1dbe240ee7e9329dee65cf59632f4d82f46fa120f9456813132fae31993e2032"
+  "sha256": "1f3c1e8400fa18b47100c9feff9c69817b82f8b96c64ab539aa4f60be0643d85",
+  "version": "0.83.0",
+  "notes": "V0.83: esfera RELOJ LAB en formato CUSTOMIZE real + cabecera CEProtocolB corregida; actualizaciones futuras desde Buscar actualización.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.83.0/RelojLab.exe"
 }
