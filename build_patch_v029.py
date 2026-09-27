@@ -3,9 +3,9 @@ from pathlib import Path
 p = Path("app.py")
 s = p.read_text(encoding="utf-8")
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.50.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.50")', 1)
-s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.50 · modo esfera única · protocolo ApWatch/WTWD', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.51.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.51")', 1)
+s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.51 · modo esfera única · protocolo ApWatch/WTWD', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -21,7 +21,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="PREPARAR ESFERA ÚNICA V0.50")
+        primary_test=ttk.Button(row,text="CAPTURAR CAMBIO DE ESFERA V0.51")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -33,19 +33,19 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("PREPARACIÓN V0.50 NO INICIADA · Bluetooth ocupado.")
+                append("CAPTURA V0.51 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V0.50 · ESFERA ÚNICA · identifica el reloj y consulta la esfera activa con el protocolo E91A/B002→B001. Esta fase NO borra ni instala: primero obtiene los IDs exactos para no escribir un dial incompatible.")
+            append("V0.51 · CAPTURA CAMBIO DE ESFERA · durante la ventana indicada cambiá MANUALMENTE una sola esfera desde el reloj. La app compara DEVICE_INFO 0x02 + DIAL_INFO 0x84 antes/después y escucha B001. No instala ni borra esferas.")
             rep=self.base_report()
-            rep["unique_face"]={
-                "phase":"identity_and_dial_inventory",
-                "target_design":"analógico negro; hora digital curva arriba-izquierda; batería arriba-derecha; pasos abajo-izquierda; frecuencia cardíaca abajo-derecha",
-                "protocol":"WTWD/ApWatch family over E91A B002/B001",
-                "requests_sent":[],
-                "decoded_responses":[],
-                "raw_frames":[],
-                "factory_faces_deleted":False,
-                "custom_face_installed":False,
+            rep["face_switch_capture"]={
+                "phase":"before",
+                "protocol":"E91A B002→B001",
+                "before":{},
+                "after":{},
+                "events":[],
+                "requests":[],
+                "writes_safe_queries":0,
+                "unknown_writes":0,
                 "destructive_actions":0,
             }
             t0=time.monotonic()
@@ -53,142 +53,129 @@ new_ota = '''        def ota_lab():
                 line=f"+{time.monotonic()-t0:06.2f}s · {message}"
                 self.ui_queue.put(lambda x=line:(append(x),self.status.set(x)))
 
-            def build_request(pid,opcode,payload=b""):
-                payload=bytes(payload)
-                if len(payload)>10:
-                    raise RuntimeError("V0.50 sólo usa consultas cortas; payload demasiado grande.")
+            def build_request(pid,opcode):
                 pkt=bytearray(20)
                 pkt[0]=0x00
                 pkt[1]=pid & 0xff
-                pkt[2]=0x00
-                pkt[3]=0x00
+                pkt[2]=0
+                pkt[3]=0
                 pkt[4]=0x03
                 pkt[5]=opcode & 0xff
-                pkt[8]=len(payload) & 0xff
-                pkt[9]=(len(payload)>>8) & 0xff
-                pkt[10:10+len(payload)]=payload
+                pkt[8]=0
+                pkt[9]=0
                 return bytes(pkt)
 
-            def decode_frame(data):
+            def decode(data):
                 b=bytes(data)
-                row={"hex":b.hex(),"length":len(b)}
+                row={"t":round(time.monotonic()-t0,3),"hex":b.hex(),"length":len(b)}
                 if len(b)>=10 and b[0]==0:
                     plen=b[8] | (b[9]<<8)
-                    row.update({
-                        "kind":"header",
-                        "pid":b[1],
-                        "continuations":b[2],
-                        "cmd_type":b[3],
-                        "send_type":b[4],
-                        "opcode":b[5],
-                        "payload_length":plen,
-                        "payload_first_hex":b[10:10+min(plen,10)].hex(),
-                    })
+                    row.update({"kind":"header","pid":b[1],"continuations":b[2],"cmd_type":b[3],"send_type":b[4],"opcode":b[5],"payload_length":plen,"payload_first_hex":b[10:10+min(plen,10)].hex()})
                     if b[5]==0x02 and plen>=6:
                         pl=b[10:16]
-                        row["device_info"]={
-                            "id_total":pl[0],"customer_id":pl[1],"hardware_id":pl[2],
-                            "code_id":pl[3],"picture_id":pl[4],"font_id":pl[5],
-                        }
-                    elif b[5]==0x84:
-                        row["dial_info_payload_first_hex"]=b[10:10+min(plen,10)].hex()
+                        row["device_info"]={"id_total":pl[0],"customer_id":pl[1],"hardware_id":pl[2],"code_id":pl[3],"picture_id":pl[4],"font_id":pl[5]}
                 elif b:
                     row.update({"kind":"continuation","index":b[0],"payload_hex":b[1:].hex()})
                 return row
 
             async def work():
                 c=None
-                rx=[]
+                events=[]
                 try:
-                    emit("1/7 · Conectando al reloj con sesión GATT limpia…")
+                    emit("1/9 · Conectando por la ruta robusta V0.50…")
                     c,n=await self.connect_retry(5,emit)
                     rep["connection"]={"connected":True,"attempts":n}
-                    expected={
-                        "E91A":"0000e91a-0000-1000-8000-00805f9b34fb",
-                        "B001":"0000b001-0000-1000-8000-00805f9b34fb",
-                        "B002":"0000b002-0000-1000-8000-00805f9b34fb",
-                        "FFC1":"f000ffc1-0451-4000-b000-000000000000",
-                        "FFC2":"f000ffc2-0451-4000-b000-000000000000",
-                    }
-                    service_uuids={str(svc.uuid).lower() for svc in c.services}
-                    char_uuids={str(ch.uuid).lower() for svc in c.services for ch in svc.characteristics}
-                    present={"E91A":expected["E91A"] in service_uuids}
-                    for name in ("B001","B002","FFC1","FFC2"):
-                        present[name]=expected[name] in char_uuids
-                    rep["unique_face"]["channels_present"]=present
-                    emit("2/7 · CANALES · "+str(present))
-                    if not (present["E91A"] and present["B001"] and present["B002"]):
-                        raise RuntimeError("No aparece el canal E91A+B001+B002 esperado para administrar esferas.")
+                    b001="0000b001-0000-1000-8000-00805f9b34fb"
+                    b002="0000b002-0000-1000-8000-00805f9b34fb"
+                    if not c.services.get_characteristic(b001) or not c.services.get_characteristic(b002):
+                        raise RuntimeError("B001/B002 no disponibles en esta sesión.")
 
-                    emit("3/7 · Leyendo identidad estándar 2A29/2A24/2A27/2A26/2A28…")
-                    fields={
-                        "manufacturer":"00002a29-0000-1000-8000-00805f9b34fb",
-                        "model":"00002a24-0000-1000-8000-00805f9b34fb",
-                        "hardware":"00002a27-0000-1000-8000-00805f9b34fb",
-                        "firmware":"00002a26-0000-1000-8000-00805f9b34fb",
-                        "software":"00002a28-0000-1000-8000-00805f9b34fb",
-                    }
-                    ident={}
-                    for key,uuid in fields.items():
-                        ch=c.services.get_characteristic(uuid)
-                        if not ch or "read" not in ch.properties:
-                            ident[key]=None
-                            continue
-                        try:
-                            raw=bytes(await asyncio.wait_for(c.read_gatt_char(ch),timeout=4))
-                            ident[key]={"text":raw.decode("utf-8","replace").strip("\\x00").strip(),"hex":raw.hex()}
-                            emit(key+"="+repr(ident[key]["text"]))
-                        except Exception as ex:
-                            ident[key]={"error":repr(ex)}
-                    rep["unique_face"]["identity"]=ident
-
-                    def on_b001(sender,data):
-                        row=decode_frame(data)
-                        row["t"]=round(time.monotonic()-t0,3)
-                        rx.append(row)
-                        rep["unique_face"]["raw_frames"].append(row)
-                        summary="B001 RX · "+row["hex"]
+                    def rx(sender,data):
+                        row=decode(data)
+                        events.append(row)
+                        rep["face_switch_capture"]["events"].append(row)
+                        text="B001 RX · "+row["hex"]
                         if row.get("opcode") is not None:
-                            summary+=f" · opcode=0x{row['opcode']:02X} · send={row.get('send_type')} · len={row.get('payload_length')}"
+                            text+=f" · op=0x{row['opcode']:02X} · send={row.get('send_type')} · len={row.get('payload_length')}"
                         if row.get("device_info"):
-                            summary+=" · DEVICE_INFO="+str(row["device_info"])
-                        emit(summary)
+                            text+=" · DEVICE_INFO="+str(row["device_info"])
+                        emit(text)
 
-                    emit("4/7 · Suscribiendo B001…")
-                    await asyncio.wait_for(c.start_notify(expected["B001"],on_b001),timeout=6)
-                    await asyncio.sleep(.35)
-
-                    requests=[("DEVICE_INFO 0x02",0x02), ("DIAL_INFO 0x84",0x84)]
+                    await asyncio.wait_for(c.start_notify(b001,rx),timeout=6)
+                    await asyncio.sleep(.4)
                     pid=0
-                    for label,opcode in requests:
+
+                    async def query(label,opcode):
+                        nonlocal pid
+                        before_count=len(events)
                         pkt=build_request(pid,opcode)
-                        rep["unique_face"]["requests_sent"].append({"label":label,"opcode":opcode,"hex":pkt.hex()})
-                        emit("5/7 · TX "+label+" · "+pkt.hex())
-                        await asyncio.wait_for(c.write_gatt_char(expected["B002"],pkt,response=False),timeout=5)
+                        rep["face_switch_capture"]["requests"].append({"label":label,"opcode":opcode,"hex":pkt.hex(),"t":round(time.monotonic()-t0,3)})
+                        rep["face_switch_capture"]["writes_safe_queries"]+=1
+                        emit("TX "+label+" · "+pkt.hex())
+                        await asyncio.wait_for(c.write_gatt_char(b002,pkt,response=False),timeout=5)
                         pid=(pid+1)&0xff
-                        await asyncio.sleep(2.2)
+                        await asyncio.sleep(1.8)
+                        return events[before_count:]
 
-                    emit("6/7 · Esperando respuestas/fragmentos finales…")
-                    await asyncio.sleep(3.5)
-                    try: await c.stop_notify(expected["B001"])
+                    emit("2/9 · Midiendo estado ANTES del cambio…")
+                    before02=await query("ANTES · DEVICE_INFO 0x02",0x02)
+                    before84=await query("ANTES · DIAL_INFO 0x84",0x84)
+                    before_dev=next((x["device_info"] for x in reversed(before02) if x.get("device_info")),None)
+                    rep["face_switch_capture"]["before"]={"device_info":before_dev,"device_frames":before02,"dial_frames":before84}
+                    if before_dev:
+                        emit("ANTES · picture_id="+str(before_dev["picture_id"])+" · font_id="+str(before_dev["font_id"]))
+                    else:
+                        emit("ANTES · DEVICE_INFO sin payload de 6 IDs.")
+
+                    rep["face_switch_capture"]["phase"]="manual_switch_window"
+                    emit("3/9 · AHORA CAMBIÁ UNA SOLA ESFERA DESDE EL RELOJ. Tenés 20 segundos.")
+                    emit("IMPORTANTE · elegí otra esfera visible y dejala puesta; no toques botones de esta app.")
+                    base_event_count=len(events)
+                    for left in range(20,0,-1):
+                        if left in (20,15,10,5,3,2,1):
+                            self.ui_queue.put(lambda z=left:self.status.set(f"CAMBIÁ UNA ESFERA EN EL RELOJ · quedan {z}s"))
+                            emit("ventana manual · quedan "+str(left)+"s")
+                        await asyncio.sleep(1)
+                    spontaneous=events[base_event_count:]
+                    rep["face_switch_capture"]["spontaneous_during_switch"]=spontaneous
+                    emit("4/9 · Ventana terminada · frames espontáneos="+str(len(spontaneous)))
+
+                    rep["face_switch_capture"]["phase"]="after"
+                    emit("5/9 · Midiendo estado DESPUÉS del cambio…")
+                    after02=await query("DESPUÉS · DEVICE_INFO 0x02",0x02)
+                    after84=await query("DESPUÉS · DIAL_INFO 0x84",0x84)
+                    after_dev=next((x["device_info"] for x in reversed(after02) if x.get("device_info")),None)
+                    rep["face_switch_capture"]["after"]={"device_info":after_dev,"device_frames":after02,"dial_frames":after84}
+                    if after_dev:
+                        emit("DESPUÉS · picture_id="+str(after_dev["picture_id"])+" · font_id="+str(after_dev["font_id"]))
+                    else:
+                        emit("DESPUÉS · DEVICE_INFO sin payload de 6 IDs.")
+
+                    emit("6/9 · Comparando IDs…")
+                    diff={}
+                    if before_dev and after_dev:
+                        for key in before_dev:
+                            if before_dev.get(key)!=after_dev.get(key):
+                                diff[key]={"before":before_dev.get(key),"after":after_dev.get(key)}
+                    rep["face_switch_capture"]["id_diff"]=diff
+                    emit("DIFERENCIAS DEVICE_INFO · "+str(diff if diff else "ninguna"))
+
+                    emit("7/9 · Comparando respuestas DIAL_INFO…")
+                    before_dial_hex=[x["hex"] for x in before84]
+                    after_dial_hex=[x["hex"] for x in after84]
+                    rep["face_switch_capture"]["dial_changed"]=before_dial_hex!=after_dial_hex
+                    rep["face_switch_capture"]["dial_before_hex"]=before_dial_hex
+                    rep["face_switch_capture"]["dial_after_hex"]=after_dial_hex
+                    emit("DIAL_INFO cambió="+str(before_dial_hex!=after_dial_hex))
+
+                    emit("8/9 · Clasificando tráfico espontáneo…")
+                    rep["face_switch_capture"]["spontaneous_opcodes"]=sorted({x.get("opcode") for x in spontaneous if x.get("opcode") is not None})
+                    emit("OPCODES ESPONTÁNEOS · "+str(rep["face_switch_capture"]["spontaneous_opcodes"]))
+
+                    rep["face_switch_capture"]["phase"]="complete"
+                    emit("9/9 · CAPTURA V0.51 FINALIZADA · cero escrituras desconocidas; cero borrados; cero instalaciones.")
+                    try: await c.stop_notify(b001)
                     except Exception: pass
-
-                    dev=None; dial_rows=[]
-                    for row in rx:
-                        if row.get("device_info"): dev=row["device_info"]
-                        if row.get("opcode")==0x84: dial_rows.append(row)
-                    rep["unique_face"]["device_info"]=dev
-                    rep["unique_face"]["dial_info_frames"]=dial_rows
-                    rep["unique_face"]["ready_for_packaging"]=bool(dev and dial_rows)
-                    if dev:
-                        emit("DEVICE IDs · customer="+str(dev["customer_id"])+" hardware="+str(dev["hardware_id"])+" code="+str(dev["code_id"])+" picture="+str(dev["picture_id"])+" font="+str(dev["font_id"]))
-                    else:
-                        emit("DEVICE_INFO 0x02 no devolvió los 6 IDs esperados.")
-                    if dial_rows:
-                        emit("DIAL_INFO 0x84 respondió · "+str(len(dial_rows))+" frame(s).")
-                    else:
-                        emit("DIAL_INFO 0x84 no respondió en esta sesión; necesito este dato antes de empaquetar/escribir una esfera.")
-                    emit("7/7 · PREPARACIÓN V0.50 FINALIZADA · no se borró ni instaló ninguna esfera en esta fase.")
                     return rep
                 finally:
                     if c:
@@ -198,28 +185,30 @@ new_ota = '''        def ota_lab():
             def done(result,error):
                 if error:
                     rep["errors"].append(type(error).__name__+": "+str(error))
-                    rep["unique_face"]["phase"]="error"
+                    rep["face_switch_capture"]["phase"]="error"
                     self.report=rep
                     self.show()
-                    append("PREPARACIÓN V0.50 FALLÓ · "+repr(error))
+                    append("CAPTURA V0.51 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V0.50 terminó con error. Copiá el diagnóstico.")
+                    self.status.set("V0.51 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result
                 self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
-                if result.get("unique_face",{}).get("ready_for_packaging"):
-                    append("LISTO PARA SIGUIENTE PASO · ya tengo IDs de hardware + respuesta DIAL_INFO para construir el paquete de tu esfera sin adivinar.")
+                diff=result.get("face_switch_capture",{}).get("id_diff",{})
+                spont=result.get("face_switch_capture",{}).get("spontaneous_during_switch",[])
+                if diff or spont:
+                    append("CAMBIO DETECTADO · ya tenemos una diferencia utilizable para aislar el selector de esfera.")
                 else:
-                    append("FALTA UNA RESPUESTA · copiá este diagnóstico tal cual para ajustar la consulta en la siguiente versión.")
-                self.status.set("V0.50 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
-            self.run_async(asyncio.wait_for(work(),timeout=180),done)
+                    append("SIN CAMBIO TELEMETRADO · el reloj cambió visualmente pero no expuso selector por estas consultas; el diagnóstico igualmente sirve para la siguiente ruta.")
+                self.status.set("V0.51 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
+            self.run_async(asyncio.wait_for(work(),timeout=150),done)
 '''
 
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.50 LISTA · 1º PREPARAR ESFERA ÚNICA V0.50; 2º COPIAR DIAGNÓSTICO. Consulta DEVICE_INFO 0x02 y DIAL_INFO 0x84 por E91A/B002→B001 sin borrar ni instalar todavía.")'
+new_ready='append("V0.51 LISTA · 1º PREPARAR ESFERA ÚNICA V0.51; 2º COPIAR DIAGNÓSTICO. Medí antes/después: durante la ventana cambiá una sola esfera manualmente en el reloj.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
@@ -267,7 +256,7 @@ s=s.replace("    def open_control(self):", '''    async def inspect_gatt_snapsho
     def open_control(self):''',1)
 
 
-# V0.50: do not depend on a second advertising cycle after the first GATT attempt.
+# V0.51: do not depend on a second advertising cycle after the first GATT attempt.
 # Reuse the BLEDevice captured by "Buscar relojes" first; fresh scanning is recovery only.
 _conn_start=s.index("    async def connect_retry(")
 _conn_end=s.index("\n    def diagnose(",_conn_start)
@@ -368,4 +357,4 @@ _new_connect_retry='''    async def connect_retry(self,attempts=5,progress=None)
 s=s[:_conn_start]+_new_connect_retry+s[_conn_end:]
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.50 aplicado")
+print("build patch v0.51 aplicado")
