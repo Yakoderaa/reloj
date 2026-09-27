@@ -102,7 +102,7 @@ new_ota = '''        def ota_lab():
                 now=int(time.time())
                 offset=-time.timezone
                 if time.daylight and time.localtime().tm_isdst:offset=-time.altzone
-                return now.to_bytes(4,"little",signed=False)+int(offset).to_bytes(4,"little",signed=True)+b"\x00"
+                return now.to_bytes(4,"little",signed=False)+int(offset).to_bytes(4,"little",signed=True)+b"\\x00"
 
             def sync_payload():
                 user=bytes([0x0C,0x00,0x66,0xE8,0x03,0x00,0x00,0x01,0x19,0xAF,0x46,0x00])
@@ -154,8 +154,8 @@ new_ota = '''        def ota_lab():
                     emit("3/10 · Bind OEM conocido: APP_SYNC 0x6E…")
                     await send_known("APP_SYNC",0,1,0x6E,sync_payload(),1.8)
                     emit("4/10 · Bind OEM conocido: BLE5 0x1D + EXT_PID 0x1F…")
-                    await send_known("SUP_BLE_50",0,1,0x1D,b"\x01",.9)
-                    await send_known("EXT_PID Universal",0,1,0x1F,b"\x08",1.8)
+                    await send_known("SUP_BLE_50",0,1,0x1D,b"\\x01",.9)
+                    await send_known("EXT_PID Universal",0,1,0x1F,b"\\x08",1.8)
 
                     emit("5/10 · PROBE · DIAL_SYNC 0x83 SEND · payload=0 bytes…")
                     start=len(events)
