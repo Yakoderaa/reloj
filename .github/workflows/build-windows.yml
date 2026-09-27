@@ -7,7 +7,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: reloj-release-main-v053
+  group: reloj-release-main-v054
   cancel-in-progress: true
 jobs:
   build:
@@ -19,7 +19,7 @@ jobs:
           python-version: '3.12'
       - name: Verify read-only inventory and cleanup
         run: python -m unittest discover -s tests -p test_inventory.py -v
-      - name: Apply v0.53 source patch
+      - name: Apply v0.54 source patch
         run: python build_patch_v029.py
       - name: Install dependencies
         run: python -m pip install -r requirements.txt pyinstaller==6.22.0
@@ -41,14 +41,14 @@ jobs:
           $releaseTag = "v$releaseVersion"
           gh release view $releaseTag *> $null
           if ($LASTEXITCODE -eq 0) { throw "La versión ya existe; no se reemplazan ejecutables publicados." }
-          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V0.53: prueba DIAL_INFO 0x84 sólo como REQUEST con payloads mínimos 00/01/02/03, con DEVICE_INFO antes/después y DIAL_SYNC 0x83 bloqueado."
+          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V0.54: identifica el reloj, consulta el backend OEM sin credenciales de terceros y descarga/analiza hasta tres diales .bin oficiales compatibles, sin escribir DIAL_SYNC 0x83."
           if ($LASTEXITCODE -ne 0) { throw "Falló la publicación del EXE" }
           New-Item -ItemType Directory -Path verified | Out-Null
           gh release download $releaseTag --pattern RelojLab.exe --dir verified
           if ($LASTEXITCODE -ne 0) { throw "No se pudo verificar la descarga publicada" }
           $expectedHash = (Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           if ((Get-FileHash verified/RelojLab.exe -Algorithm SHA256).Hash.ToLower() -ne $expectedHash) { throw "SHA-256 publicado incorrecto" }
-          $metadata = @{version=$releaseVersion; exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe"; sha256=$expectedHash; notes="V0.53: sondeo seguro de subcomandos DIAL_INFO 0x84: REQUEST payload 00/01/02/03 con control DEVICE_INFO y sin tocar DIAL_SYNC 0x83."}
+          $metadata = @{version=$releaseVersion; exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe"; sha256=$expectedHash; notes="V0.54: descubrimiento pasivo de dial OEM: consulta listas oficiales por candidatos watchId acotados, analiza .bin y mantiene DIAL_SYNC 0x83 bloqueado."}
           $metadata | ConvertTo-Json | Set-Content -Encoding utf8NoBOM version.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
