@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.74.0/RelojLab.exe",
-  "sha256": "0d585658a823749e03d418f0cb1932c0bc6f1d56ce676a575c83e153a3d5e3cb",
-  "notes": "V0.74: veinte bloques consecutivos de 300 bytes, 6000 bytes totales, con verificación de estabilidad.",
-  "version": "0.74.0"
+  "notes": "V0.75: análisis offline completo de segmentación y checksums; sin uso de Bluetooth.",
+  "sha256": "9ee012b265f4cd6fa1b26de7ee3d0da74a7fcaff8c25813a5804c1fc1e06ec43",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.75.0/RelojLab.exe",
+  "version": "0.75.0"
 }
