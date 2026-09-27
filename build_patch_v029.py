@@ -224,5 +224,47 @@ if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
 
+
+s=s.replace("    def open_control(self):", '''    async def inspect_gatt_snapshot(self,emit):
+        address=(self.selected or {}).get("address")
+        if not address: raise RuntimeError("Seleccioná el reloj primero.")
+        client=None
+        snapshot={"services":[],"errors":[],"connected":False}
+        try:
+            target=await asyncio.wait_for(BleakScanner.find_device_by_address(address,timeout=8),timeout=10)
+            if target is None: raise RuntimeError("El reloj seleccionado no está visible.")
+            client=BleakClient(target,timeout=15,winrt={"use_cached_services":False})
+            await asyncio.wait_for(client.connect(),timeout=18)
+            if not client.is_connected: raise RuntimeError("GATT no conectado")
+            snapshot["connected"]=True
+            present=set()
+            for svc in client.services:
+                entry={"uuid":svc.uuid,"characteristics":[]}
+                emit("SERVICIO "+svc.uuid)
+                for ch in svc.characteristics:
+                    present.add(ch.uuid.lower())
+                    row={"uuid":ch.uuid,"handle":ch.handle,"properties":list(ch.properties)}
+                    entry["characteristics"].append(row)
+                    emit("  CARACTERÍSTICA "+str(row))
+                snapshot["services"].append(entry)
+            expected={"B001":"0000b001-0000-1000-8000-00805f9b34fb","B002":"0000b002-0000-1000-8000-00805f9b34fb","FFC1":"f000ffc1-0451-4000-b000-000000000000","FFC2":"f000ffc2-0451-4000-b000-000000000000"}
+            snapshot["present"]={name:uuid in present for name,uuid in expected.items()}
+            emit("PRESENCIA "+str(snapshot["present"]))
+            if not snapshot["present"]["B001"]:
+                emit("B001 AUSENTE en esta enumeración. Causa pendiente; no confirma modo OTA.")
+        except asyncio.CancelledError: raise
+        except Exception as ex:
+            snapshot["errors"].append(type(ex).__name__+": "+str(ex))
+            emit("ERROR DE INSPECCIÓN · "+snapshot["errors"][-1])
+        finally:
+            if client is not None:
+                try: await asyncio.wait_for(client.disconnect(),timeout=4)
+                except Exception as ex:
+                    snapshot["errors"].append("Cierre: "+repr(ex))
+                    emit("ERROR DE CIERRE · "+repr(ex))
+        return snapshot
+
+    def open_control(self):''',1)
+
 p.write_text(s,encoding="utf-8")
 print("build patch v0.49 aplicado")
