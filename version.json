@@ -1,6 +1,6 @@
 {
-  "version": "0.58.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.58.0/RelojLab.exe",
-  "sha256": "67e6fc5bae696474f0b7ce3afd806e276f7c8d232ce72ad02d1f11f0c567ffb8",
-  "notes": "V0.58: blueprint WF 240×296 con agujas analógicas, cuatro dígitos de hora, separador y slots dinámicos identificados; DIAL_SYNC 0x83 sigue bloqueado."
+  "notes": "V0.59: mapa WF V2 con pasos/pulso/calorías confirmados y batería real por opcode 0x03; DIAL_SYNC 0x83 bloqueado.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.59.0/RelojLab.exe",
+  "version": "0.59.0",
+  "sha256": "080f5b02ad7af1adc17ecd7a5388471dd14f6c43ca3bd1dc16736594e59454a2"
 }
