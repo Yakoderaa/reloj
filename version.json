@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.81.0/RelojLab.exe",
-  "version": "0.81.0",
-  "notes": "V0.81: selección exacta de la esfera personalizada por PID/showOrder y unificación de los slots regrabables; actualizaciones futuras desde Buscar actualización.",
-  "sha256": "52c745aee0c44b13c78b78083b30ed6f095dee67600859f7f9f81e566d1e3522"
+  "version": "0.82.0",
+  "notes": "V0.82: transferencia real de esfera con estado OEM obligatorio y selección CUSTOMIZE verificada; actualizaciones futuras desde Buscar actualización.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.82.0/RelojLab.exe",
+  "sha256": "1dbe240ee7e9329dee65cf59632f4d82f46fa120f9456813132fae31993e2032"
 }
