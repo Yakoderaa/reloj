@@ -1,6 +1,6 @@
 {
-  "version": "0.48.0",
-  "sha256": "68a63e5906c48be12baaa41b5bb19cc7544f5565b486af3a23d958d1b76b7471",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.48.0/RelojLab.exe",
-  "notes": "V0.48: búsqueda y descarga de firmware oficial QWatch Pro. Copiar diagnóstico permanece como segundo botón."
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.49.0/RelojLab.exe",
+  "version": "0.49.0",
+  "notes": "V0.49: preparación de Esfera Única con DEVICE_INFO 0x02 y DIAL_INFO 0x84. PREPARAR ESFERA ÚNICA es el primer botón y COPIAR DIAGNÓSTICO el segundo.",
+  "sha256": "a83e5543c363fe1e670664c78f13b03d525530e8e8beae71dd45090abeb27a6a"
 }
