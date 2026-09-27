@@ -1,6 +1,6 @@
 {
-  "notes": "V0.75: análisis offline completo de segmentación y checksums; sin uso de Bluetooth.",
-  "sha256": "9ee012b265f4cd6fa1b26de7ee3d0da74a7fcaff8c25813a5804c1fc1e06ec43",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.75.0/RelojLab.exe",
-  "version": "0.75.0"
+  "version": "0.80.0",
+  "notes": "V0.80: instalación OEM de la esfera personalizada y selección activa; actualizaciones futuras desde Buscar actualización.",
+  "sha256": "3e2cea6f9df8725803af8e6fc88ee7ae1610b2d4dbd3247878d626b195dfbeaa",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.80.0/RelojLab.exe"
 }
