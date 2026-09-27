@@ -30,7 +30,7 @@ jobs:
             javap -classpath out/aar/classes.jar -p -c -s $c 2>&1 | Out-File -Append -Encoding utf8 out/javap.txt
           }
           Get-FileHash abpartool-release.aar -Algorithm SHA256 | Format-List | Out-File -Encoding utf8 out/sha256.txt
-          $catalog = Invoke-RestMethod -Uri "https://wr.watchhealth.com.cn/app-halfwit/app-dial/getDialList?currentPage=1&pageSize=20&watchId=102"
+          $catalog = Invoke-RestMethod -Uri "https://wr.watchhealth.com.cn/app-halfwit/app-dial/getDialList?currentPage=1&pageSize=100&watchId=102"
           $dial = $catalog.data | Where-Object { $_.dialId -eq "2011092" } | Select-Object -First 1
           $dial | ConvertTo-Json -Depth 8 | Out-File -Encoding utf8 out/dial-2011092.json
           Invoke-WebRequest -Uri $dial.dialFile -OutFile out/dial-2011092.bin
@@ -41,6 +41,14 @@ jobs:
             $d | ConvertTo-Json -Depth 8 | Out-File -Encoding utf8 ("out/" + $safe + ".json")
             if ($d.previewImg) { Invoke-WebRequest -Uri $d.previewImg -OutFile ("out/" + $safe + "-preview.png") }
             if ($d.dialFile) { Invoke-WebRequest -Uri $d.dialFile -OutFile ("out/" + $safe + ".bin") }
+          }
+          New-Item -ItemType Directory -Path out/all-dials | Out-Null
+          $all = $catalog.data | Where-Object { $_.resolution -eq "240*296" }
+          $all | ConvertTo-Json -Depth 8 | Out-File -Encoding utf8 out/all-dials/catalog.json
+          foreach ($d in $all) {
+            $safe = "dial-" + $d.dialId
+            if ($d.previewImg) { Invoke-WebRequest -Uri $d.previewImg -OutFile ("out/all-dials/" + $safe + "-preview.png") }
+            if ($d.dialFile) { Invoke-WebRequest -Uri $d.dialFile -OutFile ("out/all-dials/" + $safe + ".bin") }
           }
       - uses: actions/upload-artifact@v4
         with:
