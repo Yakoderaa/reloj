@@ -56,6 +56,11 @@ jobs:
             safe=$(echo "$f" | sed 's#^decompiled/##; s#/#__#g')
             cp "$f" "evidence/$safe" || true
           done < evidence/files.txt
+          for pid in 8330 35360 255; do
+            curl -L -sS --max-time 15 "http://watchhealth.com.cn/YueDongService/app/faceConfig.do?deviceId=$pid&pageIndex=1" -o "evidence/faceConfig-$pid-http.json" || true
+            curl -L -sS --max-time 15 "https://watchhealth.com.cn/YueDongService/app/faceConfig.do?deviceId=$pid&pageIndex=1" -o "evidence/faceConfig-$pid-https.json" || true
+          done
+          for f in evidence/faceConfig-*.json; do echo "=== $f ==="; cat "$f" || true; echo; done
           find evidence -maxdepth 1 -type f -printf '%f\n' | sort
       - uses: actions/upload-artifact@v4
         with:
