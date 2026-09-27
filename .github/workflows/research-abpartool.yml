@@ -35,6 +35,13 @@ jobs:
           $dial | ConvertTo-Json -Depth 8 | Out-File -Encoding utf8 out/dial-2011092.json
           Invoke-WebRequest -Uri $dial.dialFile -OutFile out/dial-2011092.bin
           if ($dial.previewImg) { Invoke-WebRequest -Uri $dial.previewImg -OutFile out/dial-2011092-preview.png }
+          $six = $catalog.data | Where-Object { $_.resolution -eq "240*296" } | Select-Object -First 6
+          foreach ($d in $six) {
+            $safe = "dial-" + $d.dialId
+            $d | ConvertTo-Json -Depth 8 | Out-File -Encoding utf8 ("out/" + $safe + ".json")
+            if ($d.previewImg) { Invoke-WebRequest -Uri $d.previewImg -OutFile ("out/" + $safe + "-preview.png") }
+            if ($d.dialFile) { Invoke-WebRequest -Uri $d.dialFile -OutFile ("out/" + $safe + ".bin") }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: abpartool-research
