@@ -1,6 +1,6 @@
 {
-  "version": "0.52.0",
-  "notes": "V0.52: mapeo seguro de DIAL_INFO 0x84 con reensamblado exacto; compara REQUEST vs SEND vacío y no toca DIAL_SYNC 0x83.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.52.0/RelojLab.exe",
-  "sha256": "f71a656069b0f503714cd6234dff8de345b73520ddb9b460a16e07b8071b07f2"
+  "notes": "V0.53: sondeo seguro de subcomandos DIAL_INFO 0x84: REQUEST payload 00/01/02/03 con control DEVICE_INFO y sin tocar DIAL_SYNC 0x83.",
+  "sha256": "e0a349eb107e011ff7e6c2919b4d3e982cf57f1a16204197b03b2c4f8a136277",
+  "version": "0.53.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.53.0/RelojLab.exe"
 }
