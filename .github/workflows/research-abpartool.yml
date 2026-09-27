@@ -30,6 +30,11 @@ jobs:
             javap -classpath out/aar/classes.jar -p -c -s $c 2>&1 | Out-File -Append -Encoding utf8 out/javap.txt
           }
           Get-FileHash abpartool-release.aar -Algorithm SHA256 | Format-List | Out-File -Encoding utf8 out/sha256.txt
+          $catalog = Invoke-RestMethod -Uri "https://wr.watchhealth.com.cn/app-halfwit/app-dial/getDialList?currentPage=1&pageSize=20&watchId=102"
+          $dial = $catalog.data | Where-Object { $_.dialId -eq "2011092" } | Select-Object -First 1
+          $dial | ConvertTo-Json -Depth 8 | Out-File -Encoding utf8 out/dial-2011092.json
+          Invoke-WebRequest -Uri $dial.dialFile -OutFile out/dial-2011092.bin
+          if ($dial.previewImg) { Invoke-WebRequest -Uri $dial.previewImg -OutFile out/dial-2011092-preview.png }
       - uses: actions/upload-artifact@v4
         with:
           name: abpartool-research
