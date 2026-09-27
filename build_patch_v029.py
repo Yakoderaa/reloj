@@ -5,9 +5,9 @@ s = p.read_text(encoding="utf-8")
 
 s = s.replace("import urllib.request, tempfile, os, subprocess, time, hashlib, queue", "import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math", 1)
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.63.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.63")', 1)
-s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.63 · modo esfera única · protocolo ApWatch/WTWD', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.64.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.64")', 1)
+s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.64 · modo esfera única · protocolo ApWatch/WTWD', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -23,7 +23,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="PREPARAR TRANSPORTE WF V0.63")
+        primary_test=ttk.Button(row,text="AISLAR CANAL WF V0.64")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -35,19 +35,22 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("V0.63 NO INICIADA · Bluetooth ocupado.")
+                append("V0.64 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V0.63 · PREFLIGHT DE TRANSPORTE · valida el WF V0.62, calcula compresión/CRC/límites y enumera canales GATT/FOTA. NO envía 0x83 ni datos de firmware.")
+            append("V0.64 · AISLAMIENTO FFC0/B002 · escucha FFC2 y B001 mientras ejecuta sólo DEVICE_INFO/DIAL_INFO ya verificados. Prepara segmentación 0x83 offline; no escribe FFC1 ni 0x83.")
             rep=self.base_report()
-            rep["transport_preflight"]={
+            rep["channel_isolation"]={
                 "phase":"candidate",
                 "candidate":{},
                 "compression":{},
-                "master_packet_limits":{},
-                "gatt_inventory":[],
-                "route_candidates":[],
+                "offline_segments":[],
+                "gatt":{},
+                "b001_rx":[],
+                "ffc2_rx":[],
+                "safe_control_writes":[],
+                "ffc1_writes":0,
                 "dial_sync_0x83_writes":0,
-                "fota_data_writes":0,
+                "firmware_data_writes":0,
                 "destructive_actions":0
             }
             t0=time.monotonic()
@@ -56,169 +59,152 @@ new_ota = '''        def ota_lab():
                 line=f"+{time.monotonic()-t0:06.2f}s · {msg}"
                 self.ui_queue.put(lambda x=line:(append(x),self.status.set(x)))
 
-            def crc16_8005(data):
-                crc=0
-                for bv in data:
-                    crc ^= (bv << 8)
-                    for _ in range(8):
-                        crc=((crc<<1)^0x8005)&0xffff if (crc&0x8000) else (crc<<1)&0xffff
-                return crc
+            def build_request(pid,opcode):
+                pkt=bytearray(20)
+                pkt[0]=0;pkt[1]=pid&0xff;pkt[2]=0;pkt[3]=0;pkt[4]=3;pkt[5]=opcode&0xff
+                return bytes(pkt)
 
             def read_candidate():
-                folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","wf-analysis-v062")
-                path=os.path.join(folder,"single-face-proof-v062.bin")
-                if not os.path.exists(path):
-                    raise RuntimeError("No encuentro single-face-proof-v062.bin. Ejecutá primero V0.62.")
+                path=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","wf-analysis-v062","single-face-proof-v062.bin")
+                if not os.path.exists(path):raise RuntimeError("Falta single-face-proof-v062.bin")
                 with open(path,"rb") as fh:data=fh.read()
-                if len(data)<54 or data[:2]!=b"WF":raise RuntimeError("candidato V0.62 inválido")
-                declared=int.from_bytes(data[0x30:0x34],"little")
-                width=int.from_bytes(data[0x2a:0x2c],"little")
-                height=int.from_bytes(data[0x2c:0x2e],"little")
-                count=int.from_bytes(data[0x2e:0x30],"little")
-                if declared!=len(data) or (width,height)!=(240,296) or count!=10:
-                    raise RuntimeError("el candidato V0.62 no conserva su estructura esperada")
+                if len(data)<54 or data[:2]!=b"WF":raise RuntimeError("WF V0.62 inválido")
+                if int.from_bytes(data[0x30:0x34],"little")!=len(data):raise RuntimeError("tamaño WF inconsistente")
                 return path,data
 
             async def work():
-                import zlib,gzip
-                emit("1/8 · Abriendo candidato V0.62…")
-                path,data=await asyncio.to_thread(read_candidate)
-                sha=hashlib.sha256(data).hexdigest()
-                crc=crc16_8005(data)
-                rep["transport_preflight"]["candidate"]={
-                    "path":path,"size":len(data),"sha256":sha,"crc16_8005":f"0x{crc:04X}",
-                    "declared_size":int.from_bytes(data[0x30:0x34],"little"),
-                    "resolution":[int.from_bytes(data[0x2a:0x2c],"little"),int.from_bytes(data[0x2c:0x2e],"little")],
-                    "element_count":int.from_bytes(data[0x2e:0x30],"little")
-                }
-                emit("CANDIDATO · "+str(len(data))+" bytes · "+sha)
+                import zlib
+                emit("1/9 · Cargando candidato V0.62…")
+                path,raw=await asyncio.to_thread(read_candidate)
+                packed=zlib.compress(raw,9)
+                rep["channel_isolation"]["candidate"]={"path":path,"size":len(raw),"sha256":hashlib.sha256(raw).hexdigest()}
+                rep["channel_isolation"]["compression"]={"format":"zlib","level":9,"size":len(packed),"sha256":hashlib.sha256(packed).hexdigest(),"first_16_hex":packed[:16].hex()}
 
-                emit("2/8 · Calculando variantes de compresión…")
-                variants={
-                    "raw":data,
-                    "zlib_level1":zlib.compress(data,1),
-                    "zlib_level6":zlib.compress(data,6),
-                    "zlib_level9":zlib.compress(data,9),
-                    "gzip_level9":gzip.compress(data,compresslevel=9,mtime=0)
-                }
-                comp={}
-                for name,blob in variants.items():
-                    comp[name]={
-                        "size":len(blob),
-                        "ratio":round(len(blob)/len(data),4),
-                        "sha256":hashlib.sha256(blob).hexdigest(),
-                        "first_24_hex":blob[:24].hex()
-                    }
-                rep["transport_preflight"]["compression"]=comp
-                emit("COMPRESIÓN · "+str({k:v["size"] for k,v in comp.items()}))
+                emit("2/9 · Preparando segmentación lógica OFFLINE…")
+                max_payload=4855
+                segments=[]
+                pos=0;idx=0
+                while pos<len(packed):
+                    chunk=packed[pos:pos+max_payload]
+                    segments.append({"index":idx,"offset":pos,"length":len(chunk),
+                                     "sha256":hashlib.sha256(chunk).hexdigest(),
+                                     "first_16_hex":chunk[:16].hex()})
+                    pos+=len(chunk);idx+=1
+                rep["channel_isolation"]["offline_segments"]=segments
+                emit("SEGMENTOS · "+str([x["length"] for x in segments])+" · total="+str(len(segments)))
 
-                emit("3/8 · Verificando límite del framing maestro WTWD…")
-                max_payload=10+255*19
-                limits={
-                    "header_first_payload_bytes":10,
-                    "continuation_payload_bytes":19,
-                    "continuation_count_field_bits":8,
-                    "max_continuations":255,
-                    "max_payload_single_master_message":max_payload,
-                    "candidate_raw_fits_single_master_message":len(data)<=max_payload,
-                    "variants_fit_single_master_message":{k:len(v)<=max_payload for k,v in variants.items()},
-                    "raw_20_byte_frames_if_naive":1+max(0,(len(data)-10+18)//19)
-                }
-                rep["transport_preflight"]["master_packet_limits"]=limits
-                emit("MASTER · máximo="+str(max_payload)+" · raw_fits="+str(limits["candidate_raw_fits_single_master_message"]))
-
-                emit("4/8 · Conectando sólo para inventariar GATT…")
+                emit("3/9 · Conectando y enumerando FFC0…")
                 c=None
                 try:
                     c,n=await self.connect_retry(5,emit)
                     rep["connection"]={"connected":True,"attempts":n}
-                    rows=[]
-                    for svc in c.services:
-                        srow={"uuid":str(svc.uuid).lower(),"characteristics":[]}
-                        for ch in svc.characteristics:
-                            crow={
-                                "uuid":str(ch.uuid).lower(),
-                                "handle":getattr(ch,"handle",None),
-                                "properties":list(getattr(ch,"properties",[]) or [])
-                            }
-                            srow["characteristics"].append(crow)
-                        rows.append(srow)
-                    rep["transport_preflight"]["gatt_inventory"]=rows
+                    b001="0000b001-0000-1000-8000-00805f9b34fb"
+                    b002="0000b002-0000-1000-8000-00805f9b34fb"
+                    ffc1="f000ffc1-0451-4000-b000-000000000000"
+                    ffc2="f000ffc2-0451-4000-b000-000000000000"
 
-                    flat={ch["uuid"]:ch for s in rows for ch in s["characteristics"]}
-                    probes={
-                        "b001":"0000b001-0000-1000-8000-00805f9b34fb",
-                        "b002":"0000b002-0000-1000-8000-00805f9b34fb",
-                        "b003":"0000b003-0000-1000-8000-00805f9b34fb",
-                        "b005":"0000b005-0000-1000-8000-00805f9b34fb",
-                        "ffc1":"f000ffc1-0451-4000-b000-000000000000",
-                        "ffc2":"f000ffc2-0451-4000-b000-000000000000"
+                    flat={}
+                    for svc in c.services:
+                        for ch in svc.characteristics:
+                            flat[str(ch.uuid).lower()]={
+                                "handle":getattr(ch,"handle",None),
+                                "properties":list(getattr(ch,"properties",[]) or []),
+                                "descriptors":[{"handle":getattr(d,"handle",None),"uuid":str(getattr(d,"uuid","")).lower()} for d in getattr(ch,"descriptors",[]) or []]
+                            }
+                    rep["channel_isolation"]["gatt"]={
+                        "ffc1":flat.get(ffc1),"ffc2":flat.get(ffc2),
+                        "classic_ti_oad_names":{"ffc1":"Image Identify","ffc2":"Image Block"},
+                        "classic_oad_compatible":bool(flat.get(ffc1) and flat.get(ffc2) and
+                            any(x.startswith("write") for x in flat[ffc1]["properties"]) and
+                            any(x.startswith("write") for x in flat[ffc2]["properties"])),
+                        "observed_direction":"FFC1 phone→device; FFC2 device→phone" if flat.get(ffc1) and flat.get(ffc2) else "incomplete"
                     }
-                    presence={k:(u in flat) for k,u in probes.items()}
-                    rep["transport_preflight"]["characteristic_presence"]=presence
-                    emit("GATT · "+str(presence))
+                    emit("FFC1 · "+str(flat.get(ffc1)))
+                    emit("FFC2 · "+str(flat.get(ffc2)))
+
+                    def rx_b001(sender,data):
+                        h=bytes(data).hex();rep["channel_isolation"]["b001_rx"].append(h);emit("B001 RX · "+h)
+                    def rx_ffc2(sender,data):
+                        h=bytes(data).hex();rep["channel_isolation"]["ffc2_rx"].append(h);emit("FFC2 RX · "+h)
+
+                    emit("4/9 · Suscribiendo B001 + FFC2; ningún dato hacia FFC1…")
+                    await asyncio.wait_for(c.start_notify(b001,rx_b001),timeout=6)
+                    await asyncio.wait_for(c.start_notify(ffc2,rx_ffc2),timeout=6)
+                    await asyncio.sleep(3)
+
+                    emit("5/9 · DEVICE_INFO 0x02 por B002 (consulta conocida)…")
+                    pkt=build_request(0,0x02)
+                    rep["channel_isolation"]["safe_control_writes"].append({"label":"DEVICE_INFO","characteristic":"B002","hex":pkt.hex()})
+                    await asyncio.wait_for(c.write_gatt_char(b002,pkt,response=False),timeout=5)
+                    await asyncio.sleep(4)
+
+                    emit("6/9 · DIAL_INFO 0x84 por B002 (REQUEST conocido)…")
+                    pkt=build_request(1,0x84)
+                    rep["channel_isolation"]["safe_control_writes"].append({"label":"DIAL_INFO","characteristic":"B002","hex":pkt.hex()})
+                    await asyncio.wait_for(c.write_gatt_char(b002,pkt,response=False),timeout=5)
+                    await asyncio.sleep(5)
+
+                    try:await c.stop_notify(ffc2)
+                    except Exception:pass
+                    try:await c.stop_notify(b001)
+                    except Exception:pass
                 finally:
                     if c:
                         try:await asyncio.wait_for(c.disconnect(),timeout=5)
                         except Exception as ex:rep["errors"].append("disconnect: "+repr(ex))
 
-                emit("5/8 · Clasificando rutas posibles…")
-                presence=rep["transport_preflight"].get("characteristic_presence",{})
-                routes=[]
-                if presence.get("ffc1") or presence.get("ffc2"):
-                    routes.append({"route":"FFC0 family","status":"present","action":"inspect handshake before any data"})
-                if presence.get("b003") or presence.get("b005"):
-                    routes.append({"route":"ZK/OTA side channel","status":"present","action":"inspect handshake before any data"})
-                if presence.get("b002"):
-                    routes.append({"route":"B002 WTWD big-send","status":"present","action":"0x83 requires multi-message state machine; single master payload is insufficient"})
-                rep["transport_preflight"]["route_candidates"]=routes
-
-                emit("6/8 · Generando plan de transporte sin escrituras…")
-                smallest=min(comp.items(),key=lambda kv:kv[1]["size"])
-                plan={
-                    "candidate_sha256":sha,
-                    "smallest_variant":smallest[0],
-                    "smallest_variant_size":smallest[1]["size"],
-                    "single_master_limit":max_payload,
-                    "needs_large_send_state_machine":smallest[1]["size"]>max_payload,
-                    "known_oem_fact":"DIAL_SYNC=0x83 and OEM app marks dial transfer as big-send/compressed",
-                    "safe_next_step":"identify start/clear/data/end/CRC handshake on the present large-transfer route before sending candidate bytes",
-                    "no_transfer_performed":True
+                emit("7/9 · Clasificando independencia de canales…")
+                ffc_count=len(rep["channel_isolation"]["ffc2_rx"])
+                b_count=len(rep["channel_isolation"]["b001_rx"])
+                g=rep["channel_isolation"]["gatt"]
+                conclusion={
+                    "b001_received_control_responses":b_count>0,
+                    "ffc2_received_during_safe_wtwd_queries":ffc_count>0,
+                    "classic_ti_oad_property_match":g.get("classic_oad_compatible"),
+                    "route_assessment":(
+                        "FFC2 participa en tráfico aun sin FFC1; revisar contenido antes de descartar"
+                        if ffc_count>0 else
+                        "FFC0 permanece separado durante control WTWD; no hay evidencia de que transporte DIAL_SYNC"
+                    ),
+                    "b002_big_send_still_primary_candidate":ffc_count==0
                 }
-                rep["transport_preflight"]["plan"]=plan
-                folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","wf-analysis-v063")
-                os.makedirs(folder,exist_ok=True)
-                report_path=os.path.join(folder,"transport-preflight-v063.json")
-                with open(report_path,"w",encoding="utf-8") as fh:
-                    json.dump(rep["transport_preflight"],fh,ensure_ascii=False,indent=2)
-                rep["transport_preflight"]["report_file"]=report_path
+                rep["channel_isolation"]["conclusion"]=conclusion
+                emit("RESULTADO · B001="+str(b_count)+" frames · FFC2="+str(ffc_count)+" frames")
+                emit("RUTA · "+conclusion["route_assessment"])
 
-                emit("7/8 · PLAN · variante mínima="+smallest[0]+" ("+str(smallest[1]["size"])+" bytes) · big-send="+str(plan["needs_large_send_state_machine"]))
-                rep["transport_preflight"]["phase"]="complete"
-                emit("8/8 · V0.63 FINALIZADA · transporte caracterizado sin 0x83/FOTA DATA.")
+                emit("8/9 · Guardando plan offline…")
+                folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","wf-analysis-v064")
+                os.makedirs(folder,exist_ok=True)
+                report_path=os.path.join(folder,"channel-isolation-v064.json")
+                with open(report_path,"w",encoding="utf-8") as fh:
+                    json.dump(rep["channel_isolation"],fh,ensure_ascii=False,indent=2)
+                rep["channel_isolation"]["report_file"]=report_path
+                rep["channel_isolation"]["phase"]="complete"
+
+                emit("9/9 · V0.64 FINALIZADA · FFC1 writes=0 · 0x83 writes=0 · firmware data writes=0.")
                 return rep
 
             def done(result,error):
                 if error:
                     rep["errors"].append(type(error).__name__+": "+str(error))
-                    rep["transport_preflight"]["phase"]="error"
+                    rep["channel_isolation"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("V0.63 FALLÓ · "+repr(error))
+                    append("V0.64 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V0.63 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V0.64 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
-                p=result["transport_preflight"]["plan"]
-                append("PREFLIGHT LISTO · big-send requerido="+str(p["needs_large_send_state_machine"])+" · ninguna transferencia ejecutada.")
-                self.status.set("V0.63 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
+                x=result["channel_isolation"]["conclusion"]
+                append("AISLAMIENTO COMPLETO · "+x["route_assessment"])
+                self.status.set("V0.64 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
             self.run_async(asyncio.wait_for(work(),timeout=120),done)
 '''
 
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.63 LISTA · 1º PREPARAR ESFERA ÚNICA V0.63; 2º COPIAR DIAGNÓSTICO. Calcula compresión/CRC/límites y enumera canales GATT para el transporte WF; sin 0x83/FOTA DATA.")'
+new_ready='append("V0.64 LISTA · 1º PREPARAR ESFERA ÚNICA V0.64; 2º COPIAR DIAGNÓSTICO. Aísla FFC0 frente a B002/B001 y prepara 5 segmentos comprimidos offline; sin FFC1/0x83.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
@@ -266,7 +252,7 @@ s=s.replace("    def open_control(self):", '''    async def inspect_gatt_snapsho
     def open_control(self):''',1)
 
 
-# V0.63: do not depend on a second advertising cycle after the first GATT attempt.
+# V0.64: do not depend on a second advertising cycle after the first GATT attempt.
 # Reuse the BLEDevice captured by "Buscar relojes" first; fresh scanning is recovery only.
 _conn_start=s.index("    async def connect_retry(")
 _conn_end=s.index("\n    def diagnose(",_conn_start)
@@ -367,4 +353,4 @@ _new_connect_retry='''    async def connect_retry(self,attempts=5,progress=None)
 s=s[:_conn_start]+_new_connect_retry+s[_conn_end:]
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.63 aplicado")
+print("build patch v0.64 aplicado")
