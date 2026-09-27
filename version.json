@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.54.0/RelojLab.exe",
-  "notes": "V0.54: descubrimiento pasivo de dial OEM: consulta listas oficiales por candidatos watchId acotados, analiza .bin y mantiene DIAL_SYNC 0x83 bloqueado.",
-  "sha256": "3c70bd39ca9d80b1ab24b2f93eb1866c97515577516253011a9dc009b1056639",
-  "version": "0.54.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.55.0/RelojLab.exe",
+  "sha256": "1cbffcbbb1aca514727ee2e031bed293ca0f32a76368ac7896303655da28678a",
+  "version": "0.55.0",
+  "notes": "V0.55: análisis estructural seguro de archivos WF 240×296: valida tamaños, descriptores, recursos y compara varios diales oficiales; DIAL_SYNC 0x83 bloqueado."
 }
