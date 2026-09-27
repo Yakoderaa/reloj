@@ -1,7 +1,7 @@
 name: Build Windows EXE
 on:
   push:
-    branches: [main]
+    branches: [main, release-v081-single-face]
     paths-ignore: [version.json]
   workflow_dispatch:
 permissions:
@@ -39,6 +39,7 @@ jobs:
           path: dist/RelojLab.exe
           if-no-files-found: error
       - name: Publish verified EXE then announce update
+        if: github.ref == 'refs/heads/main'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
