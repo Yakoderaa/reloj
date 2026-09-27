@@ -1,4 +1,4 @@
-name: Research AB ParTool
+name: Research UI Transfer
 on:
   push:
     branches: [research-abpartool]
@@ -8,30 +8,27 @@ jobs:
   research:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-      - name: Inspect Veepoo UI enum and ParTool
+      - name: Inspect watch UI transfer SDK
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           New-Item -ItemType Directory -Path out | Out-Null
           $vp = "https://raw.githubusercontent.com/HBandSDK/Android_Ble_SDK/add57a049a916c210c5463a66b097ad94265e481/android_sdk_source/jar_core/vpprotocol-2.3.85.15.aar"
-          $par = "https://raw.githubusercontent.com/HBandSDK/Android_Ble_SDK/add57a049a916c210c5463a66b097ad94265e481/android_sdk_source/jar_core/abpartool-release.aar"
-          Invoke-WebRequest -Uri $vp -OutFile vpprotocol.aar
-          Invoke-WebRequest -Uri $par -OutFile abpartool.aar
-          Copy-Item vpprotocol.aar out/vpprotocol.zip
-          Copy-Item abpartool.aar out/abpartool.zip
-          Expand-Archive out/vpprotocol.zip -DestinationPath out/vp
-          Expand-Archive out/abpartool.zip -DestinationPath out/par
-          javap -classpath out/vp/classes.jar -p -c -s com.veepoo.protocol.model.enums.EWatchUIElementType | Out-File -Encoding utf8 out/EWatchUIElementType.txt
-          javap -classpath out/vp/classes.jar -p -c -s com.veepoo.protocol.model.enums.EWatchUIElementPosition | Out-File -Encoding utf8 out/EWatchUIElementPosition.txt
-          javap -classpath out/par/classes.jar -p -c -s com.bluetrum.abpartool.ParTool | Out-File -Encoding utf8 out/ParTool.txt
-          Get-FileHash vpprotocol.aar -Algorithm SHA256 | Format-List | Out-File -Encoding utf8 out/vpprotocol-sha256.txt
-          Get-FileHash abpartool.aar -Algorithm SHA256 | Format-List | Out-File -Encoding utf8 out/abpartool-sha256.txt
+          Invoke-WebRequest -Uri $vp -OutFile vp.aar
+          Copy-Item vp.aar vp.zip
+          Expand-Archive vp.zip -DestinationPath vpdir
+          jar tf vpdir/classes.jar | Out-File -Encoding utf8 out/classes.txt
+          $targets = Get-Content out/classes.txt | Where-Object { $_ -match "(UiUpdate|UIBase|BigTran|BigData|WatchUI|UiBase|UIFromType|Dial)" -and $_ -like "*.class" } | ForEach-Object { $_.Replace("/",".").Replace(".class","") }
+          $targets | Out-File -Encoding utf8 out/targets.txt
+          foreach ($c in $targets) {
+            "===== $c =====" | Out-File -Append -Encoding utf8 out/javap.txt
+            javap -classpath vpdir/classes.jar -p -c -s $c 2>&1 | Out-File -Append -Encoding utf8 out/javap.txt
+          }
       - uses: actions/upload-artifact@v4
         with:
-          name: abpartool-research
+          name: ui-transfer-research
           path: out
