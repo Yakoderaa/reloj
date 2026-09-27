@@ -3,9 +3,9 @@ from pathlib import Path
 p = Path("app.py")
 s = p.read_text(encoding="utf-8")
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.53.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.53")', 1)
-s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.53 · modo esfera única · protocolo ApWatch/WTWD', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.54.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.54")', 1)
+s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.54 · modo esfera única · protocolo ApWatch/WTWD', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -21,7 +21,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="SONDEAR DIAL_INFO V0.53")
+        primary_test=ttk.Button(row,text="DESCUBRIR DIAL OEM V0.54")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -33,19 +33,21 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("SONDEO V0.53 NO INICIADO · Bluetooth ocupado.")
+                append("DESCUBRIMIENTO V0.54 NO INICIADO · Bluetooth ocupado.")
                 return
-            append("V0.53 · SUBCOMANDOS DIAL_INFO · prueba únicamente REQUEST 0x84 con payload de 1 byte 00/01/02/03. Cada prueba queda rodeada por DEVICE_INFO 0x02 para detectar cualquier cambio. DIAL_SYNC 0x83 sigue bloqueado.")
+            append("V0.54 · DIAL OEM REAL · lee DEVICE_INFO, cierra BLE y consulta el backend oficial WTWD sin credenciales ajenas. Busca listas de diales para candidatos acotados, extrae URLs .bin y analiza cualquier dial descargable. NO escribe 0x83.")
             rep=self.base_report()
-            rep["dial_info_subcommands"]={
-                "phase":"start",
-                "protocol":"WTWD/ApWatch E91A B002→B001",
-                "tested_payloads":["00","01","02","03"],
-                "transactions":[],
-                "events":[],
-                "device_snapshots":[],
+            rep["oem_dial_discovery"]={
+                "phase":"identity",
+                "backend":"https://wr.watchhealth.com.cn/app-halfwit/",
+                "auth_policy":"sin token; no se usan credenciales publicadas/de terceros",
+                "device_info":None,
+                "firmware_signature":None,
+                "candidate_watch_ids":[],
+                "http_results":[],
+                "dial_urls":[],
+                "downloads":[],
                 "dial_sync_0x83_writes":0,
-                "send_type_1_writes":0,
                 "destructive_actions":0
             }
             t0=time.monotonic()
@@ -53,132 +55,190 @@ new_ota = '''        def ota_lab():
                 line=f"+{time.monotonic()-t0:06.2f}s · {message}"
                 self.ui_queue.put(lambda x=line:(append(x),self.status.set(x)))
 
-            def build_packet(pid,send_type,opcode,payload=b""):
-                payload=bytes(payload)
-                if len(payload)>10: raise RuntimeError("payload demasiado largo")
+            def build_request(pid,opcode):
                 pkt=bytearray(20)
-                pkt[0]=0; pkt[1]=pid&0xff; pkt[2]=0; pkt[3]=0
-                pkt[4]=send_type&0xff; pkt[5]=opcode&0xff
-                pkt[8]=len(payload)&0xff; pkt[9]=(len(payload)>>8)&0xff
-                pkt[10:10+len(payload)]=payload
+                pkt[0]=0; pkt[1]=pid&0xff; pkt[2]=0; pkt[3]=0; pkt[4]=3; pkt[5]=opcode&0xff
+                pkt[8]=0; pkt[9]=0
                 return bytes(pkt)
 
-            def decode_frame(data):
-                b=bytes(data)
-                row={"t":round(time.monotonic()-t0,3),"hex":b.hex(),"length":len(b)}
-                if len(b)>=10 and b[0]==0:
-                    plen=b[8] | (b[9]<<8)
-                    row.update({"kind":"header","pid":b[1],"continuations":b[2],"cmd_type":b[3],"send_type":b[4],"opcode":b[5],"payload_length":plen,"payload_first_hex":b[10:10+min(plen,10)].hex()})
-                elif b:
-                    row.update({"kind":"continuation","index":b[0],"payload_hex":b[1:].hex()})
-                return row
+            def parse_device_frames(frames):
+                for idx,row in enumerate(frames):
+                    b=row
+                    if len(b)>=20 and b[0]==0 and b[5]==0x02:
+                        plen=b[8] | (b[9]<<8)
+                        if plen>=6 and len(b)>=16:
+                            payload=bytearray(b[10:20])
+                            remaining=plen-len(payload)
+                            j=idx+1
+                            while remaining>0 and j<len(frames):
+                                c=frames[j]
+                                if not c or c[0]==0: break
+                                take=min(19,remaining,len(c)-1)
+                                payload.extend(c[1:1+take]); remaining-=take; j+=1
+                            q=bytes(payload[:plen])
+                            if len(q)>=6:
+                                return {"id_total":q[0],"customer_id":q[1],"hardware_id":q[2],"code_id":q[3],"picture_id":q[4],"font_id":q[5],"payload_hex":q.hex()}
+                return None
 
-            def reassemble(rows):
-                out=[]; i=0
-                while i<len(rows):
-                    h=rows[i]
-                    if h.get("kind")!="header":
-                        i+=1; continue
-                    plen=int(h.get("payload_length",0))
-                    payload=bytearray.fromhex(h.get("payload_first_hex",""))
-                    remaining=max(0,plen-len(payload)); used=[]; j=i+1
-                    expected=int(h.get("continuations",0))
-                    while remaining>0 and j<len(rows) and len(used)<expected:
-                        c=rows[j]
-                        if c.get("kind")!="continuation": break
-                        raw=bytes.fromhex(c.get("payload_hex",""))
-                        take=min(19,remaining,len(raw))
-                        payload.extend(raw[:take]); remaining-=take
-                        used.append({"index":c.get("index"),"used_hex":raw[:take].hex(),"ignored_padding_hex":raw[take:].hex()})
-                        j+=1
-                    q=bytes(payload[:plen])
-                    item={"t":h.get("t"),"opcode":h.get("opcode"),"pid":h.get("pid"),"send_type":h.get("send_type"),"cmd_type":h.get("cmd_type"),"declared_length":plen,"payload_hex":q.hex(),"complete":len(payload)>=plen,"continuations_used":used}
-                    item["ack_01"]=bool(h.get("send_type")==4 and plen==1 and q==b"\\x01")
-                    item["status_byte"]=q[0] if plen==1 and len(q)==1 else None
-                    if h.get("opcode")==0x02 and len(q)>=6:
-                        item["device_info"]={"id_total":q[0],"customer_id":q[1],"hardware_id":q[2],"code_id":q[3],"picture_id":q[4],"font_id":q[5]}
-                    out.append(item)
-                    i=max(i+1,j)
+            def json_summary(value,limit=12000):
+                try:
+                    s=json.dumps(value,ensure_ascii=False,separators=(",",":"))
+                except Exception:
+                    s=str(value)
+                return s if len(s)<=limit else s[:limit]+"…[truncado]"
+
+            def collect_urls(obj,path="$"):
+                out=[]
+                if isinstance(obj,dict):
+                    for k,v in obj.items():
+                        out.extend(collect_urls(v,path+"."+str(k)))
+                elif isinstance(obj,list):
+                    for i,v in enumerate(obj):
+                        out.extend(collect_urls(v,path+"["+str(i)+"]"))
+                elif isinstance(obj,str) and obj.lower().startswith(("http://","https://")):
+                    out.append({"path":path,"url":obj})
                 return out
 
-            async def work():
-                c=None; events=[]
+            def http_json(method,url,body=None):
+                headers={
+                    "Accept":"application/json,text/plain,*/*",
+                    "Content-Type":"application/json",
+                    "User-Agent":"RelojLab/0.54 Windows; BK3288 research"
+                }
+                data=None if body is None else json.dumps(body,separators=(",",":")).encode("utf-8")
+                req=urllib.request.Request(url,data=data,headers=headers,method=method)
+                started=time.monotonic()
                 try:
-                    emit("1/10 · Conectando…")
+                    with urllib.request.urlopen(req,timeout=8) as r:
+                        raw=r.read(1024*1024)
+                        status=getattr(r,"status",200)
+                        ctype=r.headers.get("Content-Type","")
+                    text=raw.decode("utf-8","replace")
+                    try: parsed=json.loads(text)
+                    except Exception: parsed=None
+                    return {"ok":True,"status":status,"content_type":ctype,"elapsed_ms":int((time.monotonic()-started)*1000),"json":parsed,"body_preview":text[:12000]}
+                except Exception as ex:
+                    code=getattr(ex,"code",None)
+                    body_text=""
+                    try:
+                        body_text=ex.read(12000).decode("utf-8","replace")
+                    except Exception: pass
+                    return {"ok":False,"status":code,"elapsed_ms":int((time.monotonic()-started)*1000),"error":type(ex).__name__+": "+str(ex),"body_preview":body_text}
+
+            def download_candidate(url,folder):
+                info={"url":url}
+                try:
+                    req=urllib.request.Request(url,headers={"User-Agent":"RelojLab/0.54 Windows","Accept":"*/*"})
+                    with urllib.request.urlopen(req,timeout=12) as r:
+                        ctype=r.headers.get("Content-Type","")
+                        total=0; h=hashlib.sha256()
+                        name=os.path.basename(urllib.request.urlparse(url).path) if hasattr(urllib.request,"urlparse") else ""
+                        if not name or "." not in name: name="dial-"+hashlib.sha256(url.encode()).hexdigest()[:10]+".bin"
+                        safe="".join(ch for ch in name if ch.isalnum() or ch in "._-")[:120] or "dial.bin"
+                        path=os.path.join(folder,safe)
+                        first=bytearray()
+                        with open(path,"wb") as fh:
+                            while True:
+                                chunk=r.read(65536)
+                                if not chunk: break
+                                total+=len(chunk)
+                                if total>32*1024*1024: raise RuntimeError("archivo supera límite seguro de 32 MiB")
+                                h.update(chunk)
+                                if len(first)<512:first.extend(chunk[:512-len(first)])
+                                fh.write(chunk)
+                    magic=bytes(first)
+                    info.update({"ok":True,"path":path,"size":total,"sha256":h.hexdigest(),"content_type":ctype,"first_256_hex":magic[:256].hex(),"ascii_magic":magic[:16].decode("ascii","replace")})
+                    for sig,label in [(b"\\x89PNG\\r\\n\\x1a\\n","png"),(b"\\xff\\xd8\\xff","jpeg")]:
+                        pos=magic.find(sig)
+                        if pos>=0:info[label+"_offset_first512"]=pos
+                except Exception as ex:
+                    info.update({"ok":False,"error":type(ex).__name__+": "+str(ex)})
+                return info
+
+            async def work():
+                c=None; frames=[]
+                try:
+                    emit("1/8 · Conectando para leer identidad del reloj…")
                     c,n=await self.connect_retry(5,emit)
                     rep["connection"]={"connected":True,"attempts":n}
                     b001="0000b001-0000-1000-8000-00805f9b34fb"
                     b002="0000b002-0000-1000-8000-00805f9b34fb"
-                    if not c.services.get_characteristic(b001) or not c.services.get_characteristic(b002):
-                        raise RuntimeError("B001/B002 no disponibles.")
-
                     def rx(sender,data):
-                        row=decode_frame(data); events.append(row); rep["dial_info_subcommands"]["events"].append(row)
-                        msg="B001 RX · "+row["hex"]
-                        if row.get("opcode") is not None:
-                            msg+=f" · op=0x{row['opcode']:02X} · send={row.get('send_type')} · len={row.get('payload_length')}"
-                        emit(msg)
-
+                        b=bytes(data); frames.append(b); emit("B001 RX · "+b.hex())
                     await asyncio.wait_for(c.start_notify(b001,rx),timeout=6)
-                    await asyncio.sleep(.4)
-                    pid=0
-
-                    async def transact(label,opcode,payload=b"",wait=3.0):
-                        nonlocal pid
-                        start=len(events)
-                        pkt=build_packet(pid,3,opcode,payload)
-                        emit("TX "+label+" · "+pkt.hex())
-                        await asyncio.wait_for(c.write_gatt_char(b002,pkt,response=False),timeout=5)
-                        pid=(pid+1)&0xff
-                        await asyncio.sleep(wait)
-                        frames=events[start:]
-                        packets=reassemble(frames)
-                        tx={"label":label,"opcode":opcode,"payload_hex":bytes(payload).hex(),"frames":frames,"packets":packets}
-                        rep["dial_info_subcommands"]["transactions"].append(tx)
-                        for x in packets:
-                            emit("  RX PACKET · op="+("0x%02X"%x["opcode"] if x.get("opcode") is not None else "?")+" · send="+str(x.get("send_type"))+" · len="+str(x.get("declared_length"))+" · payload="+x.get("payload_hex","")+" · status="+str(x.get("status_byte")))
-                        return tx
-
-                    async def snapshot(label):
-                        tx=await transact(label+" · DEVICE_INFO",0x02,b"",3.0)
-                        dev=next((x.get("device_info") for x in tx["packets"] if x.get("device_info")),None)
-                        rep["dial_info_subcommands"]["device_snapshots"].append({"label":label,"device_info":dev})
-                        if dev:
-                            emit(label+" · picture="+str(dev["picture_id"])+" font="+str(dev["font_id"]))
-                        else:
-                            emit(label+" · DEVICE_INFO sin payload completo")
-                        return dev
-
-                    baseline=await snapshot("BASE")
-                    emit("2/10 · Probando REQUEST 0x84 payload=00")
-                    r0=await transact("DIAL_INFO 0x84 · REQUEST · payload 00",0x84,b"\\x00",4.0)
-                    s0=await snapshot("POST 00")
-
-                    emit("4/10 · Probando REQUEST 0x84 payload=01")
-                    r1=await transact("DIAL_INFO 0x84 · REQUEST · payload 01",0x84,b"\\x01",4.0)
-                    s1=await snapshot("POST 01")
-
-                    emit("6/10 · Probando REQUEST 0x84 payload=02")
-                    r2=await transact("DIAL_INFO 0x84 · REQUEST · payload 02",0x84,b"\\x02",4.0)
-                    s2=await snapshot("POST 02")
-
-                    emit("8/10 · Probando REQUEST 0x84 payload=03")
-                    r3=await transact("DIAL_INFO 0x84 · REQUEST · payload 03",0x84,b"\\x03",4.0)
-                    s3=await snapshot("POST 03")
-
-                    results=[]
-                    for val,tx in zip([0,1,2,3],[r0,r1,r2,r3]):
-                        dial=[x for x in tx["packets"] if x.get("opcode")==0x84]
-                        useful=[x for x in dial if not x.get("ack_01")]
-                        results.append({"payload":val,"dial_packets":dial,"useful_packets":useful})
-                    rep["dial_info_subcommands"]["results"]=results
-                    rep["dial_info_subcommands"]["device_changed"]=any(x and baseline and x!=baseline for x in [s0,s1,s2,s3])
-                    rep["dial_info_subcommands"]["useful_payloads"]=[x["payload"] for x in results if x["useful_packets"]]
-                    emit("9/10 · RESULTADO · payloads con respuesta no-ACK="+str(rep["dial_info_subcommands"]["useful_payloads"])+" · DEVICE cambió="+str(rep["dial_info_subcommands"]["device_changed"]))
-                    rep["dial_info_subcommands"]["phase"]="complete"
-                    emit("10/10 · SONDEO V0.53 FINALIZADO · sólo REQUEST · 0x83 NO TOCADO · cero instalaciones/borrados.")
+                    await asyncio.sleep(.3)
+                    pkt=build_request(0,0x02)
+                    emit("2/8 · TX DEVICE_INFO 0x02 · "+pkt.hex())
+                    await asyncio.wait_for(c.write_gatt_char(b002,pkt,response=False),timeout=5)
+                    await asyncio.sleep(4)
+                    dev=parse_device_frames(frames)
+                    rep["oem_dial_discovery"]["device_info"]=dev
+                    if not dev: raise RuntimeError("DEVICE_INFO no devolvió los IDs completos.")
+                    fw=f"{dev['customer_id']}.{dev['hardware_id']:02d}.{dev['code_id']}.{dev['picture_id']}.{dev['font_id']}"
+                    rep["oem_dial_discovery"]["firmware_signature"]=fw
+                    emit("IDENTIDAD · "+str(dev)+" · firma OEM candidata="+fw)
                     try: await c.stop_notify(b001)
                     except Exception: pass
+                    await asyncio.wait_for(c.disconnect(),timeout=5); c=None
+
+                    candidates=[]
+                    for v in [102,dev["customer_id"],dev["id_total"],dev["hardware_id"],dev["code_id"]]:
+                        if v not in candidates:candidates.append(v)
+                    rep["oem_dial_discovery"]["candidate_watch_ids"]=candidates
+                    emit("3/8 · BLE cerrado. Candidatos watchId acotados="+str(candidates))
+                    base="https://wr.watchhealth.com.cn/app-halfwit/"
+
+                    jobs=[]
+                    for wid in candidates:
+                        for endpoint in ["app-dial/getDialList","app-dial/getDefaultDialList"]:
+                            url=base+endpoint+"?currentPage=1&pageSize=20&watchId="+str(wid)
+                            jobs.append(("GET",wid,endpoint,url,None))
+                    # checkForUpdate is useful only as a model discriminator; no file is written.
+                    for wid in candidates:
+                        body={"currentFirmware":fw,"language":"EN","macAddress":(self.selected or {}).get("address",""),"watchId":str(wid)}
+                        jobs.append(("POST",wid,"app-device/checkForUpdate",base+"app-device/checkForUpdate",body))
+
+                    emit("4/8 · Consultando backend OEM sin token · "+str(len(jobs))+" requests máximas…")
+                    for idx,(method,wid,endpoint,url,body) in enumerate(jobs,1):
+                        emit(f"HTTP {idx}/{len(jobs)} · {method} · watchId={wid} · {endpoint}")
+                        res=await asyncio.to_thread(http_json,method,url,body)
+                        row={"watch_id":wid,"endpoint":endpoint,"method":method,**res}
+                        if row.get("json") is not None:
+                            row["json_summary"]=json_summary(row["json"])
+                            urls=collect_urls(row["json"])
+                            row["urls"]=urls
+                            for item in urls:
+                                low=item["url"].lower().split("?",1)[0]
+                                if low.endswith(".bin"):
+                                    rep["oem_dial_discovery"]["dial_urls"].append({"watch_id":wid,"endpoint":endpoint,**item})
+                            row.pop("json",None)
+                        rep["oem_dial_discovery"]["http_results"].append(row)
+                        emit("  -> status="+str(row.get("status"))+" ok="+str(row.get("ok"))+" urls="+str(len(row.get("urls",[]))))
+                        await asyncio.sleep(.15)
+
+                    # Deduplicate .bin URLs; downloading is passive and never touches the watch.
+                    unique=[]; seen=set()
+                    for item in rep["oem_dial_discovery"]["dial_urls"]:
+                        if item["url"] not in seen:
+                            seen.add(item["url"]); unique.append(item)
+                    rep["oem_dial_discovery"]["dial_urls"]=unique
+                    emit("5/8 · URLs .bin oficiales encontradas="+str(len(unique)))
+
+                    folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","oem-dials-v054")
+                    os.makedirs(folder,exist_ok=True)
+                    rep["oem_dial_discovery"]["download_folder"]=folder
+                    for i,item in enumerate(unique[:3],1):
+                        emit(f"6/8 · Descargando dial OEM {i}/{min(3,len(unique))} · watchId={item['watch_id']}")
+                        info=await asyncio.to_thread(download_candidate,item["url"],folder)
+                        info["watch_id"]=item["watch_id"]; info["source_endpoint"]=item["endpoint"]
+                        rep["oem_dial_discovery"]["downloads"].append(info)
+                        emit("  -> "+("OK "+str(info.get("size"))+" bytes · sha256="+str(info.get("sha256")) if info.get("ok") else "FALLÓ "+str(info.get("error"))))
+
+                    rep["oem_dial_discovery"]["backend_accessible"]=any(x.get("ok") for x in rep["oem_dial_discovery"]["http_results"])
+                    rep["oem_dial_discovery"]["auth_blocked"]=bool(rep["oem_dial_discovery"]["http_results"]) and all(x.get("status") in (401,403) for x in rep["oem_dial_discovery"]["http_results"] if x.get("status") is not None)
+                    rep["oem_dial_discovery"]["phase"]="complete"
+                    emit("7/8 · RESUMEN · backend_accessible="+str(rep["oem_dial_discovery"]["backend_accessible"])+" · bins="+str(len(unique))+" · downloads_ok="+str(sum(1 for x in rep["oem_dial_discovery"]["downloads"] if x.get("ok"))))
+                    emit("8/8 · V0.54 FINALIZADA · BLE sólo leyó 0x02 · 0x83 NO TOCADO · ninguna esfera instalada/borrada.")
                     return rep
                 finally:
                     if c:
@@ -188,27 +248,29 @@ new_ota = '''        def ota_lab():
             def done(result,error):
                 if error:
                     rep["errors"].append(type(error).__name__+": "+str(error))
-                    rep["dial_info_subcommands"]["phase"]="error"
+                    rep["oem_dial_discovery"]["phase"]="error"
                     self.report=rep; self.show()
-                    append("SONDEO V0.53 FALLÓ · "+repr(error))
+                    append("DESCUBRIMIENTO V0.54 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V0.53 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V0.54 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result; self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
-                useful=result.get("dial_info_subcommands",{}).get("useful_payloads",[])
-                if useful:
-                    append("SUBCOMANDO CANDIDATO DETECTADO · payload(s)="+str(useful))
+                d=result.get("oem_dial_discovery",{})
+                if d.get("downloads"):
+                    append("DIAL OEM CAPTURADO/ANALIZADO · mandame este diagnóstico; ya tenemos cabecera/tamaño/hash para reconstruir el formato.")
+                elif d.get("auth_blocked"):
+                    append("BACKEND REQUIERE SESIÓN OEM · siguiente versión capturará una sesión legítima del companion sin usar credenciales de terceros.")
                 else:
-                    append("SIN SUBCOMANDO 00–03 · siguiente ruta: backend/paquete OEM real, sin adivinar DIAL_SYNC.")
-                self.status.set("V0.53 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
-            self.run_async(asyncio.wait_for(work(),timeout=180),done)
+                    append("SIN .BIN DIRECTO · el diagnóstico conserva respuestas/URLs del backend para resolver el esquema en la siguiente versión.")
+                self.status.set("V0.54 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
+            self.run_async(asyncio.wait_for(work(),timeout=210),done)
 '''
 
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.53 LISTA · 1º PREPARAR ESFERA ÚNICA V0.53; 2º COPIAR DIAGNÓSTICO. Prueba REQUEST 0x84 con subcomandos 00/01/02/03 y control DEVICE_INFO; 0x83 bloqueado.")'
+new_ready='append("V0.54 LISTA · 1º PREPARAR ESFERA ÚNICA V0.54; 2º COPIAR DIAGNÓSTICO. Busca el dial oficial en backend OEM, descarga/analiza .bin si aparece; 0x83 bloqueado.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
@@ -256,7 +318,7 @@ s=s.replace("    def open_control(self):", '''    async def inspect_gatt_snapsho
     def open_control(self):''',1)
 
 
-# V0.53: do not depend on a second advertising cycle after the first GATT attempt.
+# V0.54: do not depend on a second advertising cycle after the first GATT attempt.
 # Reuse the BLEDevice captured by "Buscar relojes" first; fresh scanning is recovery only.
 _conn_start=s.index("    async def connect_retry(")
 _conn_end=s.index("\n    def diagnose(",_conn_start)
@@ -357,4 +419,4 @@ _new_connect_retry='''    async def connect_retry(self,attempts=5,progress=None)
 s=s[:_conn_start]+_new_connect_retry+s[_conn_end:]
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.53 aplicado")
+print("build patch v0.54 aplicado")
