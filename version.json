@@ -1,6 +1,6 @@
 {
-  "notes": "V0.67: validación offline del archivo y su segmentación; no escribe al reloj.",
-  "sha256": "531185b56cf71ac3625c3ce53bf75cc70446badb2042d4e68d780716a54236be",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.67.0/RelojLab.exe",
-  "version": "0.67.0"
+  "notes": "V0.68: dos mensajes DIAL_SYNC mínimos consecutivos, 22 bytes totales, con verificación de estabilidad.",
+  "version": "0.68.0",
+  "sha256": "6e3c4f1147ae8776585e53b1cf55dfca398d71607ed5bd8ad2576fc7c56d2884",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.68.0/RelojLab.exe"
 }
