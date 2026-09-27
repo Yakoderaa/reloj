@@ -3,9 +3,9 @@ from pathlib import Path
 p = Path("app.py")
 s = p.read_text(encoding="utf-8")
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.49.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.49")', 1)
-s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.49 · modo esfera única · protocolo ApWatch/WTWD', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.50.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.50")', 1)
+s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.50 · modo esfera única · protocolo ApWatch/WTWD', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -21,7 +21,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="PREPARAR ESFERA ÚNICA V0.49")
+        primary_test=ttk.Button(row,text="PREPARAR ESFERA ÚNICA V0.50")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -33,9 +33,9 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("PREPARACIÓN V0.49 NO INICIADA · Bluetooth ocupado.")
+                append("PREPARACIÓN V0.50 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V0.49 · ESFERA ÚNICA · identifica el reloj y consulta la esfera activa con el protocolo E91A/B002→B001. Esta fase NO borra ni instala: primero obtiene los IDs exactos para no escribir un dial incompatible.")
+            append("V0.50 · ESFERA ÚNICA · identifica el reloj y consulta la esfera activa con el protocolo E91A/B002→B001. Esta fase NO borra ni instala: primero obtiene los IDs exactos para no escribir un dial incompatible.")
             rep=self.base_report()
             rep["unique_face"]={
                 "phase":"identity_and_dial_inventory",
@@ -56,7 +56,7 @@ new_ota = '''        def ota_lab():
             def build_request(pid,opcode,payload=b""):
                 payload=bytes(payload)
                 if len(payload)>10:
-                    raise RuntimeError("V0.49 sólo usa consultas cortas; payload demasiado grande.")
+                    raise RuntimeError("V0.50 sólo usa consultas cortas; payload demasiado grande.")
                 pkt=bytearray(20)
                 pkt[0]=0x00
                 pkt[1]=pid & 0xff
@@ -188,7 +188,7 @@ new_ota = '''        def ota_lab():
                         emit("DIAL_INFO 0x84 respondió · "+str(len(dial_rows))+" frame(s).")
                     else:
                         emit("DIAL_INFO 0x84 no respondió en esta sesión; necesito este dato antes de empaquetar/escribir una esfera.")
-                    emit("7/7 · PREPARACIÓN V0.49 FINALIZADA · no se borró ni instaló ninguna esfera en esta fase.")
+                    emit("7/7 · PREPARACIÓN V0.50 FINALIZADA · no se borró ni instaló ninguna esfera en esta fase.")
                     return rep
                 finally:
                     if c:
@@ -201,9 +201,9 @@ new_ota = '''        def ota_lab():
                     rep["unique_face"]["phase"]="error"
                     self.report=rep
                     self.show()
-                    append("PREPARACIÓN V0.49 FALLÓ · "+repr(error))
+                    append("PREPARACIÓN V0.50 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V0.49 terminó con error. Copiá el diagnóstico.")
+                    self.status.set("V0.50 terminó con error. Copiá el diagnóstico.")
                     return
                 self.report=result
                 self.show()
@@ -212,14 +212,14 @@ new_ota = '''        def ota_lab():
                     append("LISTO PARA SIGUIENTE PASO · ya tengo IDs de hardware + respuesta DIAL_INFO para construir el paquete de tu esfera sin adivinar.")
                 else:
                     append("FALTA UNA RESPUESTA · copiá este diagnóstico tal cual para ajustar la consulta en la siguiente versión.")
-                self.status.set("V0.49 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
+                self.status.set("V0.50 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
             self.run_async(asyncio.wait_for(work(),timeout=180),done)
 '''
 
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.49 LISTA · 1º PREPARAR ESFERA ÚNICA V0.49; 2º COPIAR DIAGNÓSTICO. Consulta DEVICE_INFO 0x02 y DIAL_INFO 0x84 por E91A/B002→B001 sin borrar ni instalar todavía.")'
+new_ready='append("V0.50 LISTA · 1º PREPARAR ESFERA ÚNICA V0.50; 2º COPIAR DIAGNÓSTICO. Consulta DEVICE_INFO 0x02 y DIAL_INFO 0x84 por E91A/B002→B001 sin borrar ni instalar todavía.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
@@ -266,5 +266,106 @@ s=s.replace("    def open_control(self):", '''    async def inspect_gatt_snapsho
 
     def open_control(self):''',1)
 
+
+# V0.50: do not depend on a second advertising cycle after the first GATT attempt.
+# Reuse the BLEDevice captured by "Buscar relojes" first; fresh scanning is recovery only.
+_conn_start=s.index("    async def connect_retry(")
+_conn_end=s.index("\n    def diagnose(",_conn_start)
+_new_connect_retry='''    async def connect_retry(self,attempts=5,progress=None):
+        progress=progress or (lambda message:None)
+        selected=self.selected or {}
+        address=selected.get("address") or getattr(selected.get("device"),"address",None)
+        device=selected.get("device")
+        if not address:raise RuntimeError("Seleccioná un reloj en Buscar relojes.")
+
+        self.connection_state={"connected":False,"attempts":0,"phase":"starting","strategies":[]}
+        last=None
+        attempt_no=0
+
+        async def try_target(label,target,use_cache):
+            nonlocal last,attempt_no
+            attempt_no+=1
+            client=None
+            keep=False
+            self.connection_state["attempts"]=attempt_no
+            self.connection_state["strategies"].append(label)
+            progress(f"CONEXIÓN {attempt_no} · {label}")
+            try:
+                kwargs={"timeout":30}
+                if sys.platform=="win32":
+                    kwargs["winrt"]={"use_cached_services":bool(use_cache)}
+                client=BleakClient(target,**kwargs)
+                try:
+                    await asyncio.wait_for(client.connect(),timeout=32)
+                except asyncio.TimeoutError:
+                    if not client.is_connected:
+                        raise
+                    progress(label+" · connect() agotó espera pero Windows informa enlace conectado; validando GATT…")
+                if not client.is_connected:
+                    raise RuntimeError("Windows no confirmó is_connected")
+                try:
+                    services=list(client.services)
+                except Exception as ex:
+                    raise RuntimeError("enlace abierto pero servicios GATT no disponibles: "+repr(ex))
+                if not services:
+                    raise RuntimeError("servicios GATT vacíos")
+                keep=True
+                self.selected["device"]=target if not isinstance(target,str) else self.selected.get("device")
+                self.connection_state.update({"connected":True,"phase":"gatt_ready","strategy":label})
+                progress(label+f" · GATT OK · servicios={len(services)} · MTU={getattr(client,'mtu_size','?')}")
+                return client
+            except asyncio.CancelledError:
+                raise
+            except Exception as ex:
+                last=ex
+                progress(label+" · FALLÓ · "+type(ex).__name__+": "+str(ex))
+                return None
+            finally:
+                if client is not None and not keep:
+                    try:
+                        if client.is_connected:
+                            await asyncio.wait_for(client.disconnect(),timeout=5)
+                    except Exception:
+                        pass
+
+        # The scan result already contains a WinRT BLEDevice path. This is the most
+        # reliable route when the watch stops advertising after a connection attempt.
+        direct=[]
+        if device is not None:
+            direct.extend([
+                ("DEVICE + CACHE OFF",device,False),
+                ("DEVICE + CACHE ON",device,True),
+            ])
+        direct.extend([
+            ("ADDRESS + CACHE OFF",address,False),
+            ("ADDRESS + CACHE ON",address,True),
+        ])
+
+        for label,target,use_cache in direct:
+            client=await try_target(label,target,use_cache)
+            if client is not None:return client,attempt_no
+            await asyncio.sleep(2.5)
+
+        # Only now request a fresh advertisement. Failure here does not discard the
+        # direct attempts above.
+        progress("RECUPERACIÓN · buscando un anuncio fresco hasta 15 s…")
+        fresh=None
+        try:
+            fresh=await asyncio.wait_for(BleakScanner.find_device_by_address(address,timeout=15),timeout=17)
+        except Exception as ex:
+            last=ex
+            progress("RECUPERACIÓN SCAN · "+type(ex).__name__+": "+str(ex))
+        if fresh is not None:
+            self.selected["device"]=fresh
+            for label,use_cache in [("FRESH DEVICE + CACHE OFF",False),("FRESH DEVICE + CACHE ON",True)]:
+                client=await try_target(label,fresh,use_cache)
+                if client is not None:return client,attempt_no
+                await asyncio.sleep(3)
+
+        self.connection_state.update({"connected":False,"phase":"failed"})
+        raise RuntimeError("GATT NO DISPONIBLE tras rutas DEVICE/ADDRESS y recuperación: "+str(last))
+'''
+s=s[:_conn_start]+_new_connect_retry+s[_conn_end:]
+
 p.write_text(s,encoding="utf-8")
-print("build patch v0.49 aplicado")
+print("build patch v0.50 aplicado")
