@@ -1,6 +1,6 @@
 {
-  "notes": "V0.51: captura controlada del cambio manual de esfera; compara picture_id/font_id y DIAL_INFO antes/después y registra tráfico espontáneo.",
-  "version": "0.51.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.51.0/RelojLab.exe",
-  "sha256": "4771a01d83a508cae8083f53a042f1095ce6850eba6bf2c4419c627ac1044893"
+  "version": "0.52.0",
+  "notes": "V0.52: mapeo seguro de DIAL_INFO 0x84 con reensamblado exacto; compara REQUEST vs SEND vacío y no toca DIAL_SYNC 0x83.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.52.0/RelojLab.exe",
+  "sha256": "f71a656069b0f503714cd6234dff8de345b73520ddb9b460a16e07b8071b07f2"
 }
