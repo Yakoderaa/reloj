@@ -3,9 +3,9 @@ from pathlib import Path
 p = Path("app.py")
 s = p.read_text(encoding="utf-8")
 
-s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.55.0"', 1)
-s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.55")', 1)
-s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.55 · modo esfera única · protocolo ApWatch/WTWD', 1)
+s = s.replace('APP_VERSION="0.28.0"', 'APP_VERSION="0.56.0"', 1)
+s = s.replace('root.title("Reloj Lab V0.28")', 'root.title("Reloj Lab V0.56")', 1)
+s = s.replace('V0.26 · enlace BLE persistente + OTA', 'V0.56 · modo esfera única · protocolo ApWatch/WTWD', 1)
 
 old_button = '''primary_test=ttk.Button(row,text="PRUEBA V0.28 - CONEXION LIMPIA + HUELLA OAD")
         primary_test.pack(side="left",padx=4)'''
@@ -21,7 +21,7 @@ new_button = '''def copy_control_diagnostic():
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="ANALIZAR FORMATO WF V0.55")
+        primary_test=ttk.Button(row,text="EXTRAER RECURSOS WF V0.56")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)'''
 if old_button not in s:
@@ -33,17 +33,16 @@ end = s.index("        # Bind the already-visible first button now that ota_lab 
 
 new_ota = '''        def ota_lab():
             if self.ble_busy:
-                append("ANÁLISIS V0.55 NO INICIADO · Bluetooth ocupado.")
+                append("EXTRACCIÓN V0.56 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V0.55 · FORMATO WF · confirma DEVICE_INFO, descarga varios diales OEM 240×296 y desarma su cabecera, tabla de elementos de 20 bytes y offsets de recursos. NO escribe 0x83.")
+            append("V0.56 · WF CORREGIDO · revalida DEVICE_INFO, descarga diales OEM y usa los offsets correctos de cabecera/descriptores para extraer recursos. NO escribe 0x83.")
             rep=self.base_report()
-            rep["wf_format_analysis"]={
+            rep["wf_resource_analysis"]={
                 "phase":"identity",
                 "protocol":"WTWD/ApWatch",
                 "device_info":None,
                 "firmware_signature":None,
                 "catalog_watch_id":102,
-                "catalog_entries":[],
                 "files":[],
                 "cross_file":{},
                 "dial_sync_0x83_writes":0,
@@ -90,15 +89,15 @@ new_ota = '''        def ota_lab():
             def http_json(url):
                 req=urllib.request.Request(url,headers={
                     "Accept":"application/json,text/plain,*/*",
-                    "User-Agent":"RelojLab/0.55 Windows; WF format research"
+                    "User-Agent":"RelojLab/0.56 Windows; WF resource research"
                 })
                 with urllib.request.urlopen(req,timeout=10) as r:
                     raw=r.read(2*1024*1024)
                 return json.loads(raw.decode("utf-8","replace"))
 
             def download_bytes(url,max_bytes=32*1024*1024):
-                req=urllib.request.Request(url,headers={"Accept":"*/*","User-Agent":"RelojLab/0.55 Windows"})
-                with urllib.request.urlopen(req,timeout=15) as r:
+                req=urllib.request.Request(url,headers={"Accept":"*/*","User-Agent":"RelojLab/0.56 Windows"})
+                with urllib.request.urlopen(req,timeout=18) as r:
                     data=r.read(max_bytes+1)
                 if len(data)>max_bytes:
                     raise RuntimeError("archivo supera límite seguro")
@@ -112,46 +111,111 @@ new_ota = '''        def ota_lab():
                 if chunk.startswith(b"RIFF"): return "riff"
                 if chunk.startswith(b"\\x1f\\x8b"): return "gzip"
                 if len(chunk)>=2 and chunk[0]==0x78 and chunk[1] in (0x01,0x5e,0x9c,0xda): return "zlib"
-                if chunk.startswith(b"WF"): return "wf"
                 return "unknown"
-
-            def ascii_runs(data,min_len=5,max_items=30):
-                out=[]; start=None
-                for i,bv in enumerate(data):
-                    printable=32<=bv<=126
-                    if printable and start is None:start=i
-                    if (not printable or i==len(data)-1) and start is not None:
-                        end=i if not printable else i+1
-                        if end-start>=min_len:
-                            s=data[start:end].decode("ascii","replace")
-                            out.append({"offset":start,"text":s[:120]})
-                            if len(out)>=max_items:return out
-                        start=None
-                return out
 
             def parse_png_size(data):
                 if len(data)>=24 and data.startswith(b"\\x89PNG\\r\\n\\x1a\\n") and data[12:16]==b"IHDR":
                     return [int.from_bytes(data[16:20],"big"),int.from_bytes(data[20:24],"big")]
                 return None
 
-            def parse_wf(data,url,name):
+            def parse_jpeg_size(data):
+                if len(data)<4 or not data.startswith(b"\\xff\\xd8"): return None
+                i=2
+                while i+9<len(data):
+                    if data[i]!=0xff:
+                        i+=1; continue
+                    marker=data[i+1]
+                    i+=2
+                    if marker in (0xd8,0xd9): continue
+                    if i+2>len(data): break
+                    seg=int.from_bytes(data[i:i+2],"big")
+                    if seg<2 or i+seg>len(data): break
+                    if marker in (0xc0,0xc1,0xc2,0xc3,0xc5,0xc6,0xc7,0xc9,0xca,0xcb,0xcd,0xce,0xcf) and seg>=7:
+                        return [int.from_bytes(data[i+5:i+7],"big"),int.from_bytes(data[i+3:i+5],"big")]
+                    i+=seg
+                return None
+
+            def entropy(data):
+                if not data:return 0.0
+                counts=[0]*256
+                for x in data:counts[x]+=1
+                n=len(data);e=0.0
+                for c in counts:
+                    if c:
+                        q=c/n;e-=q*math.log2(q)
+                return round(e,4)
+
+            def extract_embedded_images(data,folder,prefix):
+                found=[]
+                # PNG
+                pos=0
+                while True:
+                    pos=data.find(b"\\x89PNG\\r\\n\\x1a\\n",pos)
+                    if pos<0:break
+                    end=data.find(b"IEND",pos+8)
+                    if end>=0 and end+8<=len(data):
+                        end=end+8
+                        raw=data[pos:end]
+                        path=os.path.join(folder,f"{prefix}-embedded-{len(found):02d}.png")
+                        with open(path,"wb") as fh:fh.write(raw)
+                        found.append({"offset":pos,"end":end,"length":len(raw),"type":"png","size":parse_png_size(raw),"path":path})
+                        pos=end
+                    else:
+                        pos+=8
+                # JPEG
+                pos=0
+                while True:
+                    pos=data.find(b"\\xff\\xd8\\xff",pos)
+                    if pos<0:break
+                    end=data.find(b"\\xff\\xd9",pos+3)
+                    if end>=0:
+                        end+=2
+                        raw=data[pos:end]
+                        path=os.path.join(folder,f"{prefix}-embedded-{len(found):02d}.jpg")
+                        with open(path,"wb") as fh:fh.write(raw)
+                        found.append({"offset":pos,"end":end,"length":len(raw),"type":"jpeg","size":parse_jpeg_size(raw),"path":path})
+                        pos=end
+                    else:
+                        pos+=3
+                return found
+
+            def role_hint(type_code,fields):
+                # Conservative labels: only strong geometric/sequence clues.
+                if type_code in (0x0501,0x0601,0x0701) and fields["x"]==120 and fields["y"]==148:
+                    return "analog_hand_candidate"
+                if type_code==0x0105 and fields["width_like"] in range(16,81) and fields["height_like"] in range(16,81):
+                    return "widget_icon_candidate"
+                if type_code in (0x1002,0x1102):
+                    return "image_layer_candidate"
+                return None
+
+            def parse_wf(data,url,name,folder):
                 info={
                     "name":name,"url":url,"size":len(data),
                     "sha256":hashlib.sha256(data).hexdigest(),
                     "magic":data[:2].decode("ascii","replace") if len(data)>=2 else "",
                     "version_le":u16(data,2),
-                    "first_128_hex":data[:128].hex()
+                    "first_96_hex":data[:96].hex()
                 }
                 if len(data)<54 or data[:2]!=b"WF":
                     info["valid_wf"]=False
                     return info
                 info["valid_wf"]=True
-                width=u16(data,0x28); height=u16(data,0x2a); count=u16(data,0x2c)
-                declared=u32(data,0x2e); resource_rel=u32(data,0x32)
+
+                # V0.55 proved the whole header map was shifted by two bytes.
+                # Correct layout:
+                # 0x2A width, 0x2C height, 0x2E element count,
+                # 0x30 declared file size, 0x34 resource-table base stored relative to byte 2.
+                width=u16(data,0x2a)
+                height=u16(data,0x2c)
+                count=u16(data,0x2e)
+                declared=u32(data,0x30)
+                resource_rel=u32(data,0x34)
                 desc_start=0x36
                 desc_size=20
                 desc_end=desc_start+(count or 0)*desc_size
                 resource_abs=(resource_rel+2) if resource_rel is not None else None
+
                 info.update({
                     "width":width,"height":height,"element_count":count,
                     "declared_size":declared,
@@ -163,46 +227,82 @@ new_ota = '''        def ota_lab():
                     "descriptor_end":desc_end,
                     "resource_base_matches_descriptor_end":resource_abs==desc_end
                 })
+
                 descriptors=[]
+                pointers=[]
                 for i in range(count or 0):
                     off=desc_start+i*desc_size
                     raw=data[off:off+desc_size]
                     if len(raw)<desc_size:break
-                    stored=u32(raw,16)
-                    abs_off=(stored+2) if stored is not None and stored>0 else None
-                    descriptors.append({
-                        "index":i,"offset":off,"raw_hex":raw.hex(),
-                        "kind":raw[0],"subtype":raw[1],
-                        "value":u16(raw,2),"x":u16(raw,4),"y":u16(raw,6),
-                        "field8":u16(raw,8),"field10":u16(raw,10),
-                        "field12":u16(raw,12),"field14":u16(raw,14),
-                        "resource_offset_stored":stored,
-                        "resource_offset_absolute":abs_off,
-                        "resource_in_file":bool(abs_off is not None and 0<=abs_off<len(data))
-                    })
+                    fields={
+                        "mode":u16(raw,0),
+                        "type_code":u16(raw,2),
+                        "frame_count_like":u16(raw,4),
+                        "x":u16(raw,6),
+                        "y":u16(raw,8),
+                        "width_like":u16(raw,10),
+                        "height_like":u16(raw,12),
+                        "arg2":u16(raw,14),
+                        "arg3":u16(raw,16),
+                        "resource_offset_stored":u16(raw,18)
+                    }
+                    ptr=fields["resource_offset_stored"]
+                    abs_off=(ptr+2) if ptr is not None else None
+                    fields["resource_offset_absolute"]=abs_off
+                    fields["resource_in_file"]=bool(abs_off is not None and resource_abs is not None and resource_abs<=abs_off<len(data))
+                    fields["role_hint"]=role_hint(fields["type_code"],fields)
+                    d={"index":i,"offset":off,"raw_hex":raw.hex(),**fields}
+                    descriptors.append(d)
+                    if d["resource_in_file"]:pointers.append(abs_off)
                 info["descriptors"]=descriptors
-                valid_offsets=sorted(set(
-                    d["resource_offset_absolute"] for d in descriptors
-                    if d.get("resource_offset_absolute") is not None and
-                       resource_abs is not None and
-                       resource_abs<=d["resource_offset_absolute"]<len(data)
-                ))
+
+                unique=sorted(set(pointers))
+                info["resource_pointer_count"]=len(unique)
+                info["all_descriptor_pointers_valid"]=all(d["resource_in_file"] for d in descriptors)
+
                 resources=[]
-                for idx,off in enumerate(valid_offsets):
-                    end=valid_offsets[idx+1] if idx+1<len(valid_offsets) else len(data)
-                    if end<off:continue
+                dial_dir=os.path.join(folder,os.path.splitext(name)[0])
+                os.makedirs(dial_dir,exist_ok=True)
+                starts=unique
+                for idx,off in enumerate(starts):
+                    end=starts[idx+1] if idx+1<len(starts) else len(data)
+                    if end<=off:continue
                     chunk=data[off:end]
+                    rpath=os.path.join(dial_dir,f"resource-{idx:02d}-off-{off}.bin")
+                    with open(rpath,"wb") as fh:fh.write(chunk)
+                    nearby=data[max(0,off-16):min(len(data),off+80)]
                     resources.append({
-                        "offset":off,"length":len(chunk),
+                        "index":idx,"offset":off,"end":end,"length":len(chunk),
                         "signature":classify_signature(chunk),
                         "first_64_hex":chunk[:64].hex(),
+                        "nearby_hex":nearby.hex(),
+                        "entropy":entropy(chunk[:min(len(chunk),65536)]),
                         "png_size":parse_png_size(chunk),
+                        "jpeg_size":parse_jpeg_size(chunk),
                         "png_inside":chunk.find(b"\\x89PNG\\r\\n\\x1a\\n"),
                         "jpeg_inside":chunk.find(b"\\xff\\xd8\\xff"),
-                        "zlib_header_inside":min([x for x in [chunk.find(b"\\x78\\x01"),chunk.find(b"\\x78\\x9c"),chunk.find(b"\\x78\\xda")] if x>=0],default=-1)
+                        "zlib_inside":min([x for x in [chunk.find(b"\\x78\\x01"),chunk.find(b"\\x78\\x9c"),chunk.find(b"\\x78\\xda")] if x>=0],default=-1),
+                        "path":rpath,
+                        "referenced_by":[d["index"] for d in descriptors if d["resource_offset_absolute"]==off],
+                        "type_codes":[d["type_code"] for d in descriptors if d["resource_offset_absolute"]==off]
                     })
                 info["resources"]=resources
-                info["resource_count_unique"]=len(resources)
+
+                # Bytes between descriptor table and first pointed resource are also meaningful.
+                first_ptr=unique[0] if unique else len(data)
+                if resource_abs is not None and resource_abs<first_ptr:
+                    prefix=data[resource_abs:first_ptr]
+                    ppath=os.path.join(dial_dir,f"resource-prefix-{resource_abs}-{first_ptr}.bin")
+                    with open(ppath,"wb") as fh:fh.write(prefix)
+                    info["resource_prefix"]={
+                        "offset":resource_abs,"end":first_ptr,"length":len(prefix),
+                        "signature":classify_signature(prefix),
+                        "entropy":entropy(prefix[:min(len(prefix),65536)]),
+                        "first_64_hex":prefix[:64].hex(),
+                        "path":ppath
+                    }
+
+                info["embedded_images"]=extract_embedded_images(data,dial_dir,"dial")
                 info["file_signatures"]={
                     "png_count":data.count(b"\\x89PNG\\r\\n\\x1a\\n"),
                     "jpeg_count":data.count(b"\\xff\\xd8\\xff"),
@@ -211,19 +311,12 @@ new_ota = '''        def ota_lab():
                     "zlib_789c_count":data.count(b"\\x78\\x9c"),
                     "zlib_78da_count":data.count(b"\\x78\\xda")
                 }
-                info["ascii_runs"]=ascii_runs(data[:min(len(data),4096)])
-                info["kind_counts"]={}
-                info["kind_subtype_counts"]={}
-                for d in descriptors:
-                    k=str(d["kind"]); ks=f"{d['kind']:02X}:{d['subtype']:02X}"
-                    info["kind_counts"][k]=info["kind_counts"].get(k,0)+1
-                    info["kind_subtype_counts"][ks]=info["kind_subtype_counts"].get(ks,0)+1
                 return info
 
             async def work():
-                c=None; frames=[]
+                c=None;frames=[]
                 try:
-                    emit("1/9 · Confirmando identidad del reloj…")
+                    emit("1/10 · Confirmando identidad del reloj…")
                     c,n=await self.connect_retry(5,emit)
                     rep["connection"]={"connected":True,"attempts":n}
                     b001="0000b001-0000-1000-8000-00805f9b34fb"
@@ -233,112 +326,119 @@ new_ota = '''        def ota_lab():
                     await asyncio.wait_for(c.start_notify(b001,rx),timeout=6)
                     await asyncio.sleep(.3)
                     pkt=build_request(0,0x02)
-                    emit("2/9 · TX DEVICE_INFO 0x02 · "+pkt.hex())
+                    emit("2/10 · TX DEVICE_INFO 0x02 · "+pkt.hex())
                     await asyncio.wait_for(c.write_gatt_char(b002,pkt,response=False),timeout=5)
                     await asyncio.sleep(4)
                     dev=parse_device_frames(frames)
                     if not dev:raise RuntimeError("DEVICE_INFO incompleto")
-                    rep["wf_format_analysis"]["device_info"]=dev
-                    rep["wf_format_analysis"]["firmware_signature"]=f"{dev['customer_id']}.{dev['hardware_id']:02d}.{dev['code_id']}.{dev['picture_id']}.{dev['font_id']}"
+                    rep["wf_resource_analysis"]["device_info"]=dev
+                    rep["wf_resource_analysis"]["firmware_signature"]=f"{dev['customer_id']}.{dev['hardware_id']:02d}.{dev['code_id']}.{dev['picture_id']}.{dev['font_id']}"
                     emit("IDENTIDAD · "+str(dev))
                     try:await c.stop_notify(b001)
                     except Exception:pass
                     await asyncio.wait_for(c.disconnect(),timeout=5);c=None
 
-                    emit("3/9 · Descargando catálogo OEM público watchId=102…")
+                    emit("3/10 · Descargando catálogo OEM 240×296…")
                     cat_url="https://wr.watchhealth.com.cn/app-halfwit/app-dial/getDialList?currentPage=1&pageSize=20&watchId=102"
                     catalog=await asyncio.to_thread(http_json,cat_url)
                     entries=catalog.get("data") if isinstance(catalog,dict) else None
-                    if not isinstance(entries,list) or not entries:
-                        raise RuntimeError("catálogo OEM no devolvió diales")
+                    if not isinstance(entries,list) or not entries:raise RuntimeError("catálogo OEM vacío")
                     chosen=[]
                     for e in entries:
-                        if not isinstance(e,dict):continue
-                        if str(e.get("resolution",""))!="240*296":continue
+                        if not isinstance(e,dict) or str(e.get("resolution",""))!="240*296":continue
                         url=e.get("dialFile")
-                        if not isinstance(url,str) or not url.lower().startswith("http"):continue
+                        if not isinstance(url,str) or not url.startswith("http"):continue
                         chosen.append({
-                            "id":e.get("id"),"dialId":e.get("dialId"),"dialName":e.get("dialName"),
-                            "resolution":e.get("resolution"),"watchIds":e.get("watchIds"),
-                            "dialFile":url,"previewImg":e.get("previewImg")
+                            "dialId":e.get("dialId"),"dialName":e.get("dialName"),"resolution":e.get("resolution"),
+                            "watchIds":e.get("watchIds"),"dialFile":url,"previewImg":e.get("previewImg")
                         })
                         if len(chosen)>=6:break
-                    rep["wf_format_analysis"]["catalog_entries"]=chosen
-                    emit("CATÁLOGO · diales 240×296 seleccionados="+str(len(chosen)))
-                    if len(chosen)<3:raise RuntimeError("menos de 3 diales WF candidatos")
+                    if len(chosen)<3:raise RuntimeError("menos de 3 diales compatibles")
+                    emit("CATÁLOGO · candidatos="+str(len(chosen)))
 
-                    folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","wf-analysis-v055")
+                    folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","wf-analysis-v056")
                     os.makedirs(folder,exist_ok=True)
-                    rep["wf_format_analysis"]["output_folder"]=folder
-                    emit("4/9 · Descargando y parseando "+str(len(chosen))+" archivos WF…")
+                    rep["wf_resource_analysis"]["output_folder"]=folder
 
+                    emit("4/10 · Descargando y extrayendo recursos de "+str(len(chosen))+" diales…")
                     for idx,e in enumerate(chosen,1):
-                        emit(f"WF {idx}/{len(chosen)} · {e.get('dialId')} · descargando .bin")
+                        emit(f"WF {idx}/{len(chosen)} · {e.get('dialId')} · descarga")
                         data=await asyncio.to_thread(download_bytes,e["dialFile"])
-                        fname=e["dialFile"].split("?",1)[0].rstrip("/").split("/")[-1]
-                        if not fname:fname="dial-"+str(idx)+".bin"
-                        path=os.path.join(folder,fname)
-                        with open(path,"wb") as fh:fh.write(data)
-                        info=parse_wf(data,e["dialFile"],fname)
+                        fname=e["dialFile"].split("?",1)[0].rstrip("/").split("/")[-1] or f"dial-{idx}.bin"
+                        with open(os.path.join(folder,fname),"wb") as fh:fh.write(data)
+                        info=parse_wf(data,e["dialFile"],fname,folder)
                         info["dial_id"]=e.get("dialId")
                         info["watch_ids"]=e.get("watchIds")
-                        info["local_path"]=path
 
                         preview=e.get("previewImg")
                         if isinstance(preview,str) and preview.startswith("http"):
                             try:
                                 pdata=await asyncio.to_thread(download_bytes,preview,8*1024*1024)
-                                pext=".png" if pdata.startswith(b"\\x89PNG") else ".img"
-                                ppath=os.path.join(folder,os.path.splitext(fname)[0]+"-preview"+pext)
+                                ppath=os.path.join(folder,os.path.splitext(fname)[0]+"-preview.png")
                                 with open(ppath,"wb") as ph:ph.write(pdata)
-                                info["preview"]={
-                                    "url":preview,"path":ppath,"size":len(pdata),
-                                    "sha256":hashlib.sha256(pdata).hexdigest(),
-                                    "signature":classify_signature(pdata),
-                                    "png_size":parse_png_size(pdata)
-                                }
+                                info["preview"]={"path":ppath,"size":len(pdata),"png_size":parse_png_size(pdata),"sha256":hashlib.sha256(pdata).hexdigest()}
                             except Exception as ex:
                                 info["preview_error"]=type(ex).__name__+": "+str(ex)
 
-                        rep["wf_format_analysis"]["files"].append(info)
-                        emit("  -> magic="+str(info.get("magic"))+" ver="+hex(info.get("version_le") or 0)+" res="+str(info.get("width"))+"×"+str(info.get("height"))+" elems="+str(info.get("element_count"))+" size_ok="+str(info.get("declared_size_matches"))+" table_ok="+str(info.get("resource_base_matches_descriptor_end")))
+                        rep["wf_resource_analysis"]["files"].append(info)
+                        emit("  -> "+str(info.get("width"))+"×"+str(info.get("height"))+
+                             " · elems="+str(info.get("element_count"))+
+                             " · size_ok="+str(info.get("declared_size_matches"))+
+                             " · table_ok="+str(info.get("resource_base_matches_descriptor_end"))+
+                             " · ptrs="+str(info.get("resource_pointer_count"))+
+                             " · imágenes embebidas="+str(len(info.get("embedded_images",[]))))
 
-                    emit("5/9 · Comparando estructura entre archivos…")
-                    files=rep["wf_format_analysis"]["files"]
-                    cross={}
-                    cross["all_valid_wf"]=all(x.get("valid_wf") for x in files)
-                    cross["versions"]=sorted(set(x.get("version_le") for x in files if x.get("version_le") is not None))
-                    cross["resolutions"]=sorted(set(f"{x.get('width')}x{x.get('height')}" for x in files))
-                    cross["element_counts"]=[x.get("element_count") for x in files]
-                    cross["all_declared_sizes_match"]=all(x.get("declared_size_matches") for x in files)
-                    cross["all_resource_bases_match_descriptor_end"]=all(x.get("resource_base_matches_descriptor_end") for x in files)
-                    all_pairs={}
-                    all_kinds={}
-                    for x in files:
-                        for k,v in x.get("kind_subtype_counts",{}).items():all_pairs[k]=all_pairs.get(k,0)+v
-                        for k,v in x.get("kind_counts",{}).items():all_kinds[k]=all_kinds.get(k,0)+v
-                    cross["kind_subtype_totals"]=dict(sorted(all_pairs.items()))
-                    cross["kind_totals"]=dict(sorted(all_kinds.items()))
-                    # Coordinates/components present in every file are strong engine primitives.
-                    sig_sets=[]
-                    for x in files:
-                        sig_sets.append(set((d["kind"],d["subtype"],d["value"]) for d in x.get("descriptors",[])))
-                    common=set.intersection(*sig_sets) if sig_sets else set()
-                    cross["common_element_signatures"]=[{"kind":a,"subtype":b,"value":c} for a,b,c in sorted(common)]
-                    rep["wf_format_analysis"]["cross_file"]=cross
-                    emit("  versiones="+str(cross["versions"])+" · resoluciones="+str(cross["resolutions"])+" · elementos="+str(cross["element_counts"]))
-                    emit("  tabla descriptor→recursos consistente="+str(cross["all_resource_bases_match_descriptor_end"]))
+                    emit("5/10 · Comparando tipos de elemento entre diales…")
+                    files=rep["wf_resource_analysis"]["files"]
+                    cross={
+                        "all_valid_wf":all(x.get("valid_wf") for x in files),
+                        "all_240x296":all(x.get("width")==240 and x.get("height")==296 for x in files),
+                        "element_counts":[x.get("element_count") for x in files],
+                        "all_declared_sizes_match":all(x.get("declared_size_matches") for x in files),
+                        "all_resource_bases_match_descriptor_end":all(x.get("resource_base_matches_descriptor_end") for x in files),
+                        "all_descriptor_pointers_valid":all(x.get("all_descriptor_pointers_valid") for x in files),
+                        "type_map":{}
+                    }
+                    for f in files:
+                        for d in f.get("descriptors",[]):
+                            key=f"0x{d['type_code']:04X}"
+                            row=cross["type_map"].setdefault(key,{
+                                "count":0,"modes":set(),"frame_count_like":set(),"examples":[],
+                                "role_hints":set(),"resource_lengths":[]
+                            })
+                            row["count"]+=1
+                            row["modes"].add(d["mode"])
+                            row["frame_count_like"].add(d["frame_count_like"])
+                            if d.get("role_hint"):row["role_hints"].add(d["role_hint"])
+                            if len(row["examples"])<8:
+                                row["examples"].append({
+                                    "dial":f.get("dial_id"),"x":d["x"],"y":d["y"],
+                                    "width_like":d["width_like"],"height_like":d["height_like"],
+                                    "arg2":d["arg2"],"arg3":d["arg3"],
+                                    "resource_offset":d["resource_offset_absolute"]
+                                })
+                            for r in f.get("resources",[]):
+                                if d["index"] in r.get("referenced_by",[]):
+                                    row["resource_lengths"].append(r["length"])
+                    for row in cross["type_map"].values():
+                        row["modes"]=sorted(row["modes"])
+                        row["frame_count_like"]=sorted(row["frame_count_like"])
+                        row["role_hints"]=sorted(row["role_hints"])
+                        row["resource_lengths"]=sorted(set(row["resource_lengths"]))
+                    rep["wf_resource_analysis"]["cross_file"]=cross
 
-                    emit("6/9 · Guardando informe estructural local…")
-                    report_path=os.path.join(folder,"wf-analysis-v055.json")
+                    emit("6/10 · VALIDACIÓN CABECERA · 0x2A=ancho, 0x2C=alto, 0x2E=cantidad, 0x30=tamaño, 0x34=base recursos relativa a 'WF'.")
+                    emit("7/10 · DESCRIPTOR · 20 bytes: mode/type/frame-like/x/y/width-like/height-like/arg2/arg3/puntero-u16.")
+                    emit("8/10 · Tipos detectados="+", ".join(sorted(cross["type_map"].keys())))
+                    analog=[k for k,v in cross["type_map"].items() if "analog_hand_candidate" in v.get("role_hints",[])]
+                    emit("9/10 · candidatos agujas analógicas="+str(analog)+" · imágenes OEM extraídas a "+folder)
+
+                    report_path=os.path.join(folder,"wf-analysis-v056.json")
                     with open(report_path,"w",encoding="utf-8") as fh:
-                        json.dump(rep["wf_format_analysis"],fh,ensure_ascii=False,indent=2)
-                    rep["wf_format_analysis"]["analysis_file"]=report_path
-
-                    emit("7/9 · HALLAZGO · cabecera WF: magic(2)+version(2); resolución @0x28/0x2A; cantidad @0x2C; tamaño @0x2E; base recursos almacenada @0x32.")
-                    emit("8/9 · HALLAZGO · descriptores desde 0x36, 20 bytes por elemento; offset recurso en bytes 16–19. La base/offset almacenado se valida como relativo a los 2 bytes 'WF'.")
-                    rep["wf_format_analysis"]["phase"]="complete"
-                    emit("9/9 · V0.55 FINALIZADA · sólo lectura BLE + descarga/análisis OEM · 0x83 NO TOCADO.")
+                        json.dump(rep["wf_resource_analysis"],fh,ensure_ascii=False,indent=2)
+                    rep["wf_resource_analysis"]["analysis_file"]=report_path
+                    rep["wf_resource_analysis"]["phase"]="complete"
+                    emit("10/10 · V0.56 FINALIZADA · parser corregido + recursos extraídos · 0x83 NO TOCADO.")
                     return rep
                 finally:
                     if c:
@@ -348,28 +448,27 @@ new_ota = '''        def ota_lab():
             def done(result,error):
                 if error:
                     rep["errors"].append(type(error).__name__+": "+str(error))
-                    rep["wf_format_analysis"]["phase"]="error"
+                    rep["wf_resource_analysis"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("ANÁLISIS V0.55 FALLÓ · "+repr(error))
+                    append("EXTRACCIÓN V0.56 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V0.55 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V0.56 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
-                wf=result.get("wf_format_analysis",{})
-                cross=wf.get("cross_file",{})
-                if cross.get("all_valid_wf") and cross.get("all_declared_sizes_match") and cross.get("all_resource_bases_match_descriptor_end"):
-                    append("FORMATO WF ESTRUCTURALMENTE VALIDADO · siguiente versión puede mapear cada tipo/subtipo a sus widgets y recursos antes de construir nuestra esfera.")
+                x=result.get("wf_resource_analysis",{}).get("cross_file",{})
+                if x.get("all_valid_wf") and x.get("all_240x296") and x.get("all_declared_sizes_match") and x.get("all_resource_bases_match_descriptor_end"):
+                    append("FORMATO WF VALIDADO · cabecera y tabla ya están alineadas. Siguiente paso: identificar visualmente cada recurso/tipo y generar el paquete de nuestra esfera.")
                 else:
-                    append("FORMATO WF PARCIAL · revisar diferencias del diagnóstico antes de empaquetar.")
-                self.status.set("V0.55 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
-            self.run_async(asyncio.wait_for(work(),timeout=240),done)
+                    append("FORMATO WF AÚN TIENE DIFERENCIAS · revisar diagnóstico antes de generar una esfera.")
+                self.status.set("V0.56 finalizada. Ahora COPIAR DIAGNÓSTICO y mandármelo.")
+            self.run_async(asyncio.wait_for(work(),timeout=260),done)
 '''
 
 s = s[:start] + new_ota + s[end:]
 
 old_ready='append("V0.28 LISTA · botón principal enlazado correctamente. Al pulsarlo debe aparecer actividad inmediatamente.")'
-new_ready='append("V0.55 LISTA · 1º PREPARAR ESFERA ÚNICA V0.55; 2º COPIAR DIAGNÓSTICO. Desarma varios .bin WF oficiales 240×296: cabecera, elementos y recursos; 0x83 bloqueado.")'
+new_ready='append("V0.56 LISTA · 1º PREPARAR ESFERA ÚNICA V0.56; 2º COPIAR DIAGNÓSTICO. Corrige offsets WF y extrae recursos reales de los .bin oficiales 240×296; 0x83 bloqueado.")'
 if old_ready not in s:
     raise SystemExit("No se encontró mensaje V0.28")
 s=s.replace(old_ready,new_ready,1)
@@ -417,7 +516,7 @@ s=s.replace("    def open_control(self):", '''    async def inspect_gatt_snapsho
     def open_control(self):''',1)
 
 
-# V0.55: do not depend on a second advertising cycle after the first GATT attempt.
+# V0.56: do not depend on a second advertising cycle after the first GATT attempt.
 # Reuse the BLEDevice captured by "Buscar relojes" first; fresh scanning is recovery only.
 _conn_start=s.index("    async def connect_retry(")
 _conn_end=s.index("\n    def diagnose(",_conn_start)
@@ -518,4 +617,4 @@ _new_connect_retry='''    async def connect_retry(self,attempts=5,progress=None)
 s=s[:_conn_start]+_new_connect_retry+s[_conn_end:]
 
 p.write_text(s,encoding="utf-8")
-print("build patch v0.55 aplicado")
+print("build patch v0.56 aplicado")
