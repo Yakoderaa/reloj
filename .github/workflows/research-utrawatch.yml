@@ -1,0 +1,64 @@
+name: Research UtraWatch Dial Transfer
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/research-utrawatch.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download UtraWatch package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          URL='https://04.apk.dog/storage/22/088/475/1088475/split/379294/UtraWatch.zip?apk_id=1232604&e=1790631237&file_id=3328642&lang=en&premium_speed=0&s=iCEtpd6BvpskuNvN9_qRsA&split_id=379294'
+          curl -L --fail --retry 3 --connect-timeout 20 "$URL" -o UtraWatch.zip
+          ls -lh UtraWatch.zip
+          unzip -l UtraWatch.zip | head -80
+          mkdir xapk
+          unzip -q UtraWatch.zip -d xapk
+          find xapk -maxdepth 2 -type f -printf '%p %s bytes\n' | head -80
+      - name: Install JADX
+        shell: bash
+        run: |
+          set -euxo pipefail
+          curl -L --fail --retry 3 https://github.com/skylot/jadx/releases/download/v1.5.3/jadx-1.5.3.zip -o jadx.zip
+          unzip -q jadx.zip -d jadx
+          chmod +x jadx/bin/jadx
+          jadx/bin/jadx --version
+      - name: Decompile base APK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          APK=$(find xapk -type f -name '*.apk' | sort | head -1)
+          echo "APK=$APK"
+          mkdir decompiled
+          jadx/bin/jadx -d decompiled "$APK" || true
+      - name: Extract dial transfer evidence
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir evidence
+          PAT='DIAL_COMPRESS_CTRL|IS_START_BIG_SEND|DATA_TYPE_DIAL_SYNC|DATA_TYPE_DIAL_INFO|FUNCTION_CONTROL|添加大发送数据|大发送|DialInfo|DialSync|dialSync|bigSend|BigSend|GZipUtils|ANSWER_OVER|CUSTOMIZE'
+          grep -R -n -E "$PAT" decompiled > evidence/grep.txt || true
+          echo '=== MATCH COUNT ==='
+          wc -l evidence/grep.txt
+          echo '=== FIRST 500 MATCHES ==='
+          sed -n '1,500p' evidence/grep.txt
+          cut -d: -f1 evidence/grep.txt | sort -u | head -120 > evidence/files.txt || true
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            safe=$(echo "$f" | sed 's#^decompiled/##; s#/#__#g')
+            cp "$f" "evidence/$safe" || true
+          done < evidence/files.txt
+          find evidence -maxdepth 1 -type f -printf '%f\n' | sort
+      - uses: actions/upload-artifact@v4
+        with:
+          name: utrawatch-dial-evidence
+          path: evidence
+          if-no-files-found: error
