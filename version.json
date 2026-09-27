@@ -1,6 +1,6 @@
 {
-  "sha256": "51f4684291f19dbe3816e715e927ad6f14108005deb8e4ad25f578f0d1b6bfe4",
-  "notes": "V0.56: parser WF corregido + extracción segura de recursos reales desde diales OEM 240×296; DIAL_SYNC 0x83 bloqueado.",
-  "version": "0.56.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.56.0/RelojLab.exe"
+  "notes": "V0.57: fix de entropía + extracción WF resiliente desde diales OEM 240×296; DIAL_SYNC 0x83 bloqueado.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.57.0/RelojLab.exe",
+  "version": "0.57.0",
+  "sha256": "83db3a0489a46b141ba73c7ee1ed6ea82cb99e2a821988f9068c49ec79e2b234"
 }
