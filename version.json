@@ -1,6 +1,6 @@
 {
-  "sha256": "dd0721886939b03b88c07b69b5f94e1928f74028c72270449a1090fafd0ff53f",
-  "version": "0.47.0",
-  "notes": "V0.47: inspección de servicios GATT sin escrituras. Copiar diagnóstico permanece como segundo botón.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.47.0/RelojLab.exe"
+  "version": "0.48.0",
+  "sha256": "68a63e5906c48be12baaa41b5bb19cc7544f5565b486af3a23d958d1b76b7471",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.48.0/RelojLab.exe",
+  "notes": "V0.48: búsqueda y descarga de firmware oficial QWatch Pro. Copiar diagnóstico permanece como segundo botón."
 }
