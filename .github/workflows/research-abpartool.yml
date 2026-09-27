@@ -1,4 +1,4 @@
-name: Research UI Transfer
+name: Research UtraWatch Big Send
 on:
   push:
     branches: [research-abpartool]
@@ -6,29 +6,74 @@ permissions:
   contents: read
 jobs:
   research:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-python@v5
         with:
-          distribution: temurin
-          java-version: '17'
-      - name: Inspect watch UI transfer SDK
-        shell: pwsh
+          python-version: '3.12'
+      - name: Download official APK and decompile dial transport
+        shell: bash
         run: |
-          $ErrorActionPreference = "Stop"
-          New-Item -ItemType Directory -Path out | Out-Null
-          $vp = "https://raw.githubusercontent.com/HBandSDK/Android_Ble_SDK/add57a049a916c210c5463a66b097ad94265e481/android_sdk_source/jar_core/vpprotocol-2.3.85.15.aar"
-          Invoke-WebRequest -Uri $vp -OutFile vp.aar
-          Copy-Item vp.aar vp.zip
-          Expand-Archive vp.zip -DestinationPath vpdir
-          jar tf vpdir/classes.jar | Out-File -Encoding utf8 out/classes.txt
-          $targets = Get-Content out/classes.txt | Where-Object { $_ -match "(UiUpdate|UIBase|BigTran|BigData|WatchUI|UiBase|UIFromType|Dial)" -and $_ -like "*.class" } | ForEach-Object { $_.Replace("/",".").Replace(".class","") }
-          $targets | Out-File -Encoding utf8 out/targets.txt
-          foreach ($c in $targets) {
-            "===== $c =====" | Out-File -Append -Encoding utf8 out/javap.txt
-            javap -classpath vpdir/classes.jar -p -c -s $c 2>&1 | Out-File -Append -Encoding utf8 out/javap.txt
-          }
+          set -euxo pipefail
+          mkdir -p out
+          python - <<'PY'
+          import urllib.request, json
+          pkg="com.wtwd.utrawatch"
+          urls=[
+              f"https://api-apk.apps.evozi.com/apk/v1/dl?id={pkg}",
+          ]
+          apk=None
+          for api in urls:
+              try:
+                  req=urllib.request.Request(api,headers={"User-Agent":"Mozilla/5.0"})
+                  with urllib.request.urlopen(req,timeout=30) as r:
+                      obj=json.loads(r.read().decode())
+                  if obj.get("status")=="success":
+                      apk=obj["url"]; break
+              except Exception as e:
+                  print("evozi failed",repr(e))
+          if not apk:
+              apk=f"https://d.apkpure.com/b/APK/{pkg}?version=latest"
+          print("downloading",apk)
+          req=urllib.request.Request(apk,headers={"User-Agent":"Mozilla/5.0"})
+          with urllib.request.urlopen(req,timeout=90) as r, open("utrawatch.apk","wb") as f:
+              while True:
+                  b=r.read(1024*1024)
+                  if not b: break
+                  f.write(b)
+          PY
+          file utrawatch.apk
+          sha256sum utrawatch.apk > out/apk-sha256.txt
+          sudo apt-get update -y
+          sudo apt-get install -y jadx
+          jadx --show-bad-code -d decompiled utrawatch.apk || true
+          grep -RIlE "IS_START_BIG_SEND|DIAL_SYNC|DIAL_COMPRESS_CTRL|ClockDialTextColorBean|DATA_TYPE_DIAL_SYNC|GZipUtils|bigSend|BigSend" decompiled/sources > out/hits.txt || true
+          mkdir -p out/sources
+          python - <<'PY'
+          from pathlib import Path
+          import shutil, re
+          hits=Path("out/hits.txt")
+          if hits.exists():
+              for i,line in enumerate(hits.read_text(errors="ignore").splitlines()):
+                  p=Path(line)
+                  if p.is_file():
+                      dst=Path("out/sources")/(f"{i:03d}-"+p.name)
+                      shutil.copyfile(p,dst)
+          # Also capture all files in original WTWD protocol/ble packages whose source mentions opcode 131/0x83.
+          root=Path("decompiled/sources")
+          candidates=[]
+          for p in root.rglob("*.java"):
+              try:s=p.read_text(errors="ignore")
+              except:continue
+              if ("131" in s or "0x83" in s or "DIAL" in s.upper()) and ("wtwd" in str(p).lower() or "watch" in str(p).lower()):
+                  if any(k in s for k in ["131","DIAL_SYNC","IS_START_BIG_SEND","GZipUtils","compress","dial"]):
+                      candidates.append(p)
+          for j,p in enumerate(candidates[:120],start=500):
+              shutil.copyfile(p,Path("out/sources")/(f"{j:03d}-"+p.name))
+          print("captured",len(candidates))
+          PY
+          grep -RniE "IS_START_BIG_SEND|DIAL_SYNC|DIAL_COMPRESS_CTRL|ClockDialTextColorBean|DATA_TYPE_DIAL_SYNC|GZipUtils|131|0x83" out/sources > out/snippets.txt || true
       - uses: actions/upload-artifact@v4
         with:
-          name: ui-transfer-research
+          name: utrawatch-bigsend-research
           path: out
