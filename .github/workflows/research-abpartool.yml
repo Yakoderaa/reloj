@@ -1,0 +1,36 @@
+name: Research AB ParTool
+on:
+  push:
+    branches: [research-abpartool]
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Download and inspect abpartool
+        shell: pwsh
+        run: |
+          $url = "https://raw.githubusercontent.com/HBandSDK/Android_Ble_SDK/add57a049a916c210c5463a66b097ad94265e481/android_sdk_source/jar_core/abpartool-release.aar"
+          Invoke-WebRequest -Uri $url -OutFile abpartool-release.aar
+          New-Item -ItemType Directory -Path out | Out-Null
+          Copy-Item abpartool-release.aar out/abpartool.zip
+          Expand-Archive out/abpartool.zip -DestinationPath out/aar
+          jar tf out/aar/classes.jar | Out-File -Encoding utf8 out/classes.txt
+          $classes = Get-Content out/classes.txt | Where-Object { $_ -like "*.class" -and $_ -notlike "*$*" } | ForEach-Object { $_.Replace("/",".").Replace(".class","") }
+          "===== CLASSES =====" | Out-File -Encoding utf8 out/javap.txt
+          $classes | Out-File -Append -Encoding utf8 out/javap.txt
+          foreach ($c in $classes) {
+            "===== $c =====" | Out-File -Append -Encoding utf8 out/javap.txt
+            javap -classpath out/aar/classes.jar -p -c -s $c 2>&1 | Out-File -Append -Encoding utf8 out/javap.txt
+          }
+          Get-FileHash abpartool-release.aar -Algorithm SHA256 | Format-List | Out-File -Encoding utf8 out/sha256.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: abpartool-research
+          path: out
