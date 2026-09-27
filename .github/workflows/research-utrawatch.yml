@@ -44,7 +44,7 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir evidence
-          PAT='DIAL_COMPRESS_CTRL|IS_START_BIG_SEND|DATA_TYPE_DIAL_SYNC|DATA_TYPE_DIAL_INFO|FUNCTION_CONTROL|添加大发送数据|大发送|DialInfo|DialSync|dialSync|bigSend|BigSend|GZipUtils|ANSWER_OVER|CUSTOMIZE'
+          PAT='DIAL_COMPRESS_CTRL|IS_START_BIG_SEND|DATA_TYPE_DIAL_SYNC|DATA_TYPE_DIAL_INFO|FUNCTION_CONTROL|添加大发送数据|大发送|DialInfo|DialSync|dialSync|bigSend|BigSend|GZipUtils|ANSWER_OVER|CUSTOMIZE|FileTransControl|sendFile\\(|sendWatchFileData|getFileDownloadInfo|K6_DATA_TYPE_WATCH_FACE_INFO|WATCH_FACE_INFO|fileDataSendResult|fileStateResult'
           grep -R -n -E "$PAT" decompiled > evidence/grep.txt || true
           echo '=== MATCH COUNT ==='
           wc -l evidence/grep.txt
