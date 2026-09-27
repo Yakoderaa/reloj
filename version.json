@@ -1,6 +1,6 @@
 {
-  "version": "0.50.0",
-  "sha256": "d18d8561250bed512a0dc87823d0bea4fc6203e596e8e34a6936bb2a491ec241",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.50.0/RelojLab.exe",
-  "notes": "V0.50: conexión GATT robusta para Esfera Única; usa DEVICE + CACHE OFF/ON y ADDRESS + CACHE OFF/ON antes de exigir un nuevo advertising."
+  "notes": "V0.51: captura controlada del cambio manual de esfera; compara picture_id/font_id y DIAL_INFO antes/después y registra tráfico espontáneo.",
+  "version": "0.51.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.51.0/RelojLab.exe",
+  "sha256": "4771a01d83a508cae8083f53a042f1095ce6850eba6bf2c4419c627ac1044893"
 }
