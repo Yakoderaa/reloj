@@ -1,6 +1,6 @@
 {
-  "notes": "V0.53: sondeo seguro de subcomandos DIAL_INFO 0x84: REQUEST payload 00/01/02/03 con control DEVICE_INFO y sin tocar DIAL_SYNC 0x83.",
-  "sha256": "e0a349eb107e011ff7e6c2919b4d3e982cf57f1a16204197b03b2c4f8a136277",
-  "version": "0.53.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.53.0/RelojLab.exe"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.54.0/RelojLab.exe",
+  "notes": "V0.54: descubrimiento pasivo de dial OEM: consulta listas oficiales por candidatos watchId acotados, analiza .bin y mantiene DIAL_SYNC 0x83 bloqueado.",
+  "sha256": "3c70bd39ca9d80b1ab24b2f93eb1866c97515577516253011a9dc009b1056639",
+  "version": "0.54.0"
 }
