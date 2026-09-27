@@ -1,6 +1,6 @@
 {
-  "notes": "V0.72: cinco bloques consecutivos de 300 bytes, 1500 bytes totales, con verificación de estabilidad.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.72.0/RelojLab.exe",
-  "version": "0.72.0",
-  "sha256": "4dfa51d76994d62219e87d21b39cde90e55e20729cf4b182777e85c7b84b79df"
+  "version": "0.73.0",
+  "notes": "V0.73: diez bloques consecutivos de 300 bytes, 3000 bytes totales, con verificación de estabilidad.",
+  "sha256": "db527376b76f0a3935add742ca1df8fe789ca5076172aae214827e8683d93ade",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.73.0/RelojLab.exe"
 }
