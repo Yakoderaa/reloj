@@ -1,6 +1,6 @@
 {
-  "version": "0.62.0",
-  "sha256": "5b8461512087d04932383426ed4726ab92dda36c04ad69cabcc80a01dd9b7b69",
-  "notes": "V0.62: candidato WF offline construido y validado con donantes OEM; ninguna escritura al reloj.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.62.0/RelojLab.exe"
+  "sha256": "4c53b2bd24c6d363252ae7fb7feb9f6cd2b485d82bf372f429441e61e1a45a50",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.63.0/RelojLab.exe",
+  "version": "0.63.0",
+  "notes": "V0.63: preflight de transporte WF con compresión/CRC/límites y canales GATT; sin 0x83/FOTA DATA."
 }
