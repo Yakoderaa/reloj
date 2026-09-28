@@ -1,6 +1,6 @@
 {
-  "sha256": "c491e63cef35a06c7ec90d562b994dd782b90e71f7232311fc19f2ce2b96a84e",
-  "notes": "V0.85: esfera objetivo confirmada enviada realmente a MARKET con activación verificada y reintentos; actualizaciones futuras desde Buscar actualización.",
-  "version": "0.85.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.85.0/RelojLab.exe"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.86.0/RelojLab.exe",
+  "sha256": "6625422aa240e4a57ee2ab41144ec4d71e84394aa8ca8f595bda563e72e90db2",
+  "version": "0.86.0",
+  "notes": "V0.86: referencia visual aprobada instalada por CUSTOMIZE 240x296; prioriza apariencia exacta y deja MARKET fuera de esta prueba; actualizaciones futuras desde Buscar actualización."
 }
