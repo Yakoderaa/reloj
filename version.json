@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.97.0/RelojLab.exe",
-  "notes": "V0.97: conexión física dirigida a E91A desde Bleak connect; evita enumeración GATT completa previa y conserva esfera CUSTOMIZE aprobada.",
-  "sha256": "be1b6d6a479caa8b489605219087621d6b57abf23db358785c82354bae73addb",
-  "version": "0.97.0"
+  "sha256": "eceb120069f8bdbb264ba5ab0d5af78ebdf131e57157fbb20c68fcc2b77cb15a",
+  "notes": "V0.98: DIRECT CACHE ON + validación física mediante tráfico ATT real en B002; evita los timeouts UNCACHED de V0.97 y conserva la esfera CUSTOMIZE aprobada.",
+  "version": "0.98.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.98.0/RelojLab.exe"
 }
