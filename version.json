@@ -1,6 +1,6 @@
 {
-  "notes": "V1.13: recuperación post-reset persistente; nueva instancia WinRT/Bleak espera estabilización GATT.",
-  "sha256": "a497fdb57a41630f39f06a6bc01d51c069a24a78efdd91630c6e4a28e06bdebc",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.13.0/RelojLab.exe",
-  "version": "1.13.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.14.0/RelojLab.exe",
+  "sha256": "a813c2a1d060697e0a273f445471d9c1ad2641b94325fcbf0dc1f187de0d273b",
+  "notes": "V1.14: corrige NameError progress al iniciar la recuperación post-reset; conserva la ruta BLE y esfera aprobada.",
+  "version": "1.14.0"
 }
