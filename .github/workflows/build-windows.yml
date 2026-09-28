@@ -1,13 +1,13 @@
 name: Build Windows EXE
 on:
   push:
-    branches: [main, release-v093-att-prewake]
+    branches: [main, release-v094-proven-cache-on]
     paths-ignore: [version.json]
   workflow_dispatch:
 permissions:
   contents: write
 concurrency:
-  group: reloj-release-main-v093
+  group: reloj-release-main-v094
   cancel-in-progress: true
 jobs:
   build:
@@ -51,6 +51,8 @@ jobs:
         run: python build_patch_v092.py
       - name: Apply v0.93 ATT prewake overlay
         run: python build_patch_v093.py
+      - name: Apply v0.94 proven cached GATT overlay
+        run: python build_patch_v094.py
       - name: Install dependencies
         run: python -m pip install -r requirements.txt pyinstaller==6.22.0
       - name: Verify syntax
@@ -72,14 +74,14 @@ jobs:
           $releaseTag = "v$releaseVersion"
           gh release view $releaseTag *> $null
           if ($LASTEXITCODE -eq 0) { throw "La versión ya existe; no se reemplazan ejecutables publicados." }
-          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V0.93: conserva la esfera sincronizada; fuerza una operación ATT real por B002 con write-response antes de habilitar B001 y añade fallback de CCCD 0x2902 directo."
+          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V0.94: conserva la esfera sincronizada y prioriza la única ruta GATT confirmada: DIRECT WINRT + CACHE ON; elimina CACHE OFF/RANDOM previos y mantiene PREWAKE B002 + CCCD directo."
           if ($LASTEXITCODE -ne 0) { throw "Falló la publicación del EXE" }
           New-Item -ItemType Directory -Path verified | Out-Null
           gh release download $releaseTag --pattern RelojLab.exe --dir verified
           if ($LASTEXITCODE -ne 0) { throw "No se pudo verificar la descarga publicada" }
           $expectedHash = (Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           if ((Get-FileHash verified/RelojLab.exe -Algorithm SHA256).Hash.ToLower() -ne $expectedHash) { throw "SHA-256 publicado incorrecto" }
-          $metadata = @{version=$releaseVersion; exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe"; sha256=$expectedHash; notes="V0.93: ATT prewake por B002 + B001 notify/CCCD directo + hora/pasos/pulso vivos; actualizaciones futuras desde Buscar actualización."}
+          $metadata = @{version=$releaseVersion; exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe"; sha256=$expectedHash; notes="V0.94: DIRECT WINRT + CACHE ON primero, sin rutas que degradan el stack; PREWAKE/CCCD directo + hora/pasos/pulso vivos; actualizaciones futuras desde Buscar actualización."}
           $metadata | ConvertTo-Json | Set-Content -Encoding utf8NoBOM version.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
