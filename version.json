@@ -1,6 +1,6 @@
 {
-  "sha256": "edb6809c52b9dc41afcdc3eab2c0284e335a75b44f6a5d1dcdb4f7bc29317810",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.99.0/RelojLab.exe",
-  "version": "0.99.0",
-  "notes": "V0.99: gate físico mediante intercambio OEM DEVICE_INFO real; sin payload B002 inválido; esfera CUSTOMIZE aprobada sin cambios."
+  "sha256": "e7c2010ddc523af2c907a4ef8d72ed26de30a91f819f39a7566b6bb9e594dbb8",
+  "version": "1.00.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.00.0/RelojLab.exe",
+  "notes": "V1.00: ruta de conexión V0.88 restaurada; esfera aprobada y campos vivos conservados."
 }
