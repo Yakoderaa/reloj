@@ -1,6 +1,6 @@
 {
-  "sha256": "6d727abd092f2c72853d3a72d443919b80f7eec202bdf6faf6f4a386a850ecb3",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.06.0/RelojLab.exe",
-  "notes": "V1.06: physical-ready mediante lectura ATT real de B001 CCCD antes de notify; esfera aprobada intacta.",
-  "version": "1.06.0"
+  "sha256": "3bad7272ff1b461d7d805454b4694a12bde3ca88a5bce56e40d635c03cd36d07",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.07.0/RelojLab.exe",
+  "version": "1.07.0",
+  "notes": "V1.07: recuperación larga del bearer ATT Windows con 7 sesiones frescas; esfera aprobada intacta."
 }
