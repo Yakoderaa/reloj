@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.02.0/RelojLab.exe",
-  "notes": "V1.02: conexión original V0.83 restaurada; esfera aprobada V0.86 + datos vivos V0.88.",
-  "sha256": "ef824a79eeea6a5cdffa74bb5067352354afea8e346ef840fa414e44f56c3df0",
-  "version": "1.02.0"
+  "notes": "V1.03: discovery por firma UtraWatch en cada intento + objeto BLE fresco; esfera aprobada intacta.",
+  "sha256": "c74bd4ceb7ffe3bd2a5e2e1d56d47201f80761cbe701c58bb258900161e41b8b",
+  "version": "1.03.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.03.0/RelojLab.exe"
 }
