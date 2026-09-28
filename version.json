@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.95.0/RelojLab.exe",
-  "sha256": "a7f73322dee8717827ea932874feb7a4b7108b4dbd919ae444ce4dda1b20c699",
-  "version": "0.95.0",
-  "notes": "V0.95: exige enlace físico WinRT real antes de escribir; BLEDevice real/uncached + physical gate + pairing correcto; conserva esfera sincronizada y PREWAKE/CCCD."
+  "sha256": "b47c26bfdfb2bb7ee8611cdaa6fd4270ff43b3e29cb1fcf1289fb07a9b75c49f",
+  "version": "0.96.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.96.0/RelojLab.exe",
+  "notes": "V0.96: valida físicamente B001/B002 con UNCACHED dirigido antes de escribir; conserva esfera sincronizada y PREWAKE/CCCD; pairing Windows sólo si hace falta."
 }
