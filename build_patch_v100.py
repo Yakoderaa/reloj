@@ -6,15 +6,14 @@ if 'APP_VERSION="0.99.0"' not in s:
     raise SystemExit("V1.00 requiere V0.99")
 s=s.replace('APP_VERSION="0.99.0"','APP_VERSION="1.00.0"',1).replace('V0.99','V1.00')
 
-# IMPORTANT: V1.00 deliberately removes the experimental connection gates added
-# after V0.88.  The watch face was physically installed before those experiments.
-# Restore the exact connect_retry implementation produced by V0.88 by extracting
-# it from the V0.88 overlay source that is still in the repository build chain.
-v88=Path("build_patch_v088.py").read_text(encoding="utf-8")
+# Restore the exact connect_retry implementation introduced by V0.87 and still
+# used by V0.88. V0.88 itself only adds the live-data face bindings and does not
+# redefine connect_retry.
+v87=Path("build_patch_v087.py").read_text(encoding="utf-8")
 marker="new_conn='''"
-a=v88.index(marker)+len(marker)
-b=v88.index("'''",a)
-v88_conn=v88[a:b]
+a=v87.index(marker)+len(marker)
+b=v87.index("'''",a)
+v88_conn=v87[a:b]
 
 start=s.index("    async def connect_retry(")
 end=s.index("\n    def diagnose(",start)
