@@ -1,6 +1,6 @@
 {
-  "version": "0.89.0",
-  "notes": "V0.89: conexión GATT fresca y recuperación de reloj ocupado + hora/pasos/pulso vivos de V0.88; actualizaciones futuras desde Buscar actualización.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.89.0/RelojLab.exe",
-  "sha256": "72879470ff787cb980e83cc0b41c10a794fe451d514348d641a0bb809e1f240b"
+  "version": "0.90.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.90.0/RelojLab.exe",
+  "notes": "V0.90: secuencia GATT completa por cada anuncio fresco + hora/pasos/pulso vivos de V0.88; actualizaciones futuras desde Buscar actualización.",
+  "sha256": "eff78f01470213e098e410a6adf02b4c3ebb29bbb00878bb88a8e7f5266daad4"
 }
