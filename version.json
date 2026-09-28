@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.14.0/RelojLab.exe",
-  "sha256": "a813c2a1d060697e0a273f445471d9c1ad2641b94325fcbf0dc1f187de0d273b",
-  "notes": "V1.14: corrige NameError progress al iniciar la recuperación post-reset; conserva la ruta BLE y esfera aprobada.",
-  "version": "1.14.0"
+  "notes": "V1.15: corrige Path no definido al guardar y leer el marcador post-reset; conserva la ruta BLE y esfera aprobada.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.15.0/RelojLab.exe",
+  "sha256": "ca5503688d39be7474d88403486c422e8ae156744801b2e6170f71a1146937f9",
+  "version": "1.15.0"
 }
