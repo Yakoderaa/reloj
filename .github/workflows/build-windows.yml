@@ -7,7 +7,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: reloj-release-main-v106
+  group: reloj-release-main-v107
   cancel-in-progress: true
 jobs:
   build:
@@ -36,6 +36,7 @@ jobs:
       - run: python build_patch_v104.py
       - run: python build_patch_v105.py
       - run: python build_patch_v106.py
+      - run: python build_patch_v107.py
       - name: Install dependencies
         run: python -m pip install -r requirements.txt pyinstaller==6.22.0
       - name: Verify syntax
@@ -57,13 +58,13 @@ jobs:
           $releaseTag = "v$releaseVersion"
           gh release view $releaseTag *> $null
           if ($LASTEXITCODE -eq 0) { throw "La versión ya existe" }
-          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V1.06: no confunde B001/B002 cacheados con conexión física. Antes de entregar una sesión, exige una lectura ATT real del descriptor CCCD 0x2902 de B001; sólo entonces continúa a notify y protocolo OEM. Esfera aprobada intacta."
+          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V1.07: V1.06 confirmó que el fallo está en el bearer ATT de Windows (CCCD 0x2902 devuelve Unreachable). Mantiene el gate de lectura real y amplía la recuperación a 7 sesiones completamente nuevas con cooldown progresivo y advertising fresco; no toca pairing, firmware ni esfera."
           if ($LASTEXITCODE -ne 0) { throw "Falló publicación" }
           New-Item -ItemType Directory -Path verified | Out-Null
           gh release download $releaseTag --pattern RelojLab.exe --dir verified
           $expectedHash=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           if ((Get-FileHash verified/RelojLab.exe -Algorithm SHA256).Hash.ToLower() -ne $expectedHash) { throw "SHA incorrecto" }
-          $metadata=@{version=$releaseVersion;exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe";sha256=$expectedHash;notes="V1.06: physical-ready mediante lectura ATT real de B001 CCCD antes de notify; esfera aprobada intacta."}
+          $metadata=@{version=$releaseVersion;exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe";sha256=$expectedHash;notes="V1.07: recuperación larga del bearer ATT Windows con 7 sesiones frescas; esfera aprobada intacta."}
           $metadata|ConvertTo-Json|Set-Content -Encoding utf8NoBOM version.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
