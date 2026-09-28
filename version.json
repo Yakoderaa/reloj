@@ -1,6 +1,6 @@
 {
-  "notes": "V0.93: ATT prewake por B002 + B001 notify/CCCD directo + hora/pasos/pulso vivos; actualizaciones futuras desde Buscar actualización.",
-  "sha256": "52a3b077c00209826683eefdcdb0242ed0bff0c0291079918a4ef1fcbd19de9f",
-  "version": "0.93.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.93.0/RelojLab.exe"
+  "notes": "V0.94: DIRECT WINRT + CACHE ON primero, sin rutas que degradan el stack; PREWAKE/CCCD directo + hora/pasos/pulso vivos; actualizaciones futuras desde Buscar actualización.",
+  "version": "0.94.0",
+  "sha256": "8e3bd6a152d21838f9f1d72dee9d3dec2d20facb6b5e8f3b3dd39f583b132b2d",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.94.0/RelojLab.exe"
 }
