@@ -1,6 +1,6 @@
 {
-  "version": "0.88.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.88.0/RelojLab.exe",
-  "notes": "V0.88: hora real + pasos y pulso vivos en la esfera aprobada; batería real al instalar y auto-identificación UtraWatch; actualizaciones futuras desde Buscar actualización.",
-  "sha256": "1202789696da48482b407a49e70e1fd90d7888864fc702da86bbdfa3950dfacb"
+  "version": "0.89.0",
+  "notes": "V0.89: conexión GATT fresca y recuperación de reloj ocupado + hora/pasos/pulso vivos de V0.88; actualizaciones futuras desde Buscar actualización.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.89.0/RelojLab.exe",
+  "sha256": "72879470ff787cb980e83cc0b41c10a794fe451d514348d641a0bb809e1f240b"
 }
