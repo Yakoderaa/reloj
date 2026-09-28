@@ -1,6 +1,6 @@
 {
-  "notes": "V1.03: discovery por firma UtraWatch en cada intento + objeto BLE fresco; esfera aprobada intacta.",
-  "sha256": "c74bd4ceb7ffe3bd2a5e2e1d56d47201f80761cbe701c58bb258900161e41b8b",
-  "version": "1.03.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.03.0/RelojLab.exe"
+  "sha256": "af5baeb4a6c9ce440cc8063e9a9b64f132b1504d7468f0e7e4b7d65c56063bf2",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.04.0/RelojLab.exe",
+  "version": "1.04.0",
+  "notes": "V1.04: recuperación automática de B001 notify mediante sesión BLE fresca; esfera aprobada intacta."
 }
