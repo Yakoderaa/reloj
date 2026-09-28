@@ -1,6 +1,6 @@
 {
-  "sha256": "af5baeb4a6c9ce440cc8063e9a9b64f132b1504d7468f0e7e4b7d65c56063bf2",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.04.0/RelojLab.exe",
-  "version": "1.04.0",
-  "notes": "V1.04: recuperación automática de B001 notify mediante sesión BLE fresca; esfera aprobada intacta."
+  "sha256": "88b81efc9d297199097d12c4e3002e933457167cc298f63d655e708f8021d75b",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.05.0/RelojLab.exe",
+  "notes": "V1.05: B001 notify se reintenta en la misma sesión GATT válida; esfera aprobada intacta.",
+  "version": "1.05.0"
 }
