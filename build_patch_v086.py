@@ -145,7 +145,7 @@ s=s[:sel_start]+new_sel+s[sel_end:]
 # file in this version.
 old_mirror='''                    rep["single_face_install"]["customize_mirror"]={
                         "attempted":False,
-                        "reason":"V0.85 mantiene V0.83 en CUSTOMIZE y dedica MARKET a la esfera dinámica de la foto"
+                        "reason":"V0.86 mantiene V0.83 en CUSTOMIZE y dedica MARKET a la esfera dinámica de la foto"
                     }
 '''
 new_mirror='''                    rep["single_face_install"]["market_attempt"]={
