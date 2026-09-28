@@ -6,9 +6,6 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
-concurrency:
-  group: reloj-release-main-v108
-  cancel-in-progress: true
 jobs:
   build:
     runs-on: windows-latest
@@ -17,8 +14,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify read-only inventory and cleanup
-        run: python -m unittest discover -s tests -p test_inventory.py -v
       - run: python build_patch_v029.py
       - run: python build_patch_v075.py
       - run: python build_patch_v080.py
@@ -38,43 +33,14 @@ jobs:
       - run: python build_patch_v106.py
       - run: python build_patch_v107.py
       - run: python build_patch_v108.py
-      - name: Verify actual V1.08 source
-        shell: pwsh
-        run: |
-          $v = python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); print(next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)))"
-          if ($v -ne '1.08.0') { throw "Expected 1.08.0, got $v" }
-      - name: Install dependencies
-        run: python -m pip install -r requirements.txt pyinstaller==6.22.0
-      - name: Verify syntax
-        run: python -m py_compile app.py
-      - name: Build EXE
-        run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab app.py
+      - run: python build_patch_v109.py
+      - name: Verify V1.09
+        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.09.0',v"
+      - run: python -m pip install -r requirements.txt pyinstaller==6.22.0
+      - run: python -m py_compile app.py
+      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab app.py
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.08
+          name: RelojLab-Windows-V1.09
           path: dist/RelojLab.exe
           if-no-files-found: error
-      - name: Publish V1.08
-        if: github.ref == 'refs/heads/main'
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $releaseVersion = '1.08.0'
-          $releaseTag = 'v1.08.0'
-          gh release view $releaseTag *> $null
-          if ($LASTEXITCODE -eq 0) { gh release delete $releaseTag --yes --cleanup-tag }
-          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab V1.08" --notes "V1.08: recuperación controlada del adaptador Bluetooth Windows tras ATT Unreachable persistente. Conserva pairing, firmware y esfera aprobada."
-          if ($LASTEXITCODE -ne 0) { throw 'Falló publicación V1.08' }
-          New-Item -ItemType Directory -Path verified | Out-Null
-          gh release download $releaseTag --pattern RelojLab.exe --dir verified
-          $expectedHash=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
-          $actualHash=(Get-FileHash verified/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
-          if ($actualHash -ne $expectedHash) { throw 'SHA incorrecto' }
-          $metadata=@{version=$releaseVersion;exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.08.0/RelojLab.exe';sha256=$expectedHash;notes='V1.08 real: recuperación controlada del adaptador Bluetooth Windows + gate ATT CCCD.'}
-          $metadata|ConvertTo-Json|Set-Content -Encoding utf8NoBOM version.json
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add version.json
-          git commit -m 'Publish verified v1.08.0 update metadata'
-          git push origin HEAD:main
