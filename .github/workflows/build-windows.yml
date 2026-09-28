@@ -35,13 +35,14 @@ jobs:
       - run: python build_patch_v108.py
       - run: python build_patch_v109.py
       - run: python build_patch_v110.py
-      - name: Verify V1.10
-        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.10.0',v"
+      - run: python build_patch_v111.py
+      - name: Verify V1.11
+        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.11.0',v"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0
       - run: python -m py_compile app.py
       - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab app.py
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.10
+          name: RelojLab-Windows-V1.11
           path: dist/RelojLab.exe
           if-no-files-found: error
