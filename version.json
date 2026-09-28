@@ -1,6 +1,6 @@
 {
-  "notes": "V1.16: conexión al reloj seleccionado con tipo de dirección anunciado, validación ATT sin caché y cierre de sesiones fallidas; elimina el ciclo de reinicios Bluetooth.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.16.0/RelojLab.exe",
-  "sha256": "d3953a7c5828e14cfdb5efc589b34297eaa9b467044a7c23f51448498c7526a1",
-  "version": "1.16.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.17.0/RelojLab.exe",
+  "sha256": "5003c5d95f0ee44ee2edaec40f668ce7fc65c2f69d385ece2e0b7acfd80267df",
+  "notes": "V1.17: consulta GATT directa al servicio E91A durante la instalación; conserva validación ATT y agrega registro nativo por intento. Conexión física pendiente de verificar.",
+  "version": "1.17.0"
 }
