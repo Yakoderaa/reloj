@@ -1,6 +1,6 @@
 {
-  "sha256": "9fd2dd5bd1cb4dc04c45d9dd032e0c505b67e94dc94fc04d60efa6d94e24ed61",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.92.0/RelojLab.exe",
-  "version": "0.92.0",
-  "notes": "V0.92: conexión WinRT directa + recuperación B001 notify/CCCD + hora/pasos/pulso vivos; actualizaciones futuras desde Buscar actualización."
+  "notes": "V0.93: ATT prewake por B002 + B001 notify/CCCD directo + hora/pasos/pulso vivos; actualizaciones futuras desde Buscar actualización.",
+  "sha256": "52a3b077c00209826683eefdcdb0242ed0bff0c0291079918a4ef1fcbd19de9f",
+  "version": "0.93.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.93.0/RelojLab.exe"
 }
