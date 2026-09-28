@@ -1,6 +1,6 @@
 {
-  "sha256": "92453c5fc407500f6e7ed649bfe3e980e0d5e1a49c5c523af9eb86bd0ccc1912",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.12.0/RelojLab.exe",
-  "version": "1.12.0",
-  "notes": "V1.12: reinicio limpio de Reloj Lab después de recuperar el adaptador Bluetooth."
+  "notes": "V1.13: recuperación post-reset persistente; nueva instancia WinRT/Bleak espera estabilización GATT.",
+  "sha256": "a497fdb57a41630f39f06a6bc01d51c069a24a78efdd91630c6e4a28e06bdebc",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.13.0/RelojLab.exe",
+  "version": "1.13.0"
 }
