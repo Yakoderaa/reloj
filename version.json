@@ -1,6 +1,6 @@
 {
-  "notes": "V1.08 real: recuperación controlada del adaptador Bluetooth Windows + gate ATT CCCD.",
-  "sha256": "d62d179ace6df2b4e228253a6d50d8afb89322c7ab974258e7005668ce6cdfd3",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.08.0/RelojLab.exe",
-  "version": "1.08.0"
+  "sha256": "92453c5fc407500f6e7ed649bfe3e980e0d5e1a49c5c523af9eb86bd0ccc1912",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.12.0/RelojLab.exe",
+  "version": "1.12.0",
+  "notes": "V1.12: reinicio limpio de Reloj Lab después de recuperar el adaptador Bluetooth."
 }
