@@ -39,8 +39,9 @@ jobs:
       - run: python build_patch_v112.py
       - run: python build_patch_v113.py
       - run: python build_patch_v114.py
-      - name: Verify V1.14
-        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.14.0',v"
+      - run: python build_patch_v115.py
+      - name: Verify V1.15
+        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.15.0',v"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0
       - run: python -m py_compile app.py
       - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab app.py
@@ -49,30 +50,30 @@ jobs:
         run: |
           $sha=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           $manifest=@{
-            version='1.14.0'
-            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.14.0/RelojLab.exe'
+            version='1.15.0'
+            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.15.0/RelojLab.exe'
             sha256=$sha
-            notes='V1.14: corrige NameError progress al iniciar la recuperación post-reset; conserva la ruta BLE y esfera aprobada.'
+            notes='V1.15: corrige Path no definido al guardar y leer el marcador post-reset; conserva la ruta BLE y esfera aprobada.'
           } | ConvertTo-Json
           Set-Content -Path version.json -Value $manifest -Encoding UTF8
-      - name: Publish V1.14 release asset
+      - name: Publish V1.15 release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.14.0 *> $null
-          if ($LASTEXITCODE -ne 0) { gh release create v1.14.0 dist/RelojLab.exe --title 'Reloj Lab V1.14' --notes 'V1.14: corrige NameError progress al iniciar la recuperación post-reset; conserva la ruta BLE y esfera aprobada.' }
-          else { gh release upload v1.14.0 dist/RelojLab.exe --clobber }
+          gh release view v1.15.0 *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create v1.15.0 dist/RelojLab.exe --title 'Reloj Lab V1.15' --notes 'V1.15: corrige Path no definido al guardar y leer el marcador post-reset; conserva la ruta BLE y esfera aprobada.' }
+          else { gh release upload v1.15.0 dist/RelojLab.exe --clobber }
       - name: Publish updater manifest
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git commit -m 'Updater: publish V1.14' || echo 'manifest unchanged'
+          git commit -m 'Updater: publish V1.15' || echo 'manifest unchanged'
           git push
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.14
+          name: RelojLab-Windows-V1.15
           path: dist/RelojLab.exe
           if-no-files-found: error
