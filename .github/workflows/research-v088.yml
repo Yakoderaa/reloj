@@ -1,0 +1,48 @@
+name: Research V088 seconds battery face lock
+on:
+  push:
+    branches: [research-v088-face-lock]
+    paths:
+      - '.github/workflows/research-v088.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and decompile UtraWatch
+        shell: bash
+        run: |
+          set -euxo pipefail
+          URL='https://04.apk.dog/storage/22/088/475/1088475/split/379294/UtraWatch.zip?apk_id=1232604&e=1790631237&file_id=3328642&lang=en&premium_speed=0&s=iCEtpd6BvpskuNvN9_qRsA&split_id=379294'
+          curl -L --fail --retry 3 --connect-timeout 20 "$URL" -o UtraWatch.zip
+          unzip -q UtraWatch.zip -d xapk
+          curl -L --fail --retry 3 https://github.com/skylot/jadx/releases/download/v1.5.3/jadx-1.5.3.zip -o jadx.zip
+          unzip -q jadx.zip -d jadx
+          chmod +x jadx/bin/jadx
+          APK=$(find xapk -type f -name '*.apk' | sort | head -1)
+          mkdir decompiled
+          jadx/bin/jadx -d decompiled "$APK" || true
+      - name: Extract seconds battery and dial-lock evidence
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir evidence
+          grep -R -n -i -E 'battery|电量|second hand|seconds|秒针|watch.?face|clockdial|dial.?switch|switch.?dial|long.?press|长按|gesture|lock.?dial|dial.?lock|choice.?dial|watch.?dial|showOrder|FACE_SYN|DIAL_SYNC|DIAL_INFO|K6_DataType|FunctionControl|function.?control' decompiled/sources > evidence/grep.txt || true
+          echo '=== BATTERY / DIAL / LOCK MATCHES ==='
+          grep -i -E 'battery|电量|second|秒针|long.?press|长按|dial.?lock|lock.?dial|switch.?dial|watch.?face' evidence/grep.txt | head -1200 || true
+          echo '=== WATCHFACE CONSTANTS ==='
+          grep -R -n -E '0x[0-9A-Fa-f]{4}|4104|4204|4304|0501|0601|0701' decompiled/sources/com/utra decompiled/sources/com/wr 2>/dev/null | head -1200 || true
+          echo '=== cBinFile implementation ==='
+          grep -R -n -A120 -B40 'cBinFile' decompiled/sources/com/utra 2>/dev/null | head -1000 || true
+          echo '=== DIAL SYNC selection ==='
+          grep -R -n -A80 -B40 -E 'DIAL_SYNC|K6_DATA_TYPE_WATCH_FACE|showOrder - 1|showOrder-1' decompiled/sources/com/utra decompiled/sources/com/wr 2>/dev/null | head -1500 || true
+          echo '=== FUNCTION CONTROL constants ==='
+          grep -R -n -A80 -B30 -E 'FUNCTION_CONTROL|FunctionControl|DIAL_COMPRESS|LONG|PRESS|GESTURE' decompiled/sources/com/wr 2>/dev/null | head -1500 || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v088-research
+          path: evidence
+          if-no-files-found: error
