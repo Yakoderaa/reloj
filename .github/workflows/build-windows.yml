@@ -1,13 +1,13 @@
 name: Build Windows EXE
 on:
   push:
-    branches: [main, release-v096-targeted-uncached]
+    branches: [main]
     paths-ignore: [version.json]
   workflow_dispatch:
 permissions:
   contents: write
 concurrency:
-  group: reloj-release-main-v096
+  group: reloj-release-main-v097
   cancel-in-progress: true
 jobs:
   build:
@@ -57,6 +57,8 @@ jobs:
         run: python build_patch_v095.py
       - name: Apply v0.96 targeted uncached probe overlay
         run: python build_patch_v096.py
+      - name: Apply v0.97 targeted service connect overlay
+        run: python build_patch_v097.py
       - name: Install dependencies
         run: python -m pip install -r requirements.txt pyinstaller==6.22.0
       - name: Verify syntax
@@ -78,17 +80,17 @@ jobs:
           $releaseTag = "v$releaseVersion"
           gh release view $releaseTag *> $null
           if ($LASTEXITCODE -eq 0) { throw "La versión ya existe; no se reemplazan ejecutables publicados." }
-          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V0.96: usa CACHE ON sólo como bootstrap y exige una consulta UNCACHED dirigida al servicio que contiene B001/B002 antes de aceptar la conexión; pairing Windows queda como recuperación."
+          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V0.97: corrige el punto real de timeout de V0.96. Bleak solicita únicamente el servicio E91A desde connect() con UNCACHED, evitando enumerar todo el árbol GATT antes de la prueba física. Conserva sin cambios la esfera aprobada y la secuencia OEM posterior."
           if ($LASTEXITCODE -ne 0) { throw "Falló la publicación del EXE" }
           New-Item -ItemType Directory -Path verified | Out-Null
           gh release download $releaseTag --pattern RelojLab.exe --dir verified
           if ($LASTEXITCODE -ne 0) { throw "No se pudo verificar la descarga publicada" }
           $expectedHash = (Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           if ((Get-FileHash verified/RelojLab.exe -Algorithm SHA256).Hash.ToLower() -ne $expectedHash) { throw "SHA-256 publicado incorrecto" }
-          $metadata = @{version=$releaseVersion; exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe"; sha256=$expectedHash; notes="V0.96: valida físicamente B001/B002 con UNCACHED dirigido antes de escribir; conserva esfera sincronizada y PREWAKE/CCCD; pairing Windows sólo si hace falta."}
+          $metadata = @{version=$releaseVersion; exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe"; sha256=$expectedHash; notes="V0.97: conexión física dirigida a E91A desde Bleak connect; evita enumeración GATT completa previa y conserva esfera CUSTOMIZE aprobada."}
           $metadata | ConvertTo-Json | Set-Content -Encoding utf8NoBOM version.json
           git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.email "4189824+github-actions[bot]@users.noreply.github.com"
           git add version.json
           git commit -m "Publish verified $releaseTag update metadata"
           git push origin HEAD:main
