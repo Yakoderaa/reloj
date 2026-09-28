@@ -23,9 +23,11 @@ s=s.replace(old,new,1)
 lines=s.splitlines(keepends=True)
 idx=None
 for i,line in enumerate(lines):
-    if 'progress(' in line and 'Conectando' in line:
+    # V1.12 emits this exact progress line at the start of the install coroutine.
+    # Match the stable message text rather than a literal source-code quoting style.
+    if 'Cargando diseño aprobado 240×296' in line:
         idx=i; break
-if idx is None: raise SystemExit('inicio conexión no encontrado')
+if idx is None: raise SystemExit('inicio instalación V1.12 no encontrado')
 indent=lines[idx][:len(lines[idx])-len(lines[idx].lstrip())]
 block=(indent+'try:\n'+indent+"    marker=Path.home()/'AppData'/'Local'/'RelojLab'/'radio-reset-v113.flag'\n"+indent+'    if marker.exists():\n'+indent+'        marker.unlink(missing_ok=True)\n'+indent+"        progress('POST-RESET DETECTADO · proceso WinRT/Bleak nuevo; esperando 12s a que Windows estabilice GATT antes del discovery...')\n"+indent+'        await asyncio.sleep(12)\n'+indent+'except Exception as marker_ex:\n'+indent+"    progress('POST-RESET MARKER OMITIDO · '+type(marker_ex).__name__+': '+str(marker_ex))\n")
 lines.insert(idx+1,block)
