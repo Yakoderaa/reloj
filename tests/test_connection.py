@@ -60,6 +60,44 @@ class ConnectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.gate,[{'use_cached':False}])
         self.assertFalse(client.closed)
 
+    async def test_filtered_discovery_avoids_full_catalog_failure(self):
+        original = c.BleakClient
+        class ScopedClient(original):
+            async def connect(inner):
+                if inner.kw.get('services') != [c.E91A]:
+                    raise TimeoutError('full catalog unavailable')
+                await super().connect()
+        with patch.object(c, 'BleakClient', ScopedClient):
+            client, n = await c.connect_watch(self.app, services=[c.E91A])
+        self.assertEqual(n, 1)
+        self.assertEqual(client.kw['services'], [c.E91A])
+        self.assertEqual(client.gate, [{'use_cached':False}])
+
+    async def test_general_diagnostics_keep_full_catalog(self):
+        client, _ = await c.connect_watch(self.app)
+        self.assertNotIn('services', client.kw)
+
+    async def test_native_logs_are_attributed_to_each_attempt(self):
+        import logging
+        logger = logging.getLogger('bleak.backends.winrt.client')
+        previous_level, previous_handlers = logger.level, list(logger.handlers)
+        original = c.BleakClient
+        count = 0
+        class LoggedClient(original):
+            async def connect(inner):
+                nonlocal count
+                count += 1
+                logger.debug('native attempt %s', count)
+                if count == 1: raise TimeoutError()
+                await super().connect()
+        with patch.object(c, 'BleakClient', LoggedClient):
+            await c.connect_watch(self.app, services=[c.E91A])
+        rows = self.app.connection_state['history']
+        self.assertEqual(rows[0]['native'][0]['message'], 'native attempt 1')
+        self.assertEqual(rows[1]['native'][0]['message'], 'native attempt 2')
+        self.assertEqual(logger.level, previous_level)
+        self.assertEqual(logger.handlers, previous_handlers)
+
     async def test_timeout_disposes_disconnected_client_then_recovers(self):
         self.failures=[TimeoutError()]
         client,n=await c.connect_watch(self.app,7)

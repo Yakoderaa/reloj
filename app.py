@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math
 
-APP_VERSION="1.16.0"
+APP_VERSION="1.17.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V1.16"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V1.17"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -36,7 +36,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V1.16 · esfera única OEM").pack(side="left",padx=12)
+        ttk.Label(top,text="V1.17 · esfera única OEM").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -170,9 +170,9 @@ class App:
         "computer":{"platform":platform.platform(),"python":sys.version},"advertisement":{k:v for k,v in self.selected.items() if k!="device"},
         "connection":{"connected":False,"attempts":0},"services":[],"standard_reads":{},"passive_notifications":[],
         "safety":{"writes_performed":0,"firmware_actions":0},"errors":[]}
-    async def connect_retry(self,attempts=2,progress=None):
+    async def connect_retry(self,attempts=2,progress=None,*,services=None):
         from connection import connect_watch
-        return await connect_watch(self,attempts,progress)
+        return await connect_watch(self,attempts,progress,services=services)
 
     def diagnose(self):
         if not self.selected:return
@@ -401,7 +401,7 @@ class App:
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.16")
+        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.17")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)
         ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
@@ -651,9 +651,9 @@ class App:
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab():
             if self.ble_busy:
-                append("V1.16 NO INICIADA · Bluetooth ocupado.")
+                append("V1.17 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V1.16 · CONEXIÓN LIMITADA · mantiene el reloj seleccionado, usa el tipo de dirección anunciado, valida ATT sin caché y libera sesiones fallidas. Dos intentos como máximo; diagnóstico persistente sin reiniciar el adaptador.")
+            append("V1.17 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
             rep=self.base_report()
             rep["single_face_install"]={
                 "phase":"prepare","blocks":[],"payload_bytes_written":0,"ack_count":0,
@@ -703,9 +703,9 @@ class App:
                 raw=zlib.decompress(base64.b64decode(packed))
                 expected='61b86e4f5f998a436c88785e14436b00d797a705dcea6879e96a7828c4cb62a2'
                 if len(raw)!=142090 or hashlib.sha256(raw).hexdigest()!=expected:
-                    raise RuntimeError("Referencia visual V1.16 embebida corrupta")
+                    raise RuntimeError("Referencia visual V1.17 embebida corrupta")
                 if raw[:10].hex()!="000000000002f0002801":
-                    raise RuntimeError("Cabecera CUSTOMIZE V1.16 inválida")
+                    raise RuntimeError("Cabecera CUSTOMIZE V1.17 inválida")
                 folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),
                                     "RelojLab","wf-analysis-v086")
                 os.makedirs(folder,exist_ok=True)
@@ -720,7 +720,7 @@ class App:
                 # Use time at the top, steps above it and heart rate below it.
                 raw=bytearray(base_raw)
                 if len(raw)!=142090 or raw[5]!=2:
-                    raise RuntimeError("Base CUSTOMIZE V1.16 inválida")
+                    raise RuntimeError("Base CUSTOMIZE V1.17 inválida")
 
                 # Live metadata. Target orange sampled from the approved design:
                 # RGB ~= (239,83,64) -> BGR565 0x429D -> little-endian 9d42.
@@ -841,7 +841,7 @@ class App:
                         "heart_rate":"firmware live · CUSTOMIZE value 4",
                         "battery":"read from watch at install time"
                     },
-                    "static_analog_note":"Las agujas/segundero del raster siguen siendo gráficos; V1.16 no los declara dinámicos.",
+                    "static_analog_note":"Las agujas/segundero del raster siguen siendo gráficos; V1.17 no los declara dinámicos.",
                     "base_raw_size":len(raw),
                     "base_raw_sha256":hashlib.sha256(raw).hexdigest()
                 }
@@ -853,8 +853,8 @@ class App:
                 protocol_acks_sent=[]
 
                 try:
-                    emit("2/9 · Conectando…")
-                    c,n=await self.connect_retry(5,emit)
+                    emit("2/9 · Conectando al servicio de esfera E91A…")
+                    c,n=await self.connect_retry(2,emit,services=[CONTROL_SERVICE])
                     rep["connection"]={"connected":True,"attempts":n}
                     rep["advertisement"]={k:v for k,v in (self.selected or {}).items() if k not in ("device","_watch_score")}
                     rep["single_face_install"]["auto_watch_identity"]={
@@ -1251,7 +1251,7 @@ class App:
 
                     rep["single_face_install"]["market_attempt"]={
                         "attempted":False,
-                        "reason":"V1.16 usa exclusivamente CUSTOMIZE, la ruta ya confirmada visualmente en V0.83"
+                        "reason":"V1.17 usa exclusivamente CUSTOMIZE, la ruta ya confirmada visualmente en V0.83"
                     }
                     rep["single_face_install"]["factory_faces_deleted"]=False
                     rep["single_face_install"]["factory_faces_note"]="UtraWatch no expone comando de borrado para esferas integradas en firmware; sólo se reemplazaron los slots regrabables."
@@ -1272,7 +1272,7 @@ class App:
                     )
                     rep["single_face_install"]["connected_end"]=connected
                     rep["single_face_install"]["phase"]="complete"
-                    emit("9/9 · V1.16 FINALIZADA · "+rep["single_face_install"]["classification"])
+                    emit("9/9 · V1.17 FINALIZADA · "+rep["single_face_install"]["classification"])
                     return rep
                 finally:
                     if c:
@@ -1286,18 +1286,18 @@ class App:
                     rep["errors"].append(type(error).__name__+": "+str(error))
                     rep["single_face_install"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("V1.16 FALLÓ · "+repr(error))
+                    append("V1.17 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V1.16 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V1.17 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
                 append("ESFERA ÚNICA · "+result["single_face_install"]["classification"]+".")
-                self.status.set("V1.16 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
+                self.status.set("V1.17 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
             self.run_async(asyncio.wait_for(work(),timeout=360),done)
         # Bind the already-visible first button now that ota_lab exists.
         primary_test.configure(command=ota_lab)
-        append("V1.16 LISTA · 1º INSTALAR ESFERA SINCRONIZADA V1.16; 2º REVISAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. La app permanece abierta si falla la conexión.")
+        append("V1.17 LISTA · 1º INSTALAR ESFERA SINCRONIZADA V1.17; 2º REVISAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. La app permanece abierta si falla la conexión.")
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("La instalación sólo comienza después de confirmar una conexión ATT operativa.")

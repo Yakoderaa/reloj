@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import sys
+import time
 from bleak import BleakClient, BleakScanner
 
 B1 = '0000b001-0000-1000-8000-00805f9b34fb'
@@ -29,19 +30,27 @@ def advertisement_metadata(device):
     return address_type, getattr(event, 'is_connectable', None)
 
 
-async def connect_watch(app, attempts=2, progress=None):
+async def connect_watch(app, attempts=2, progress=None, *, services=None):
     progress = progress or (lambda message: None)
     limit = min(2, max(1, attempts))
     selected = app.selected or {}
     address = selected.get('address') or getattr(selected.get('device'), 'address', None)
     state = app.connection_state = dict(connected=False, attempts=0, phase='scan', history=[], native=[])
+    requested = list(services) if services else None
+    state['requested_services'] = requested
+    started = time.monotonic()
+    active_row = None
     logger = logging.getLogger('bleak.backends.winrt.client')
     old_level = logger.level
 
     class NativeLog(logging.Handler):
         def emit(self, record):
-            state['native'].append(record.getMessage())
-            del state['native'][:-40]
+            message = record.getMessage()
+            state['native'].append(message)
+            del state['native'][:-80]
+            if active_row is not None:
+                active_row['native'].append({'elapsed_s': round(time.monotonic()-started, 3), 'message': message})
+                del active_row['native'][:-60]
 
     handler = NativeLog()
     logger.addHandler(handler)
@@ -51,7 +60,8 @@ async def connect_watch(app, attempts=2, progress=None):
         for index in range(limit):
             client = None
             keep = False
-            row = dict(attempt=index + 1, phase='scan')
+            row = dict(attempt=index + 1, phase='scan', native=[])
+            active_row = row
             state['history'].append(row)
             state.update(attempts=index + 1, phase='scan')
             try:
@@ -74,12 +84,16 @@ async def connect_watch(app, attempts=2, progress=None):
                     raise RuntimeError('El reloj anuncia que no acepta conexiones BLE en este momento.')
                 cache = index == 1
                 kwargs = {'timeout': 30}
+                if requested is not None:
+                    kwargs['services'] = requested
                 if sys.platform == 'win32':
                     kwargs['winrt'] = {'use_cached_services': cache}
                     if kind:
                         kwargs['winrt']['address_type'] = kind
-                row.update(phase='connect_and_services', cached_services=cache)
+                row.update(phase='connect_and_services', cached_services=cache, requested_services=requested)
                 state['phase'] = row['phase']
+                if requested:
+                    progress('GATT DIRECTO · consultando sólo ' + ', '.join(requested))
                 progress('ABRIENDO GATT · ' + ('catálogo en caché; se validará con lectura real' if cache else 'servicios leídos del reloj'))
                 client = BleakClient(target, **kwargs)
                 await asyncio.wait_for(client.connect(), timeout=35)
@@ -88,12 +102,12 @@ async def connect_watch(app, attempts=2, progress=None):
                 b1 = client.services.get_characteristic(B1)
                 b2 = client.services.get_characteristic(B2)
                 if b1 is None or b2 is None:
-                    raise RuntimeError('El catálogo GATT no contiene B001/B002')
+                    raise RuntimeError('El servicio solicitado no contiene B001/B002' if requested else 'El catálogo GATT no contiene B001/B002')
                 cccd = next((d for d in b1.descriptors if str(d.uuid).lower() == CCCD), None)
                 if cccd is None:
                     raise RuntimeError('B001 no contiene CCCD')
                 row['phase'] = state['phase'] = 'att_read'
-                # WinRT defaults can return a cached descriptor. Require actual ATT.
+                # Require actual ATT regardless of the service-catalog cache policy.
                 await asyncio.wait_for(client.read_gatt_descriptor(cccd.handle, use_cached=False), timeout=8)
                 if not client.is_connected:
                     raise RuntimeError('Se perdió la conexión durante la lectura ATT')
