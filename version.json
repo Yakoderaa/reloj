@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.86.0/RelojLab.exe",
-  "sha256": "6625422aa240e4a57ee2ab41144ec4d71e84394aa8ca8f595bda563e72e90db2",
-  "version": "0.86.0",
-  "notes": "V0.86: referencia visual aprobada instalada por CUSTOMIZE 240x296; prioriza apariencia exacta y deja MARKET fuera de esta prueba; actualizaciones futuras desde Buscar actualización."
+  "notes": "V0.87: conexión fiable por auto-identificación UtraWatch E91A/3802 + esfera exacta aprobada por CUSTOMIZE; actualizaciones futuras desde Buscar actualización.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.87.0/RelojLab.exe",
+  "version": "0.87.0",
+  "sha256": "8ca20f373e7e1c1f2a77ca5f0809014987ef6b2c0966ba2d3ca2eb57aabedaa9"
 }
