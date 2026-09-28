@@ -1,6 +1,6 @@
 {
-  "sha256": "b47c26bfdfb2bb7ee8611cdaa6fd4270ff43b3e29cb1fcf1289fb07a9b75c49f",
-  "version": "0.96.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.96.0/RelojLab.exe",
-  "notes": "V0.96: valida físicamente B001/B002 con UNCACHED dirigido antes de escribir; conserva esfera sincronizada y PREWAKE/CCCD; pairing Windows sólo si hace falta."
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.97.0/RelojLab.exe",
+  "notes": "V0.97: conexión física dirigida a E91A desde Bleak connect; evita enumeración GATT completa previa y conserva esfera CUSTOMIZE aprobada.",
+  "sha256": "be1b6d6a479caa8b489605219087621d6b57abf23db358785c82354bae73addb",
+  "version": "0.97.0"
 }
