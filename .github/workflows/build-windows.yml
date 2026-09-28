@@ -7,7 +7,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: reloj-release-main-v102
+  group: reloj-release-main-v103
   cancel-in-progress: true
 jobs:
   build:
@@ -19,32 +19,20 @@ jobs:
           python-version: '3.12'
       - name: Verify read-only inventory and cleanup
         run: python -m unittest discover -s tests -p test_inventory.py -v
-      - name: Apply v0.74 base patch
-        run: python build_patch_v029.py
-      - name: Apply v0.75 offline overlay
-        run: python build_patch_v075.py
-      - name: Apply v0.80 OEM face overlay
-        run: python build_patch_v080.py
-      - name: Apply v0.81 exact face selection overlay
-        run: python build_patch_v081.py
-      - name: Apply v0.82 OEM transfer state overlay
-        run: python build_patch_v082.py
-      - name: Apply v0.83 real CUSTOMIZE bin + CEProtocolB overlay
-        run: python build_patch_v083.py
-      - name: Apply v0.84 target-photo dynamic MARKET overlay
-        run: python build_patch_v084.py
-      - name: Apply v0.85 exact target activation overlay
-        run: python build_patch_v085.py
-      - name: Apply v0.86 exact approved reference overlay
-        run: python build_patch_v086.py
-      - name: Apply v0.87 UtraWatch auto-identification overlay
-        run: python build_patch_v087.py
-      - name: Apply v0.88 live time steps heart overlay
-        run: python build_patch_v088.py
-      - name: Apply v1.01 clean release overlay
-        run: python build_patch_v101.py
-      - name: Apply v1.02 original V0.83 connection overlay
-        run: python build_patch_v102.py
+      - run: python build_patch_v029.py
+      - run: python build_patch_v075.py
+      - run: python build_patch_v080.py
+      - run: python build_patch_v081.py
+      - run: python build_patch_v082.py
+      - run: python build_patch_v083.py
+      - run: python build_patch_v084.py
+      - run: python build_patch_v085.py
+      - run: python build_patch_v086.py
+      - run: python build_patch_v087.py
+      - run: python build_patch_v088.py
+      - run: python build_patch_v101.py
+      - run: python build_patch_v102.py
+      - run: python build_patch_v103.py
       - name: Install dependencies
         run: python -m pip install -r requirements.txt pyinstaller==6.22.0
       - name: Verify syntax
@@ -65,19 +53,17 @@ jobs:
           $releaseVersion = python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); print(next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)))"
           $releaseTag = "v$releaseVersion"
           gh release view $releaseTag *> $null
-          if ($LASTEXITCODE -eq 0) { throw "La versión ya existe; no se reemplazan ejecutables publicados." }
-          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V1.02: restaura la conexión limpia original de V0.83 (anuncio fresco -> BleakClient -> GATT), eliminando el auto-ID/reintentos V0.87 que V1.01 mostró atascados. Conserva esfera aprobada V0.86 y datos vivos V0.88."
-          if ($LASTEXITCODE -ne 0) { throw "Falló la publicación del EXE" }
+          if ($LASTEXITCODE -eq 0) { throw "La versión ya existe" }
+          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V1.03: recuperación BLE por firma E91A/3802 en cada intento; conecta al BLEDevice recién descubierto en vez de depender de find_device_by_address/dirección previa. Conserva esfera aprobada y bindings vivos."
+          if ($LASTEXITCODE -ne 0) { throw "Falló publicación" }
           New-Item -ItemType Directory -Path verified | Out-Null
           gh release download $releaseTag --pattern RelojLab.exe --dir verified
-          if ($LASTEXITCODE -ne 0) { throw "No se pudo verificar la descarga publicada" }
-          $expectedHash = (Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
-          if ((Get-FileHash verified/RelojLab.exe -Algorithm SHA256).Hash.ToLower() -ne $expectedHash) { throw "SHA-256 publicado incorrecto" }
-          $metadata = @{version=$releaseVersion; exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe"; sha256=$expectedHash; notes="V1.02: conexión original V0.83 restaurada; esfera aprobada V0.86 + datos vivos V0.88."}
-          $metadata | ConvertTo-Json | Set-Content -Encoding utf8NoBOM version.json
+          $expectedHash=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
+          if ((Get-FileHash verified/RelojLab.exe -Algorithm SHA256).Hash.ToLower() -ne $expectedHash) { throw "SHA incorrecto" }
+          $metadata=@{version=$releaseVersion;exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe";sha256=$expectedHash;notes="V1.03: discovery por firma UtraWatch en cada intento + objeto BLE fresco; esfera aprobada intacta."}
+          $metadata|ConvertTo-Json|Set-Content -Encoding utf8NoBOM version.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add version.json
           git commit -m "Publish verified $releaseTag update metadata"
           git push origin HEAD:main
-          if ($LASTEXITCODE -ne 0) { throw "EXE disponible pero actualización no anunciada" }
