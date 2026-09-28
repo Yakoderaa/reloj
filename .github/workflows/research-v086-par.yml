@@ -1,0 +1,37 @@
+name: Research Bluetrum PAR encoder
+on:
+  push:
+    branches: [research-v086-donor]
+    paths:
+      - '.github/workflows/research-v086-par.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect abpartool AAR
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence/aar
+          curl -L --fail --retry 3 https://raw.githubusercontent.com/HBandSDK/Android_Ble_SDK/master/android_sdk_source/jar_core/abpartool-release.aar -o evidence/abpartool-release.aar
+          unzip -l evidence/abpartool-release.aar | tee evidence/aar-list.txt
+          unzip -q evidence/abpartool-release.aar -d evidence/aar
+          find evidence/aar -maxdepth 4 -type f -printf '%p %s bytes\n' | sort | tee evidence/aar-files.txt
+          jar tf evidence/aar/classes.jar | grep -E 'ParTool|bluetrum|partool' | tee evidence/classes-matches.txt || true
+          javap -classpath evidence/aar/classes.jar -p -c com.bluetrum.abpartool.ParTool | tee evidence/ParTool-javap.txt || true
+          javap -classpath evidence/aar/classes.jar -p -c com.bluetrum.abpartool.ParTool\$Companion | tee evidence/ParTool-Companion-javap.txt || true
+          for so in $(find evidence/aar -name '*.so'); do
+            echo "=== $so ===" | tee -a evidence/native-symbols.txt
+            file "$so" | tee -a evidence/native-symbols.txt
+            nm -D "$so" 2>/dev/null | grep -Ei 'par|raw|bitmap|Java_com_bluetrum' | head -200 | tee -a evidence/native-symbols.txt || true
+            strings "$so" | grep -Ei 'rawToPar|bitmapToPar|parTool|JNI' | head -200 | tee -a evidence/native-symbols.txt || true
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v086-par-evidence
+          path: evidence
+          if-no-files-found: error
