@@ -1,6 +1,6 @@
 {
-  "notes": "V1.15: corrige Path no definido al guardar y leer el marcador post-reset; conserva la ruta BLE y esfera aprobada.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.15.0/RelojLab.exe",
-  "sha256": "ca5503688d39be7474d88403486c422e8ae156744801b2e6170f71a1146937f9",
-  "version": "1.15.0"
+  "notes": "V1.16: conexión al reloj seleccionado con tipo de dirección anunciado, validación ATT sin caché y cierre de sesiones fallidas; elimina el ciclo de reinicios Bluetooth.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.16.0/RelojLab.exe",
+  "sha256": "d3953a7c5828e14cfdb5efc589b34297eaa9b467044a7c23f51448498c7526a1",
+  "version": "1.16.0"
 }
