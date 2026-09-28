@@ -9,15 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 ROOT=Path(__file__).resolve().parents[1]
-with tempfile.TemporaryDirectory() as folder:
-    old=os.getcwd()
-    try:
-        os.chdir(folder)
-        Path('app.py').write_text((ROOT/'app.py').read_text(encoding='utf-8'),encoding='utf-8')
-        runpy.run_path(str(ROOT/'build_patch_v029.py'))
-        source=ast.parse(Path('app.py').read_text(encoding='utf-8'))
-    finally:
-        os.chdir(old)
+source=ast.parse((ROOT/'app.py').read_text(encoding='utf-8'))
 cls=next(n for n in source.body if isinstance(n,ast.ClassDef))
 method=next(n for n in cls.body if n.name=='inspect_gatt_snapshot')
 namespace={'asyncio':asyncio}

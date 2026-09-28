@@ -14,66 +14,41 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - run: python build_patch_v029.py
-      - run: python build_patch_v075.py
-      - run: python build_patch_v080.py
-      - run: python build_patch_v081.py
-      - run: python build_patch_v082.py
-      - run: python build_patch_v083.py
-      - run: python build_patch_v084.py
-      - run: python build_patch_v085.py
-      - run: python build_patch_v086.py
-      - run: python build_patch_v087.py
-      - run: python build_patch_v088.py
-      - run: python build_patch_v101.py
-      - run: python build_patch_v102.py
-      - run: python build_patch_v103.py
-      - run: python build_patch_v104.py
-      - run: python build_patch_v105.py
-      - run: python build_patch_v106.py
-      - run: python build_patch_v107.py
-      - run: python build_patch_v108.py
-      - run: python build_patch_v109.py
-      - run: python build_patch_v110.py
-      - run: python build_patch_v111.py
-      - run: python build_patch_v112.py
-      - run: python build_patch_v113.py
-      - run: python build_patch_v114.py
-      - run: python build_patch_v115.py
-      - name: Verify V1.15
-        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.15.0',v"
+      - name: Verify V1.16
+        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.16.0',v"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0
-      - run: python -m py_compile app.py
+      - run: python -m unittest discover -s tests
+      - run: python -m py_compile app.py connection.py
       - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab app.py
       - name: Calculate EXE SHA256 and updater manifest
         shell: pwsh
         run: |
           $sha=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           $manifest=@{
-            version='1.15.0'
-            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.15.0/RelojLab.exe'
+            version='1.16.0'
+            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.16.0/RelojLab.exe'
             sha256=$sha
-            notes='V1.15: corrige Path no definido al guardar y leer el marcador post-reset; conserva la ruta BLE y esfera aprobada.'
+            notes='V1.16: conexión al reloj seleccionado con tipo de dirección anunciado, validación ATT sin caché y cierre de sesiones fallidas; elimina el ciclo de reinicios Bluetooth.'
           } | ConvertTo-Json
           Set-Content -Path version.json -Value $manifest -Encoding UTF8
-      - name: Publish V1.15 release asset
+      - name: Publish V1.16 release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.15.0 *> $null
-          if ($LASTEXITCODE -ne 0) { gh release create v1.15.0 dist/RelojLab.exe --title 'Reloj Lab V1.15' --notes 'V1.15: corrige Path no definido al guardar y leer el marcador post-reset; conserva la ruta BLE y esfera aprobada.' }
-          else { gh release upload v1.15.0 dist/RelojLab.exe --clobber }
+          gh release view v1.16.0 *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create v1.16.0 dist/RelojLab.exe --title 'Reloj Lab V1.16' --notes 'V1.16: conexión al reloj seleccionado con tipo de dirección anunciado, validación ATT sin caché y cierre de sesiones fallidas; elimina el ciclo de reinicios Bluetooth.' }
+          else { gh release upload v1.16.0 dist/RelojLab.exe --clobber }
       - name: Publish updater manifest
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git commit -m 'Updater: publish V1.15' || echo 'manifest unchanged'
+          git commit -m 'Updater: publish V1.16' || echo 'manifest unchanged'
           git push
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.15
+          name: RelojLab-Windows-V1.16
           path: dist/RelojLab.exe
           if-no-files-found: error

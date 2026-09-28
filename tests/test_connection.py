@@ -1,143 +1,120 @@
-"""Exercise actual connection and worker methods without a Bluetooth adapter or GUI."""
-import ast
 import asyncio
-import queue
-import threading
+import importlib.util
+import sys
 import unittest
-from pathlib import Path
-from types import SimpleNamespace
+from types import SimpleNamespace as NS, ModuleType
+from unittest.mock import patch, AsyncMock
 
-source=ast.parse((Path(__file__).resolve().parents[1]/'app.py').read_text(encoding='utf-8'))
-app_node=next(n for n in source.body if isinstance(n,ast.ClassDef) and n.name=='App')
-namespace={'asyncio':asyncio, 'threading':threading}
-exec(compile(ast.Module(body=[app_node],type_ignores=[]),'app.py','exec'),namespace)
-App=namespace['App']
+if importlib.util.find_spec('bleak') is None:
+    stub = ModuleType('bleak')
+    stub.BleakClient = stub.BleakScanner = None
+    sys.modules['bleak'] = stub
+import connection as c
+
+
+def device(address='AA', kind=1, connectable=True):
+    return NS(address=address, name='Watch', details=NS(adv=NS(
+        bluetooth_address_type=kind, is_connectable=connectable)))
+
+
+def advert():
+    return NS(service_uuids=[c.E91A], local_name='Watch', rssi=-60)
+
 
 class ConnectionTests(unittest.IsolatedAsyncioTestCase):
-    async def test_same_name_does_not_select_another_watch(self):
-        wanted=SimpleNamespace(address='AA',name='Apple Watch Ultra')
-        wrong=SimpleNamespace(address='BB',name='Apple Watch Ultra')
-        class Scanner:
-            @staticmethod
-            async def find_device_by_address(address,**kw):return wanted
+    async def asyncSetUp(self):
+        self.app = NS(selected={'address': 'AA'})
+        self.clients = []
+        self.failures = []
+        self.gate_failure = False
+        self.discover = AsyncMock(return_value={'AA': (device(), advert())})
+        self.patches = [patch.object(c, 'BleakScanner', NS(discover=self.discover)),
+                        patch.object(c.sys, 'platform', 'win32'),
+                        patch.object(c.asyncio, 'sleep', AsyncMock())]
+        owner = self
         class Client:
-            def __init__(self,target,**kw):self.target=target; self.is_connected=False; self.services=[]
-            async def connect(self):self.is_connected=True
-        namespace.update(BleakScanner=Scanner,BleakClient=Client)
-        app=App.__new__(App); app.selected={'address':'AA','device':wrong}
-        progress=[]
-        client,attempt=await app.connect_retry(1,progress.append)
-        self.assertIs(client.target,wanted)
-        self.assertEqual(attempt,1)
-        self.assertTrue(any("detectado nuevamente" in x for x in progress))
-
-    async def test_error_is_reported_and_client_disconnected(self):
-        disconnected=[]
-        class Scanner:
-            @staticmethod
-            async def find_device_by_address(address,**kw):return SimpleNamespace(address=address)
-        class Client:
-            def __init__(self,*args,**kw):pass
-            async def connect(self):raise TimeoutError('GATT timeout')
-            async def disconnect(self):disconnected.append(True)
-        namespace.update(BleakScanner=Scanner,BleakClient=Client)
-        app=App.__new__(App); app.selected={'address':'AA','device':None}
-        progress=[]
-        with self.assertRaisesRegex(RuntimeError,'TIEMPO DE CONEXIÓN AGOTADO'):
-            await app.connect_retry(1,progress.append)
-        self.assertEqual(disconnected,[True])
-        self.assertTrue(any('TIEMPO DE CONEXIÓN AGOTADO' in x for x in progress))
-        self.assertEqual(app.connection_state['attempts'],1)
-
-    async def test_saved_ble_device_connects_without_another_scan(self):
-        wanted=SimpleNamespace(address='AA',name='Apple Watch Ultra')
-        class Scanner:
-            @staticmethod
-            async def find_device_by_address(*args,**kw):raise AssertionError('implicit rescan')
-        class Client:
-            def __init__(self,target,**kw):
-                if isinstance(target,str):raise AssertionError('address string triggers implicit scan')
-                self.target=target; self.is_connected=False; self.services=[]
-            async def connect(self):self.is_connected=True
-        namespace.update(BleakScanner=Scanner,BleakClient=Client)
-        app=App.__new__(App);app.selected={'address':'AA','device':wanted}
-        client,n=await app.connect_retry(1)
-        self.assertIs(client.target,wanted)
-        self.assertTrue(app.connection_state['connected'])
-
-    async def test_missing_advertisement_does_not_attempt_gatt(self):
-        class Scanner:
-            @staticmethod
-            async def find_device_by_address(*args,**kw):return None
-        class Client:
-            def __init__(self,*args,**kw):raise AssertionError('must not connect')
-        namespace.update(BleakScanner=Scanner,BleakClient=Client)
-        app=App.__new__(App);app.selected={'address':'AA','device':None}
-        with self.assertRaisesRegex(RuntimeError,'RELOJ NO VISIBLE'):
-            await app.connect_retry(1)
-        self.assertEqual(app.connection_state['phase'],'scanning')
-
-    async def test_failed_direct_connection_recovers_with_fresh_device(self):
-        old=SimpleNamespace(address='AA');fresh=SimpleNamespace(address='AA')
-        targets=[];disconnected=[]
-        class Scanner:
-            @staticmethod
-            async def find_device_by_address(*args,**kw):return fresh
-        class Client:
-            def __init__(self,target,**kw):
-                targets.append(target);self.target=target;self.is_connected=False;self.services=[]
+            def __init__(self, target, **kw):
+                self.target=target; self.kw=kw; self.closed=False; self.is_connected=False
+                self.gate=[]
+                self.services=NS(get_characteristic=lambda uuid: NS(descriptors=[NS(uuid=c.CCCD,handle=46)]))
+                owner.clients.append(self)
             async def connect(self):
-                if self.target is old:raise RuntimeError('old device failed')
+                if owner.failures:
+                    error=owner.failures.pop(0)
+                    if error: raise error
                 self.is_connected=True
-            async def disconnect(self):disconnected.append(self.target)
-        namespace.update(BleakScanner=Scanner,BleakClient=Client)
-        app=App.__new__(App);app.selected={'address':'AA','device':old}
-        client,n=await app.connect_retry(2)
-        self.assertEqual(targets,[old,fresh]);self.assertEqual(disconnected,[old])
-        self.assertEqual(n,2);self.assertIs(app.selected['device'],fresh)
+            async def read_gatt_descriptor(self, handle, **kwargs):
+                self.gate.append(kwargs)
+                if owner.gate_failure: raise RuntimeError('Unreachable')
+                return b'\0\0'
+            async def disconnect(self):
+                self.closed=True; self.is_connected=False
+        self.patches.append(patch.object(c, 'BleakClient', Client))
+        for p in self.patches:p.start()
+        self.addCleanup(lambda: [p.stop() for p in reversed(self.patches)])
 
-    async def test_cancelled_connect_disconnects_client(self):
-        started=asyncio.Event();disconnected=[]
-        class Client:
-            def __init__(self,*args,**kw):pass
-            async def connect(self):started.set();await asyncio.Event().wait()
-            async def disconnect(self):disconnected.append(True)
-        namespace['BleakClient']=Client
-        app=App.__new__(App);app.selected={'address':'AA','device':SimpleNamespace(address='AA')}
-        task=asyncio.create_task(app.connect_retry(1))
-        await started.wait();task.cancel()
-        with self.assertRaises(asyncio.CancelledError):await task
-        self.assertEqual(disconnected,[True])
+    async def test_success_uses_observed_address_and_actual_att(self):
+        client, n = await c.connect_watch(self.app)
+        self.assertEqual(n,1)
+        self.assertEqual(client.kw['winrt'],dict(use_cached_services=False,address_type='random'))
+        self.assertEqual(client.gate,[{'use_cached':False}])
+        self.assertFalse(client.closed)
 
-    async def test_second_operation_is_rejected(self):
-        app=App.__new__(App); app.ble_busy=True
-        async def job():raise AssertionError('must not execute')
-        task=job(); errors=[]
-        app.run_async(task,lambda result,error:errors.append(error))
-        self.assertIsInstance(errors[0],RuntimeError)
-        self.assertIsNone(task.cr_frame)
+    async def test_timeout_disposes_disconnected_client_then_recovers(self):
+        self.failures=[TimeoutError()]
+        client,n=await c.connect_watch(self.app,7)
+        self.assertEqual(n,2)
+        self.assertTrue(self.clients[0].closed)
+        self.assertTrue(client.kw['winrt']['use_cached_services'])
+        self.assertIn('connect_and_services',self.app.connection_state['history'][0]['error'])
 
-class WorkerTests(unittest.TestCase):
-    def test_success_and_failure_share_loop_and_release_busy_state(self):
-        app=App.__new__(App); app.ble_busy=False
-        app.tree=SimpleNamespace(state=lambda x:None)
-        app.ui_queue=queue.Queue(); app.ble_loop=asyncio.new_event_loop()
-        thread=threading.Thread(target=app.ble_loop.run_forever)
-        thread.start()
-        results=[]
-        try:
-            async def success():return asyncio.get_running_loop()
-            app.run_async(success(),lambda r,e:results.append((r,e)))
-            app.ui_queue.get(timeout=3)()
-            self.assertIs(results[-1][0],app.ble_loop)
-            self.assertFalse(app.ble_busy)
-            async def failure():raise ValueError('test')
-            app.run_async(failure(),lambda r,e:results.append((r,e)))
-            app.ui_queue.get(timeout=3)()
-            self.assertIsInstance(results[-1][1],ValueError)
-            self.assertFalse(app.ble_busy)
-        finally:
-            app.ble_loop.call_soon_threadsafe(app.ble_loop.stop)
-            thread.join(timeout=3); app.ble_loop.close()
+    async def test_repeated_timeouts_stop_at_two_without_system_exit(self):
+        self.failures=[TimeoutError(),TimeoutError()]
+        with self.assertRaisesRegex(RuntimeError,'La esfera no se transfirió'):
+            await c.connect_watch(self.app,7)
+        self.assertEqual(len(self.clients),2)
+        self.assertTrue(all(x.closed for x in self.clients))
+        self.assertEqual(self.app.connection_state['phase'],'failed')
+
+    async def test_cached_catalog_is_insufficient_when_att_fails(self):
+        self.gate_failure=True
+        with self.assertRaises(RuntimeError):await c.connect_watch(self.app)
+        self.assertTrue(all(x.closed for x in self.clients))
+        self.assertFalse(self.app.connection_state['connected'])
+        self.assertTrue(all(x['phase']=='att_read' for x in self.app.connection_state['history']))
+
+    async def test_other_watch_is_never_substituted(self):
+        self.discover.return_value={'BB':(device('BB'),advert())}
+        with self.assertRaises(RuntimeError):await c.connect_watch(self.app)
+        self.assertEqual(self.clients,[])
+
+    async def test_nonconnectable_advertisement_does_not_open_client(self):
+        self.discover.return_value={'AA':(device(connectable=False),advert())}
+        with self.assertRaises(RuntimeError):await c.connect_watch(self.app)
+        self.assertEqual(self.clients,[])
+
+    async def test_ambiguous_discovery_stops(self):
+        self.app.selected=None
+        self.discover.return_value={a:(device(a),advert()) for a in ['AA','BB']}
+        with self.assertRaisesRegex(RuntimeError,'varios relojes'):await c.connect_watch(self.app)
+        self.assertEqual(self.discover.await_count,1)
+        self.assertEqual(self.clients,[])
+
+    async def test_cancelled_connection_is_disposed(self):
+        self.failures=[asyncio.CancelledError()]
+        with self.assertRaises(asyncio.CancelledError):await c.connect_watch(self.app)
+        self.assertTrue(self.clients[0].closed)
+        self.assertEqual(self.app.connection_state['phase'],'cancelled')
+
+    async def test_unselected_unique_watch_pinned_across_attempts(self):
+        self.app.selected=None
+        self.failures=[TimeoutError()]
+        self.discover.side_effect=[{'AA':(device(),advert())},{'BB':(device('BB'),advert())}]
+        with self.assertRaises(RuntimeError):await c.connect_watch(self.app)
+        self.assertEqual(len(self.clients),1)
+
+    def test_missing_native_metadata_does_not_invent_address_type(self):
+        self.assertEqual(c.advertisement_metadata(NS()),(None,None))
+        self.assertEqual(c.advertisement_metadata(device(kind=0)),('public',True))
 
 if __name__=='__main__':unittest.main()
