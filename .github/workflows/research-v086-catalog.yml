@@ -1,0 +1,72 @@
+name: Research V086 catalog previews
+on:
+  push:
+    branches: [research-v086-donor]
+    paths:
+      - '.github/workflows/research-v086-catalog.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  catalog:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build preview contact sheets
+        shell: bash
+        run: |
+          set -euxo pipefail
+          pip install pillow
+          mkdir -p evidence/previews evidence/files
+          python - <<'PY'
+          import json, urllib.request, os, hashlib
+          from PIL import Image, ImageOps, ImageDraw
+          entries=[]
+          for page in range(1,13):
+              url=f"https://wr.watchhealth.com.cn/app-halfwit/app-dial/getDialList?currentPage={page}&pageSize=20&watchId=102"
+              with urllib.request.urlopen(url,timeout=20) as r:
+                  obj=json.load(r)
+              rows=obj.get("data") or []
+              if not rows: break
+              entries.extend(rows)
+          seen={}
+          for e in entries:
+              did=str(e.get("dialId") or "")
+              if did: seen[did]=e
+          entries=list(seen.values())
+          print("count",len(entries))
+          thumbs=[]
+          for i,e in enumerate(entries):
+              did=str(e.get("dialId") or "")
+              purl=e.get("previewImg") or e.get("preview")
+              furl=e.get("dialFile") or e.get("file")
+              if not purl: continue
+              ppath=f"evidence/previews/{did}.png"
+              try:
+                  urllib.request.urlretrieve(purl,ppath)
+                  im=Image.open(ppath).convert("RGB")
+                  im.thumbnail((120,148))
+                  tile=Image.new("RGB",(150,178),"white")
+                  tile.paste(im,((150-im.width)//2,4))
+                  d=ImageDraw.Draw(tile)
+                  d.text((5,154),did,fill="black")
+                  thumbs.append((did,tile))
+              except Exception as ex:
+                  print("preview error",did,ex)
+          cols=6; rows_per=5; per=cols*rows_per
+          for sheet_idx in range((len(thumbs)+per-1)//per):
+              chunk=thumbs[sheet_idx*per:(sheet_idx+1)*per]
+              sh=Image.new("RGB",(cols*150,rows_per*178),(220,220,220))
+              for j,(did,tile) in enumerate(chunk):
+                  sh.paste(tile,((j%cols)*150,(j//cols)*178))
+              sh.save(f"evidence/contact-{sheet_idx+1}.jpg",quality=92)
+          with open("evidence/catalog.json","w") as f: json.dump(entries,f,indent=2)
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v086-catalog
+          path: evidence
+          if-no-files-found: error
