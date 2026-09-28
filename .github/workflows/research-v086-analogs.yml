@@ -1,0 +1,37 @@
+name: Research V086 analog candidates
+on:
+  push:
+    branches: [research-v086-donor]
+    paths:
+      - '.github/workflows/research-v086-analogs.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  candidates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download candidate WF files
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          : > evidence/found.tsv
+          for page in $(seq 1 12); do
+            curl -L --fail --retry 3 "https://wr.watchhealth.com.cn/app-halfwit/app-dial/getDialList?currentPage=$page&pageSize=20&watchId=102" -o "evidence/page-$page.json"
+            jq -r '.data[]? | select((.dialId|tostring)=="2011059" or (.dialId|tostring)=="2011057" or (.dialId|tostring)=="2011015" or (.dialId|tostring)=="2014014" or (.dialId|tostring)=="2011017") | [(.dialId|tostring),.dialFile,.previewImg] | @tsv' "evidence/page-$page.json" >> evidence/found.tsv
+          done
+          sort -u evidence/found.tsv -o evidence/found.tsv
+          cat evidence/found.tsv
+          while IFS=$'\t' read -r id file preview; do
+            [ -n "$id" ] || continue
+            curl -L --fail --retry 3 "$file" -o "evidence/$id.bin"
+            curl -L --fail --retry 3 "$preview" -o "evidence/$id.png"
+            sha256sum "evidence/$id.bin" "evidence/$id.png"
+          done < evidence/found.tsv
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v086-analog-candidates
+          path: evidence
+          if-no-files-found: error
