@@ -7,7 +7,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: reloj-release-main-v103
+  group: reloj-release-main-v104
   cancel-in-progress: true
 jobs:
   build:
@@ -33,6 +33,7 @@ jobs:
       - run: python build_patch_v101.py
       - run: python build_patch_v102.py
       - run: python build_patch_v103.py
+      - run: python build_patch_v104.py
       - name: Install dependencies
         run: python -m pip install -r requirements.txt pyinstaller==6.22.0
       - name: Verify syntax
@@ -54,13 +55,13 @@ jobs:
           $releaseTag = "v$releaseVersion"
           gh release view $releaseTag *> $null
           if ($LASTEXITCODE -eq 0) { throw "La versión ya existe" }
-          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V1.03: recuperación BLE por firma E91A/3802 en cada intento; conecta al BLEDevice recién descubierto en vez de depender de find_device_by_address/dirección previa. Conserva esfera aprobada y bindings vivos."
+          gh release create $releaseTag dist/RelojLab.exe --target $env:GITHUB_SHA --title "Reloj Lab $releaseVersion" --notes "V1.04: V1.03 ya recuperó B001/B002. Si B001 notify falla, V1.04 descarta esa sesión BLE, reescanea por firma UtraWatch y vuelve a intentar notify antes del protocolo OEM."
           if ($LASTEXITCODE -ne 0) { throw "Falló publicación" }
           New-Item -ItemType Directory -Path verified | Out-Null
           gh release download $releaseTag --pattern RelojLab.exe --dir verified
           $expectedHash=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           if ((Get-FileHash verified/RelojLab.exe -Algorithm SHA256).Hash.ToLower() -ne $expectedHash) { throw "SHA incorrecto" }
-          $metadata=@{version=$releaseVersion;exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe";sha256=$expectedHash;notes="V1.03: discovery por firma UtraWatch en cada intento + objeto BLE fresco; esfera aprobada intacta."}
+          $metadata=@{version=$releaseVersion;exe_url="https://github.com/Yakoderaa/reloj/releases/download/$releaseTag/RelojLab.exe";sha256=$expectedHash;notes="V1.04: recuperación automática de B001 notify mediante sesión BLE fresca; esfera aprobada intacta."}
           $metadata|ConvertTo-Json|Set-Content -Encoding utf8NoBOM version.json
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
