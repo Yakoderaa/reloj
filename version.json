@@ -1,6 +1,6 @@
 {
-  "notes": "V0.94: DIRECT WINRT + CACHE ON primero, sin rutas que degradan el stack; PREWAKE/CCCD directo + hora/pasos/pulso vivos; actualizaciones futuras desde Buscar actualización.",
-  "version": "0.94.0",
-  "sha256": "8e3bd6a152d21838f9f1d72dee9d3dec2d20facb6b5e8f3b3dd39f583b132b2d",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.94.0/RelojLab.exe"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v0.95.0/RelojLab.exe",
+  "sha256": "a7f73322dee8717827ea932874feb7a4b7108b4dbd919ae444ce4dda1b20c699",
+  "version": "0.95.0",
+  "notes": "V0.95: exige enlace físico WinRT real antes de escribir; BLEDevice real/uncached + physical gate + pairing correcto; conserva esfera sincronizada y PREWAKE/CCCD."
 }
