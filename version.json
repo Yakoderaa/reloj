@@ -1,6 +1,6 @@
 {
-  "sha256": "3bad7272ff1b461d7d805454b4694a12bde3ca88a5bce56e40d635c03cd36d07",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.07.0/RelojLab.exe",
-  "version": "1.07.0",
-  "notes": "V1.07: recuperación larga del bearer ATT Windows con 7 sesiones frescas; esfera aprobada intacta."
+  "sha256": "19908d8d5b5db836812d15e47ce0ededb219f8f5bd62b82bb9ab14119e65f2b6",
+  "notes": "V1.08 real: recuperación controlada del adaptador Bluetooth Windows + gate ATT CCCD.",
+  "version": "1.08.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.08.0/RelojLab.exe"
 }
