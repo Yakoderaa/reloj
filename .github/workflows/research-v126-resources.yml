@@ -1,0 +1,63 @@
+name: Research V1.26 2D7F Resources
+on:
+  push:
+    branches: [research-v123-valid-market]
+    paths: ['.github/workflows/research-v126-resources.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch carrier
+        run: |
+          mkdir -p evidence
+          curl -L --fail --retry 3 'http://watchhealth.com.cn/k6File/clock/file/2D7F.bin' -o evidence/2D7F.bin
+      - name: Parse resources
+        shell: bash
+        run: |
+          python - <<'PY' | tee evidence/report.txt
+          from pathlib import Path
+          import struct, hashlib
+          b=Path('evidence/2D7F.bin').read_bytes()
+          def u16(o):return int.from_bytes(b[o:o+2],'little')
+          def u32(o):return int.from_bytes(b[o:o+4],'little')
+          print('sha',hashlib.sha256(b).hexdigest(),'len',len(b),'binid',b[4:6].hex(),'count',u16(10))
+          print('head256',b[:256].hex())
+          # walk descriptor table using observed record kinds
+          off=0x10
+          for i in range(u16(10)):
+              typ=u16(off); kind=u16(off+8) if off+10<=len(b) else None
+              if typ!=0x0164:
+                  print('REC',i,hex(off),'type',hex(typ),'UNKNOWN head',b[off:off+40].hex());break
+              if kind==0x1202: n=28
+              elif kind==0x0804: n=18
+              else:n=12
+              print('REC',i,hex(off),'len',n,'kind',hex(kind),'raw',b[off:off+n].hex())
+              off+=n
+          print('config_end',hex(off))
+          # signatures
+          for sig,name in [(b'\xff\xd8\xff','JPEG'),(b'\x89PNG\r\n\x1a\n','PNG'),(b'BM','BMP')]:
+              pos=0
+              while True:
+                  j=b.find(sig,pos)
+                  if j<0:break
+                  print(name,'at',hex(j))
+                  pos=j+1
+          # likely resource offsets: scan 32-bit LE values in config that point into file
+          vals=[]
+          for p in range(0x10,min(0x800,len(b)-4),2):
+              v=u32(p)
+              if 0x800<=v<len(b):
+                  vals.append((p,v))
+          print('candidate_ptrs',[(hex(p),hex(v)) for p,v in vals[:200]])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v126-2d7f-resources
+          path: evidence
