@@ -3,21 +3,21 @@ import base64, hashlib, json, zlib
 
 ASSETS=Path("assets")
 DONORS={
-    "4CC6":{
-        "file":"donor_4CC6.bin",
-        "sha256":"52f9a9857929fc64791551010eb0eaf2ad03f5e280f9e9d36701f1fdc07d1b2b",
-        "profile":"black minimal analog, white hour/minute hands, red second hand",
-        "live":"analog hour/minute/second"
-    },
     "2D7F":{
         "file":"donor_2D7F.bin",
         "sha256":"ad27959066b73c522dba4dedb0aa78a0c01681cddafc32a3d461d51a72b4c13a",
-        "profile":"native analog carrier with steps, heart rate and battery",
+        "profile":"analog carrier with moving hands, steps, heart rate and battery",
         "live":"analog hour/minute/second + steps + heart rate + battery"
+    },
+    "4CC6":{
+        "file":"donor_4CC6.bin",
+        "sha256":"52f9a9857929fc64791551010eb0eaf2ad03f5e280f9e9d36701f1fdc07d1b2b",
+        "profile":"fallback black minimal analog",
+        "live":"analog hour/minute/second"
     }
 }
 
-manifest={"version":"1.24.0","strategy":"byte-for-byte native MARKET bootstrap","candidates":[]}
+manifest={"version":"1.25.0","strategy":"byte-for-byte native MARKET bootstrap","candidates":[]}
 for binid,spec in DONORS.items():
     raw=(ASSETS/spec["file"]).read_bytes()
     got=hashlib.sha256(raw).hexdigest()

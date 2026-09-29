@@ -23,13 +23,13 @@ class NativeMarketTests(unittest.TestCase):
 
     def test_manifest_marks_both_candidates_byte_for_byte(self):
         meta=json.loads((ROOT/'assets'/'market_native_v124.json').read_text(encoding='utf-8'))
-        self.assertEqual(meta['version'],'1.24.0')
+        self.assertEqual(meta['version'],'1.25.0')
         self.assertEqual([x['bin_id_hex'] for x in meta['candidates']],['4cc6','2d7f'])
         self.assertTrue(all(x['byte_for_byte'] for x in meta['candidates']))
 
     def test_app_tries_native_market_and_never_selects_before_registration(self):
         source=(ROOT/'app.py').read_text(encoding='utf-8')
-        self.assertIn('APP_VERSION="1.24.0"',source)
+        self.assertIn('APP_VERSION="1.25.0"',source)
         self.assertIn('build_native_market_v124',source)
         self.assertIn('OEM-MARKET-',source)
         self.assertIn('"byte_for_byte":True',source)

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math
 
-APP_VERSION="1.24.0"
+APP_VERSION="1.25.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V1.24"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V1.25"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -36,7 +36,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V1.24 · MARKET válido + registro seguro").pack(side="left",padx=12)
+        ttk.Label(top,text="V1.25 · MARKET válido + registro seguro").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -401,7 +401,7 @@ class App:
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.24")
+        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.25")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)
         ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
@@ -651,9 +651,9 @@ class App:
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab(pair=False):
             if self.ble_busy:
-                append("V1.24 NO INICIADA · Bluetooth ocupado.")
+                append("V1.25 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V1.24 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
+            append("V1.25 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
             rep=self.base_report()
             rep["windows_binding_repair"]=dict(getattr(self,"binding_repair",{}))
             rep["single_face_install"]={
@@ -700,16 +700,16 @@ class App:
                 root=getattr(sys,"_MEIPASS",os.path.dirname(os.path.abspath(__file__)))
                 meta_path=os.path.join(root,"assets","market_native_v124.json")
                 specs=[
-                    ("4cc6","market_native_4cc6_v124.b64",
-                     "52f9a9857929fc64791551010eb0eaf2ad03f5e280f9e9d36701f1fdc07d1b2b",
-                     "black minimal analog · white hour/minute · red second",
-                     {"analog_hour":True,"analog_minute":True,"analog_second":True,
-                      "steps":False,"heart_rate":False,"battery":False,"digital_time":False}),
                     ("2d7f","market_native_2d7f_v124.b64",
                      "ad27959066b73c522dba4dedb0aa78a0c01681cddafc32a3d461d51a72b4c13a",
-                     "native analog carrier · steps + heart + battery",
+                     "analog carrier · moving hands + live steps + heart + battery",
                      {"analog_hour":True,"analog_minute":True,"analog_second":True,
-                      "steps":True,"heart_rate":True,"battery":True,"digital_time":False})
+                      "steps":True,"heart_rate":True,"battery":True,"digital_time":False}),
+                    ("4cc6","market_native_4cc6_v124.b64",
+                     "52f9a9857929fc64791551010eb0eaf2ad03f5e280f9e9d36701f1fdc07d1b2b",
+                     "fallback black minimal analog",
+                     {"analog_hour":True,"analog_minute":True,"analog_second":True,
+                      "steps":False,"heart_rate":False,"battery":False,"digital_time":False})
                 ]
                 meta={}
                 if os.path.exists(meta_path):
@@ -723,7 +723,7 @@ class App:
                 for binid,name,expected_sha,profile,live in specs:
                     path=os.path.join(root,"assets",name)
                     if not os.path.exists(path):
-                        raise RuntimeError("Falta MARKET OEM V1.24: "+name)
+                        raise RuntimeError("Falta MARKET OEM V1.25: "+name)
                     raw=zlib.decompress(base64.b64decode(open(path,"r",encoding="ascii").read().strip()))
                     got=hashlib.sha256(raw).hexdigest()
                     if got!=expected_sha:
@@ -780,7 +780,7 @@ class App:
 
             async def work():
                 native_candidates,native_meta=await asyncio.to_thread(build_native_market_v124)
-                emit("1/9 · Cargando dos MARKET OEM ORIGINALES sin modificar · 4CC6 → fallback 2D7F…")
+                emit("1/9 · Cargando carrier funcional MARKET · 2D7F (agujas + pasos + pulso + batería) → fallback 4CC6…")
                 primary=native_candidates[0]
                 raw=primary["raw"]
                 market_bin_id=primary["bin_id_hex"]
@@ -794,6 +794,7 @@ class App:
                     "primary_raw_size":primary["raw_size"],
                     "primary_raw_sha256":primary["raw_sha256"],
                     "primary_profile":primary["profile"],
+                    "target_note":"V1.25 prioriza funciones reales del diseño aprobado: agujas, pasos, pulso y batería; mantiene fallback seguro 4CC6.",
                     "native_candidates":[{k:v for k,v in x.items() if k!="raw"} for x in native_candidates],
                     "build_meta":native_meta
                 }
@@ -1064,12 +1065,12 @@ class App:
                         "primary_oem_header_hex":oem_stream[:20].hex()
                     })
                     rep["single_face_install"]["live_bindings"]={
-                        "note":"V1.24 prioriza registrar un MARKET OEM intacto. No declara campos que el carrier no tenga.",
+                        "note":"V1.25 prioriza registrar un MARKET OEM intacto. No declara campos que el carrier no tenga.",
                         "4cc6":native_candidates[0]["live"],
                         "2d7f":native_candidates[1]["live"],
                         "battery_value_seen_during_install":battery_percent
                     }
-                    emit("CARRIER OEM · sin injertos binarios; se verificará BinID antes de seleccionar.")
+                    emit("CARRIER OEM FUNCIONAL · agujas + pasos + pulso + batería LIVE; se verifica BinID antes de seleccionar.")
 
                     if device_pid is None:
                         pid_mark=len(messages)
@@ -1113,7 +1114,7 @@ class App:
                     if not face_slots or face_slots.get("custom_index") is None:
                         raise RuntimeError("No se pudo resolver el slot editable de la esfera; no se seleccionará un índice a ciegas.")
 
-                    # V1.24: do not synthesize or splice a MARKET file before proving
+                    # V1.25: do not synthesize or splice a MARKET file before proving
                     # the watch accepts an untouched OEM MARKET. The SDK uses compression
                     # only when FUNCTION_CONTROL advertises DIAL_COMPRESS.
                     transfer_attempts=[]
@@ -1285,7 +1286,7 @@ class App:
                     )
                     rep["single_face_install"]["connected_end"]=connected
                     rep["single_face_install"]["phase"]="complete"
-                    emit("9/9 · V1.24 FINALIZADA · "+rep["single_face_install"]["classification"])
+                    emit("9/9 · V1.25 FINALIZADA · "+rep["single_face_install"]["classification"])
                     return rep
                 finally:
                     if c:
@@ -1300,14 +1301,14 @@ class App:
                     rep["errors"].append(type(error).__name__+": "+str(error))
                     rep["single_face_install"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("V1.24 FALLÓ · "+repr(error))
+                    append("V1.25 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V1.24 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V1.25 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
                 append("ESFERA ÚNICA · "+result["single_face_install"]["classification"]+".")
-                self.status.set("V1.24 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
+                self.status.set("V1.25 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
             self.run_async(asyncio.wait_for(work(),timeout=360),done)
         def repair_binding():
             if self.ble_busy:
@@ -1340,9 +1341,9 @@ class App:
                 append("REPARACIÓN · continuando con emparejamiento e instalación…")
                 ota_lab(pair=True)
             self.run_async(repair_selected(self,address,emit_repair),repaired)
-        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.24",command=repair_binding)
+        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.25",command=repair_binding)
         ttk.Button(row,text="INSTALAR SIN REPARAR",command=ota_lab).pack(side="left",padx=4)
-        append("V1.24 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.24; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
+        append("V1.25 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.25; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("La instalación sólo comienza después de confirmar una conexión ATT operativa.")
