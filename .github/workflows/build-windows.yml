@@ -14,48 +14,43 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify V1.29
-        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.29.0',v"
-      - run: python -m pip install -r requirements.txt pyinstaller==6.22.0 pillow numpy
-      - name: Fetch physically proven 2D7F MARKET
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force assets | Out-Null
-          Invoke-WebRequest 'http://watchhealth.com.cn/k6File/clock/file/2D7F.bin' -OutFile assets/donor_2D7F.bin
-      - name: Build V1.29 minimal pixel-only patch
-        run: python prepare_v128_minpatch.py
+      - name: Verify V1.30
+        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.30.0',v"
+      - run: python -m pip install -r requirements.txt pyinstaller==6.22.0
+      - name: Validate approved face asset
+        run: python -c "import base64,zlib,hashlib; r=zlib.decompress(base64.b64decode(open('assets/target_face_v086.b64',encoding='ascii').read().strip())); assert len(r)==142090; assert hashlib.sha256(r).hexdigest()=='61b86e4f5f998a436c88785e14436b00d797a705dcea6879e96a7828c4cb62a2'; assert r[5]==2 and int.from_bytes(r[6:8],'little')==240 and int.from_bytes(r[8:10],'little')==296"
       - run: python -m unittest discover -s tests
-      - run: python -m py_compile app.py connection.py windows_binding.py prepare_v128_minpatch.py
-      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v128_minimal_patch.b64;assets" --add-data "assets/face_v128_oem_recovery.b64;assets" --add-data "assets/face_v128.json;assets" app.py
+      - run: python -m py_compile app.py connection.py windows_binding.py
+      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/target_face_v086.b64;assets" app.py
       - name: Calculate EXE SHA256 and updater manifest
         shell: pwsh
         run: |
           $sha=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           $manifest=@{
-            version='1.29.0'
-            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.29.0/RelojLab.exe'
+            version='1.30.0'
+            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.30.0/RelojLab.exe'
             sha256=$sha
-            notes='V1.29: si una prueba anterior dejó cmd3=0000, primero restaura la MARKET 2D7F OEM exacta y la selecciona. Recién después prueba el parche mínimo que cambia sólo el fondo negro. Si ese parche es rechazado, vuelve a restaurar automáticamente la OEM.'
+            notes='V1.30 abandona los intentos MARKET para nuestra esfera y vuelve a la ruta CUSTOMIZE cmd=2 que ya instaló físicamente la referencia aprobada en V1.19. Instala el raster exacto 240x296, con hora/pasos/pulso del firmware y batería leída al instalar, y verifica custom_index + cmd2.'
           } | ConvertTo-Json
           Set-Content -Path version.json -Value $manifest -Encoding UTF8
-      - name: Publish V1.29 release asset
+      - name: Publish V1.30 release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.29.0 *> $null
-          if ($LASTEXITCODE -ne 0) { gh release create v1.29.0 dist/RelojLab.exe --title 'Reloj Lab V1.29' --notes 'V1.29 recupera automáticamente un MARKET roto con cmd3=0000: restaura 2D7F OEM, verifica y selecciona el slot, y recién entonces prueba el parche visual mínimo. Si el firmware rechaza el fondo personalizado, restaura otra vez la OEM.' }
-          else { gh release upload v1.29.0 dist/RelojLab.exe --clobber }
+          gh release view v1.30.0 *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create v1.30.0 dist/RelojLab.exe --title 'Reloj Lab V1.30' --notes 'V1.30 vuelve a la única ruta que ya instaló nuestra esfera aprobada en este reloj: CUSTOMIZE cmd=2. No modifica MARKET. Reinstala la referencia exacta 240x296, activa el slot CUSTOMIZE real y verifica cmd2=0008049d4202.' }
+          else { gh release upload v1.30.0 dist/RelojLab.exe --clobber }
       - name: Publish updater manifest
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git commit -m 'Updater: publish V1.29' || echo 'manifest unchanged'
+          git commit -m 'Updater: publish V1.30' || echo 'manifest unchanged'
           git push
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.29
+          name: RelojLab-Windows-V1.30
           path: dist/RelojLab.exe
           if-no-files-found: error
