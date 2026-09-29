@@ -1,6 +1,6 @@
 {
-  "notes": "V1.28: parche mínimo sobre la MARKET 2D7F que ya funciona en el reloj. Conserva byte por byte header, BinID, descriptores, tabla de recursos y recursos dinámicos; cambia únicamente el bitmap de fondo por el diseño negro Reloj Lab. Si cmd3 cae a 0000, restaura automáticamente la 2D7F OEM.",
-  "sha256": "d5cbc33a81f0814f51e81b2ca38453109f483242013e30c3d3c939e99773a53e",
-  "version": "1.28.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.28.0/RelojLab.exe"
+  "notes": "V1.29: si una prueba anterior dejó cmd3=0000, primero restaura la MARKET 2D7F OEM exacta y la selecciona. Recién después prueba el parche mínimo que cambia sólo el fondo negro. Si ese parche es rechazado, vuelve a restaurar automáticamente la OEM.",
+  "sha256": "72f7218ab403fa842709d9ecfa70b1f64b21950d9b219de855955f92c8dfa10a",
+  "version": "1.29.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.29.0/RelojLab.exe"
 }
