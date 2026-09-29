@@ -16,58 +16,35 @@ jobs:
         shell: bash
         run: |
           set -u
-          mkdir -p evidence
+          mkdir -p evidence/previews
           for page in 0 1 2 3 4 5; do
             curl -L -sS --max-time 20 "http://watchhealth.com.cn/YueDongService/app/faces.do?deviceId=1180&pageIndex=$page" -o "evidence/faces-1180-p$page.json" || true
           done
           curl -L -sS --max-time 20 "http://watchhealth.com.cn/YueDongService/app/faceConfig.do?deviceId=1180&pageIndex=1" -o evidence/faceConfig-1180-p1.json || true
-          : > evidence/market-urls.txt
-          for j in evidence/faces-1180-p*.json; do
-            jq -r '.. | objects | to_entries[]? | select(.value|type=="string") | select(.value|startswith("http://") or startswith("https://")) | [.key,.value] | @tsv' "$j" >> evidence/market-urls.txt 2>/dev/null || true
-          done
-          sort -u evidence/market-urls.txt -o evidence/market-urls.txt
-          cat evidence/faceConfig-1180-p1.json > evidence/summary.txt 2>/dev/null || true
+          : > evidence/summary.txt
+          cat evidence/faceConfig-1180-p1.json >> evidence/summary.txt 2>/dev/null || true
           for j in evidence/faces-1180-p*.json; do
             echo "=== $j ===" >> evidence/summary.txt
             cat "$j" >> evidence/summary.txt
             echo >> evidence/summary.txt
           done
-          n=0
-          while IFS=$'\t' read -r key url; do
-            case "$key $url" in
-              *file*|*File*|*.bin*)
-                [ "$n" -ge 16 ] && break
-                dest=$(printf 'evidence/market-%02d.bin' "$n")
-                curl -L -sS --fail --max-time 30 "$url" -o "$dest" || rm -f "$dest"
-                if [ -f "$dest" ]; then
-                  echo "$dest $(wc -c < "$dest") $url" >> evidence/downloaded.txt
-                  n=$((n+1))
-                fi
-                ;;
-            esac
-          done < evidence/market-urls.txt
-          mkdir -p evidence/previews
+          : > evidence/market-urls.txt
           for j in evidence/faces-1180-p*.json; do
-            jq -r '.result.pageData[]? | [.binid,.preview] | @tsv' "$j" 2>/dev/null | while IFS=          for f in evidence/market-*.bin; do
-            [ -f "$f" ] || continue
-            echo "=== $f ===" >> evidence/market-analysis.txt
-            file "$f" >> evidence/market-analysis.txt || true
-            wc -c "$f" >> evidence/market-analysis.txt || true
-            sha256sum "$f" >> evidence/market-analysis.txt || true
-            xxd -l 512 "$f" >> evidence/market-analysis.txt || true
-            strings -a -n 4 "$f" | head -120 >> evidence/market-analysis.txt || true
+            jq -r '.result.pageData[]? | [.binid,.preview,.file] | join("|")' "$j" 2>/dev/null >> evidence/market-urls.txt || true
           done
-          find evidence -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
-      - uses: actions/upload-artifact@v4
-        with:
-          name: utrawatch-v120-market-evidence
-          path: evidence
-          if-no-files-found: error
-\t' read -r binid url; do
-              [ -n "$binid" ] || continue
-              curl -L -sS --fail --max-time 30 "$url" -o "evidence/previews/$binid.png" || rm -f "evidence/previews/$binid.png"
-            done
-          done
+          n=0
+          while IFS='|' read -r binid preview fileurl; do
+            [ -n "$binid" ] || continue
+            curl -L -sS --fail --max-time 30 "$preview" -o "evidence/previews/$binid.png" || rm -f "evidence/previews/$binid.png"
+            if [ "$n" -lt 24 ]; then
+              dest=$(printf 'evidence/market-%02d-%s.bin' "$n" "$binid")
+              curl -L -sS --fail --max-time 30 "$fileurl" -o "$dest" || rm -f "$dest"
+              if [ -f "$dest" ]; then
+                echo "$dest $(wc -c < "$dest") $fileurl" >> evidence/downloaded.txt
+                n=$((n+1))
+              fi
+            fi
+          done < evidence/market-urls.txt
           : > evidence/market-analysis.txt
           for f in evidence/market-*.bin; do
             [ -f "$f" ] || continue
@@ -78,7 +55,7 @@ jobs:
             xxd -l 512 "$f" >> evidence/market-analysis.txt || true
             strings -a -n 4 "$f" | head -120 >> evidence/market-analysis.txt || true
           done
-          find evidence -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
+          find evidence -maxdepth 2 -type f -printf '%P %s bytes\n' | sort
       - uses: actions/upload-artifact@v4
         with:
           name: utrawatch-v120-market-evidence
