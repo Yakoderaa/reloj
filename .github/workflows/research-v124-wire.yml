@@ -1,0 +1,45 @@
+name: Research V1.24 CEDevData Wire
+on:
+  push:
+    branches: [research-v123-valid-market]
+    paths: ['.github/workflows/research-v124-wire.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download UtraWatch package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          URL='https://04.apk.dog/storage/22/088/475/1088475/split/379294/UtraWatch.zip?apk_id=1232604&e=1790631237&file_id=3328642&lang=en&premium_speed=0&s=iCEtpd6BvpskuNvN9_qRsA&split_id=379294'
+          curl -L --fail --retry 3 --connect-timeout 20 "$URL" -o UtraWatch.zip
+          mkdir xapk
+          unzip -q UtraWatch.zip -d xapk
+      - name: Install JADX
+        shell: bash
+        run: |
+          curl -L --fail --retry 3 https://github.com/skylot/jadx/releases/download/v1.5.3/jadx-1.5.3.zip -o jadx.zip
+          unzip -q jadx.zip -d jadx
+          chmod +x jadx/bin/jadx
+      - name: Decompile and extract wire classes
+        shell: bash
+        run: |
+          set -euxo pipefail
+          APK=$(find xapk -type f -name '*.apk' | sort | head -1)
+          mkdir decompiled evidence
+          jadx/bin/jadx -d decompiled "$APK" || true
+          find decompiled/sources -type f \( -name 'CEDevData.java' -o -name 'CEProtocolB.java' -o -name 'SendDataManager.java' -o -name 'SendQueue*.java' -o -name 'CEDevK6Proxy.java' -o -name 'CEBluetoothProxyBase.java' \) -print | tee evidence/files.txt
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            cp "$f" "evidence/$(echo "$f" | sed 's#^decompiled/##;s#/#__#g')" || true
+          done < evidence/files.txt
+          grep -R -n -E 'itemNumber|itemL|toByte|toBytes|protocol|build|sendData|push\(|CEDevData|DATA_TYPE_WATCH_FILE|131' decompiled/sources/com/wr/sdk > evidence/grep.txt || true
+          sed -n '1,1200p' evidence/grep.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v124-wire-evidence
+          path: evidence
