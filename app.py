@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math
 
-APP_VERSION="1.28.0"
+APP_VERSION="1.29.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V1.28"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V1.29"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -36,7 +36,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V1.28 · MARKET válido + registro seguro").pack(side="left",padx=12)
+        ttk.Label(top,text="V1.29 · MARKET válido + registro seguro").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -333,7 +333,7 @@ class App:
         ttk.Label(w,text="Analizador B002 → B001",font=("Segoe UI",14,"bold")).pack(anchor="w",padx=12,pady=(12,4))
         ttk.Label(w,text="Captura respuestas completas y compara bytes. El canal OTA FFC1 permanece separado.").pack(anchor="w",padx=12)
         row=ttk.Frame(w,padding=12); row.pack(fill="x")
-        # V1.28 regression guard: CONTROL ACTIVO toolbar is created before the log
+        # V1.29 regression guard: CONTROL ACTIVO toolbar is created before the log
         # and must remain intact; V1.26 accidentally replaced capture() with installer code.
         ttk.Entry(row,textvariable=self.raw_hex,width=70).pack(side="left",fill="x",expand=True)
         log=tk.Text(w,font=("Consolas",9),wrap="none"); log.pack(fill="both",expand=True,padx=12,pady=(0,12))
@@ -403,7 +403,7 @@ class App:
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.28")
+        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.29")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)
         ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
@@ -653,9 +653,9 @@ class App:
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab(pair=False):
             if self.ble_busy:
-                append("V1.28 NO INICIADA · Bluetooth ocupado.")
+                append("V1.29 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V1.28 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
+            append("V1.29 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
             rep=self.base_report()
             rep["windows_binding_repair"]=dict(getattr(self,"binding_repair",{}))
             rep["single_face_install"]={
@@ -702,7 +702,7 @@ class App:
                 root=getattr(sys,"_MEIPASS",os.path.dirname(os.path.abspath(__file__)))
                 meta_path=os.path.join(root,"assets","face_v128.json")
                 if not os.path.exists(meta_path):
-                    raise RuntimeError("Falta el manifiesto V1.28")
+                    raise RuntimeError("Falta el manifiesto V1.29")
                 with open(meta_path,"r",encoding="utf-8") as fh:
                     meta=json.load(fh)
                 folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),
@@ -713,20 +713,20 @@ class App:
                     name=spec.get("file")
                     path=os.path.join(root,"assets",name)
                     if not name or not os.path.exists(path):
-                        raise RuntimeError("Falta recurso V1.28: "+str(name))
+                        raise RuntimeError("Falta recurso V1.29: "+str(name))
                     raw=zlib.decompress(base64.b64decode(open(path,"r",encoding="ascii").read().strip()))
                     got=hashlib.sha256(raw).hexdigest()
                     if got!=spec.get("raw_sha256") or len(raw)!=int(spec.get("raw_size",0)):
-                        raise RuntimeError("Recurso V1.28 corrupto: "+str(name))
+                        raise RuntimeError("Recurso V1.29 corrupto: "+str(name))
                     if raw[4:6].hex()!="2d7f":
-                        raise RuntimeError("V1.28 debe conservar BinID 2D7F")
+                        raise RuntimeError("V1.29 debe conservar BinID 2D7F")
                     local=os.path.join(folder,spec.get("role","candidate")+".bin")
                     with open(local,"wb") as fh:fh.write(raw)
                     row=dict(spec);row.update({"raw":raw,"path":local})
                     out.append(row)
                 roles={x.get("role") for x in out}
                 if not {"minimal_patch","oem_recovery"}.issubset(roles):
-                    raise RuntimeError("V1.28 no contiene minimal_patch + oem_recovery")
+                    raise RuntimeError("V1.29 no contiene minimal_patch + oem_recovery")
                 return out,meta
 
             def build(dev_type,n_seq,op,payload=b"",send_type=1):
@@ -770,7 +770,7 @@ class App:
 
             async def work():
                 face_variants,face_meta=await asyncio.to_thread(build_minpatch_market_v128)
-                emit("1/9 · V1.28 PARCHE MÍNIMO · 2D7F OEM intacta salvo el fondo negro aprobado…")
+                emit("1/9 · V1.29 PARCHE MÍNIMO · 2D7F OEM intacta salvo el fondo negro aprobado…")
                 custom=next(x for x in face_variants if x.get("role")=="minimal_patch")
                 recovery=next(x for x in face_variants if x.get("role")=="oem_recovery")
                 raw=custom["raw"]
@@ -1061,10 +1061,10 @@ class App:
                         "steps":"0x8009 LIVE / original position",
                         "heart_rate":"0x800E LIVE / original position",
                         "battery":"0x8013 LIVE / original position",
-                        "digital_time":"not moved/added in V1.28 to preserve firmware acceptance",
+                        "digital_time":"not moved/added in V1.29 to preserve firmware acceptance",
                         "battery_value_seen_during_install":battery_percent
                     }
-                    emit("V1.28 · sólo cambió el bitmap de fondo; header/descriptores/tabla/recursos dinámicos siguen OEM.")
+                    emit("V1.29 · sólo cambió el bitmap de fondo; header/descriptores/tabla/recursos dinámicos siguen OEM.")
 
                     if device_pid is None:
                         pid_mark=len(messages)
@@ -1108,7 +1108,7 @@ class App:
                     if not face_slots or face_slots.get("custom_index") is None:
                         raise RuntimeError("No se pudo resolver el slot editable de la esfera; no se seleccionará un índice a ciegas.")
 
-                    # V1.28: one conservative test only. The binary keeps the OEM
+                    # V1.29: one conservative test only. The binary keeps the OEM
                     # header, BinID, descriptor table, resource table and dynamic resources.
                     # Only the 240x296 background pixel payload differs.
                     dynamic_transfer=None
@@ -1138,16 +1138,47 @@ class App:
                             await asyncio.sleep(.7)
                         return info,attempts
 
-                    emit("4/9 · Confirmando MARKET OEM 2D7F antes del parche mínimo…")
+                    emit("4/9 · Verificando MARKET; si V1.27 dejó cmd3=0000, primero se restaura OEM 2D7F…")
                     pre,state_attempts=await read_face_info("pre",3)
                     rep["single_face_install"]["file_state_gate"]={"attempts":state_attempts,"ready":pre is not None}
                     rep["single_face_install"]["pre_dial_info"]=pre
                     if pre is None:
-                        raise RuntimeError("WATCH_FACE_INFO 0x84 no respondió; V1.28 no escribe.")
-                    if not market_id_ok(pre):
-                        raise RuntimeError("V1.28 esperaba MARKET 2D7F activo antes de parchear; recibido "+repr(pre))
+                        raise RuntimeError("WATCH_FACE_INFO 0x84 no respondió; V1.29 no escribe.")
 
                     use_compressed=(has_dial_compress is True)
+                    bootstrap=None
+                    if not market_id_ok(pre):
+                        emit("ESTADO HEREDADO ROTO · cmd3="+str((pre or {}).get("cmd3_raw"))+"; restaurando 2D7F OEM exacta antes del parche…")
+                        rec_stream0,rec_deflated0=await asyncio.to_thread(oem_dial_compress,recovery["raw"])
+                        rec_bytes0=rec_stream0 if use_compressed else recovery["raw"]
+                        rec_chunks0=[rec_bytes0[i:i+300] for i in range(0,len(rec_bytes0),300)]
+                        rec_transfer0=await transfer_slot(3,"OEM-BOOTSTRAP-2D7F",rec_bytes0,rec_chunks0)
+                        rec_info0,rec_reads0=await read_face_info("bootstrap-oem",6)
+                        bootstrap={
+                            "needed":True,"transfer":rec_transfer0,"reads":rec_reads0,
+                            "restored":market_id_ok(rec_info0),"dial_info":rec_info0
+                        }
+                        rep["single_face_install"]["bootstrap_oem_recovery"]=bootstrap
+                        if not market_id_ok(rec_info0):
+                            raise RuntimeError("No se pudo restaurar 2D7F OEM desde cmd3=0000; no se prueba la esfera personalizada.")
+                        market_index=face_slots.get("market_index")
+                        if market_index is not None:
+                            market_index=int(market_index)
+                            _,boot_sel_status,_=await tx83_wait(bytes([1,market_index&255]),3.0)
+                            await asyncio.sleep(1.8)
+                            boot_selected,boot_reads=await read_face_info("bootstrap-select",3)
+                            bootstrap["selection_status"]=boot_sel_status
+                            bootstrap["selection_reads"]=boot_reads
+                            bootstrap["selection_verified"]=bool(
+                                boot_sel_status==1 and boot_selected and
+                                boot_selected.get("index")==market_index and market_id_ok(boot_selected))
+                            if not bootstrap["selection_verified"]:
+                                raise RuntimeError("2D7F OEM se restauró pero no pudo seleccionarse antes del parche mínimo.")
+                        pre=rec_info0
+                        emit("OEM 2D7F RESTAURADA · ahora sí se prueba únicamente el bitmap negro.")
+                    else:
+                        rep["single_face_install"]["bootstrap_oem_recovery"]={"needed":False,"restored":True}
+
                     cand_stream,cand_deflated=await asyncio.to_thread(oem_dial_compress,custom["raw"])
                     file_bytes=cand_stream if use_compressed else custom["raw"]
                     chunks=[file_bytes[i:i+300] for i in range(0,len(file_bytes),300)]
@@ -1177,11 +1208,11 @@ class App:
                         "transfer":dynamic_transfer,
                         "registration_attempts":registration_attempts,
                         "accepted":accepted,
-                        "acceptance_rule":"cmd3 must remain 2d7f; V1.27 rejection changed it to 0000"
+                        "acceptance_rule":"after OEM bootstrap if needed, cmd3 must remain 2d7f after minimal patch"
                     }
 
                     if not accepted:
-                        emit("V1.28 · firmware rechazó el bitmap; restaurando 2D7F OEM exacta para dejar el reloj sano…")
+                        emit("V1.29 · firmware rechazó el bitmap; restaurando 2D7F OEM exacta para dejar el reloj sano…")
                         rec_stream,rec_deflated=await asyncio.to_thread(oem_dial_compress,recovery["raw"])
                         rec_bytes=rec_stream if use_compressed else recovery["raw"]
                         rec_chunks=[rec_bytes[i:i+300] for i in range(0,len(rec_bytes),300)]
@@ -1263,7 +1294,7 @@ class App:
 
                     rep["single_face_install"]["connected_end"]=connected
                     rep["single_face_install"]["phase"]="complete"
-                    emit("9/9 · V1.28 FINALIZADA · "+rep["single_face_install"]["classification"])
+                    emit("9/9 · V1.29 FINALIZADA · "+rep["single_face_install"]["classification"])
                     return rep
                 finally:
                     if c:
@@ -1278,15 +1309,15 @@ class App:
                     rep["errors"].append(type(error).__name__+": "+str(error))
                     rep["single_face_install"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("V1.28 FALLÓ · "+repr(error))
+                    append("V1.29 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V1.28 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V1.29 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
                 append("ESFERA ÚNICA · "+result["single_face_install"]["classification"]+".")
-                self.status.set("V1.28 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
-            self.run_async(asyncio.wait_for(work(),timeout=360),done)
+                self.status.set("V1.29 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
+            self.run_async(asyncio.wait_for(work(),timeout=650),done)
         def repair_binding():
             if self.ble_busy:
                 append("Esperá a que termine la operación Bluetooth actual.")
@@ -1318,9 +1349,9 @@ class App:
                 append("REPARACIÓN · continuando con emparejamiento e instalación…")
                 ota_lab(pair=True)
             self.run_async(repair_selected(self,address,emit_repair),repaired)
-        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.28",command=repair_binding)
+        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.29",command=repair_binding)
         ttk.Button(row,text="INSTALAR SIN REPARAR",command=ota_lab).pack(side="left",padx=4)
-        append("V1.28 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.28; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
+        append("V1.29 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.29; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("La instalación sólo comienza después de confirmar una conexión ATT operativa.")
