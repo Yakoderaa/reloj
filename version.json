@@ -1,6 +1,6 @@
 {
-  "version": "1.25.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.25.0/RelojLab.exe",
-  "sha256": "4b24235383541de65cb86f56b7684446687d9fc895d6aa420429c68ce94f3a22",
-  "notes": "V1.25: usa como carrier principal 2D7F porque conserva agujas analógicas móviles y agrega pasos, pulso y batería reales. Si no registra, vuelve automáticamente al 4CC6 ya validado. La selección sólo ocurre con BinID confirmado."
+  "version": "1.26.0",
+  "notes": "V1.26: usa el MARKET 2D7F ya validado como motor, pero reemplaza el fondo naranja por la esfera Reloj Lab aprobada: negro, analógico central, agujas blancas, segundero rojo y hora/batería/pasos/pulso LIVE en sus posiciones finales. Prueba identidad verificable 4CC6 y luego overwrite 2D7F si el firmware exige el mismo ID.",
+  "sha256": "d08600b324274731840a6b4f4006423833a990c2f2ec0e50c8a0065fccff861c",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.26.0/RelojLab.exe"
 }
