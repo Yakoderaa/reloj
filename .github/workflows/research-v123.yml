@@ -1,0 +1,41 @@
+name: Research V1.23 Valid MARKET
+on:
+  push:
+    branches: [research-v123-valid-market]
+    paths: ['.github/workflows/research-v123.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan candidate MARKET faces
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence/bins
+          IDS='0583 0BDD 1E17 23F6 2D7F 2F68 3A1F 4078 4CC6 4CF4 5168 5DF3 61C0 7480 936A 9798 C92F CEB2 D19C D4DB D635 D8B3 DBEC DF49 E631 F3A7 F435 FE37'
+          for id in $IDS; do
+            curl -L --fail --retry 2 "http://watchhealth.com.cn/k6File/clock/file/$id.bin" -o "evidence/bins/$id.bin" || true
+          done
+          python - <<'PY' | tee evidence/report.txt
+          from pathlib import Path
+          wanted={0x8001,0x8002,0x8009,0x800E,0x8013}
+          def u16(b,o): return int.from_bytes(b[o:o+2],'little')
+          for p in sorted(Path('evidence/bins').glob('*.bin')):
+              b=p.read_bytes()
+              fields=[]
+              for off in range(0x10,min(0x800,len(b)-28)):
+                  if u16(b,off)==0x0164 and u16(b,off+8)==0x1202:
+                      fields.append((u16(b,off+10),off,u16(b,off+2),u16(b,off+4),u16(b,off+6),b[off+12:off+20].split(bytes([0]),1)[0]))
+              ids={x[0] for x in fields}
+              score=len(ids&wanted)
+              print(p.stem,'len',len(b),'head',b[:16].hex(),'count',u16(b,10) if len(b)>12 else None,
+                    'score',score,'fields',[f'{x[0]:04X}@{x[1]:04X}({x[2]},{x[3]})' for x in fields])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v123-valid-market
+          path: evidence
