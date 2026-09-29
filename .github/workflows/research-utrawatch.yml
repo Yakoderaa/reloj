@@ -1,7 +1,7 @@
-name: Research UtraWatch Dial Transfer
+name: Research UtraWatch V1.20 Market
 on:
   push:
-    branches: [main, research-v120-market]
+    branches: [research-v120-market]
     paths:
       - '.github/workflows/research-utrawatch.yml'
   workflow_dispatch:
@@ -12,92 +12,53 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Download UtraWatch package
+      - name: Query UtraWatch market for device 1180
         shell: bash
         run: |
-          set -euxo pipefail
-          URL='https://04.apk.dog/storage/22/088/475/1088475/split/379294/UtraWatch.zip?apk_id=1232604&e=1790631237&file_id=3328642&lang=en&premium_speed=0&s=iCEtpd6BvpskuNvN9_qRsA&split_id=379294'
-          curl -L --fail --retry 3 --connect-timeout 20 "$URL" -o UtraWatch.zip
-          ls -lh UtraWatch.zip
-          unzip -l UtraWatch.zip | head -80
-          mkdir xapk
-          unzip -q UtraWatch.zip -d xapk
-          find xapk -maxdepth 2 -type f -printf '%p %s bytes\n' | head -80
-      - name: Install JADX
-        shell: bash
-        run: |
-          set -euxo pipefail
-          curl -L --fail --retry 3 https://github.com/skylot/jadx/releases/download/v1.5.3/jadx-1.5.3.zip -o jadx.zip
-          unzip -q jadx.zip -d jadx
-          chmod +x jadx/bin/jadx
-          jadx/bin/jadx --version
-      - name: Decompile base APK
-        shell: bash
-        run: |
-          set -euxo pipefail
-          APK=$(find xapk -type f -name '*.apk' | sort | head -1)
-          echo "APK=$APK"
-          mkdir decompiled
-          jadx/bin/jadx -d decompiled "$APK" || true
-      - name: Extract dial transfer evidence
-        shell: bash
-        run: |
-          set -euxo pipefail
-          mkdir evidence
-          PAT='DIAL_COMPRESS_CTRL|IS_START_BIG_SEND|DATA_TYPE_DIAL_SYNC|DATA_TYPE_DIAL_INFO|FUNCTION_CONTROL|添加大发送数据|大发送|DialInfo|DialSync|dialSync|bigSend|BigSend|GZipUtils|ANSWER_OVER|CUSTOMIZE|FileTransControl|sendFile|sendWatchFileData|getFileDownloadInfo|K6_DATA_TYPE_WATCH_FACE_INFO|WATCH_FACE_INFO|fileDataSendResult|fileStateResult|V2BleFileDownLoadActivity|startFileDownload|jSONObject.put|K6_DATA_TYPE_WATCH_FACE_SYN_NNNOMAL_CHOICE|FACE_SYN_NNNOMAL_CHOICE|ChoiceClockdialAdapter|Clockdial|FaceMore|faceMore|faceDetail|binId|fileUrl|watch_face'
-          grep -R -n -E "$PAT" decompiled > evidence/grep.txt || true
-          echo '=== MATCH COUNT ==='
-          wc -l evidence/grep.txt
-          echo '=== FIRST 500 MATCHES ==='
-          sed -n '1,500p' evidence/grep.txt
-          cut -d: -f1 evidence/grep.txt | sort -u | head -120 > evidence/files.txt || true
-          while IFS= read -r f; do
-            [ -f "$f" ] || continue
-            safe=$(echo "$f" | sed 's#^decompiled/##; s#/#__#g')
-            cp "$f" "evidence/$safe" || true
-          done < evidence/files.txt
-          cp decompiled/sources/com/utra/entity/FaceMoreBaseBean.java evidence/ 2>/dev/null || true
-          cp decompiled/sources/com/utra/entity/FaceMoreDetailBean.java evidence/ 2>/dev/null || true
-          cp decompiled/sources/com/utra/entity/FaceDetailBean.java evidence/ 2>/dev/null || true
-          cp decompiled/sources/com/utra/ui/module/device/watch/more/V2MoreWatchFaceVM.java evidence/ 2>/dev/null || true
-          cp decompiled/sources/com/utra/vm/V2ModifyClockdialVM.java evidence/ 2>/dev/null || true
-          echo '=== ONLINE DEVICE 1180 ===' | tee evidence/online-summary.txt
-          for page in 0 1 2 3; do
+          set -u
+          mkdir -p evidence
+          for page in 0 1 2 3 4 5; do
             curl -L -sS --max-time 20 "http://watchhealth.com.cn/YueDongService/app/faces.do?deviceId=1180&pageIndex=$page" -o "evidence/faces-1180-p$page.json" || true
-            echo "--- faces page $page ---" | tee -a evidence/online-summary.txt
-            cat "evidence/faces-1180-p$page.json" | tee -a evidence/online-summary.txt || true
-            echo | tee -a evidence/online-summary.txt
           done
           curl -L -sS --max-time 20 "http://watchhealth.com.cn/YueDongService/app/faceConfig.do?deviceId=1180&pageIndex=1" -o evidence/faceConfig-1180-p1.json || true
-          echo '--- faceConfig 1180 ---' | tee -a evidence/online-summary.txt
-          cat evidence/faceConfig-1180-p1.json | tee -a evidence/online-summary.txt || true
           : > evidence/market-urls.txt
           for j in evidence/faces-1180-p*.json; do
             jq -r '.. | objects | to_entries[]? | select(.value|type=="string") | select(.value|startswith("http://") or startswith("https://")) | [.key,.value] | @tsv' "$j" >> evidence/market-urls.txt 2>/dev/null || true
           done
           sort -u evidence/market-urls.txt -o evidence/market-urls.txt
+          cat evidence/faceConfig-1180-p1.json > evidence/summary.txt 2>/dev/null || true
+          for j in evidence/faces-1180-p*.json; do
+            echo "=== $j ===" >> evidence/summary.txt
+            cat "$j" >> evidence/summary.txt
+            echo >> evidence/summary.txt
+          done
           n=0
           while IFS=$'\t' read -r key url; do
             case "$key $url" in
               *file*|*File*|*.bin*)
-                [ "$n" -ge 12 ] && break
+                [ "$n" -ge 16 ] && break
                 dest=$(printf 'evidence/market-%02d.bin' "$n")
                 curl -L -sS --fail --max-time 30 "$url" -o "$dest" || rm -f "$dest"
-                if [ -f "$dest" ]; then echo "DOWNLOADED $dest $(wc -c < "$dest") $url"; n=$((n+1)); fi
+                if [ -f "$dest" ]; then
+                  echo "$dest $(wc -c < "$dest") $url" >> evidence/downloaded.txt
+                  n=$((n+1))
+                fi
                 ;;
             esac
           done < evidence/market-urls.txt
+          : > evidence/market-analysis.txt
           for f in evidence/market-*.bin; do
             [ -f "$f" ] || continue
             echo "=== $f ===" >> evidence/market-analysis.txt
             file "$f" >> evidence/market-analysis.txt || true
             wc -c "$f" >> evidence/market-analysis.txt || true
-            xxd -l 256 "$f" >> evidence/market-analysis.txt || true
-            strings -a -n 4 "$f" | head -80 >> evidence/market-analysis.txt || true
+            sha256sum "$f" >> evidence/market-analysis.txt || true
+            xxd -l 512 "$f" >> evidence/market-analysis.txt || true
+            strings -a -n 4 "$f" | head -120 >> evidence/market-analysis.txt || true
           done
-          find evidence -maxdepth 1 -type f -printf '%f\n' | sort
+          find evidence -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
       - uses: actions/upload-artifact@v4
         with:
-          name: utrawatch-dial-evidence
+          name: utrawatch-v120-market-evidence
           path: evidence
           if-no-files-found: error
