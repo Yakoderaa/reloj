@@ -701,23 +701,22 @@ class App:
                 b64_path=os.path.join(root,"assets","target_face_v120.b64")
                 meta_path=os.path.join(root,"assets","target_face_v120.json")
                 if not os.path.exists(b64_path):
-                    raise RuntimeError("Falta el WF dinámico V1.20 en el paquete de la aplicación")
+                    raise RuntimeError("Falta la esfera MARKET dinámica V1.20 en el paquete")
                 packed=open(b64_path,"r",encoding="ascii").read().strip()
                 raw=zlib.decompress(base64.b64decode(packed))
-                if len(raw)<54 or raw[:2]!=b"WF":
-                    raise RuntimeError("WF dinámico V1.20 inválido")
-                width=int.from_bytes(raw[0x2a:0x2c],"little")
-                height=int.from_bytes(raw[0x2c:0x2e],"little")
-                count=int.from_bytes(raw[0x2e:0x30],"little")
-                types=[]
-                for i in range(count):
-                    off=54+i*20
-                    if off+20>len(raw): raise RuntimeError("Descriptor WF V1.20 truncado")
-                    types.append(int.from_bytes(raw[off+2:off+4],"little"))
-                required={0x0501,0x0601,0x0701,0x0804,0x0904,0x0A04,0x0B04,
-                          0x4104,0x4204,0x4304,0x1102}
-                if (width,height)!=(240,296) or not required.issubset(set(types)):
-                    raise RuntimeError("WF V1.20 no contiene todos los bindings dinámicos requeridos")
+                if len(raw)<0x800 or int.from_bytes(raw[:4],"little")!=len(raw)-16:
+                    raise RuntimeError("Esfera MARKET dinámica V1.20 inválida")
+                def u16(off): return int.from_bytes(raw[off:off+2],"little")
+                def find_field(field):
+                    for off in range(0x10,0x800-28):
+                        if u16(off)==0x0164 and u16(off+8)==0x1202 and u16(off+10)==field:
+                            return off
+                    return None
+                fields={name:find_field(field) for field,name in (
+                    (0x8001,"hour"),(0x8002,"minute"),(0x8009,"steps"),
+                    (0x800E,"heart_rate"),(0x8013,"battery"))}
+                if any(v is None for v in fields.values()):
+                    raise RuntimeError("MARKET V1.20 no contiene todos los campos vivos requeridos: "+repr(fields))
                 meta={}
                 if os.path.exists(meta_path):
                     try:
@@ -726,9 +725,9 @@ class App:
                 folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),
                                     "RelojLab","wf-analysis-v120")
                 os.makedirs(folder,exist_ok=True)
-                path=os.path.join(folder,"approved-dynamic-v120.bin")
+                path=os.path.join(folder,"approved-dynamic-market-v120.bin")
                 with open(path,"wb") as fh:fh.write(raw)
-                return path,raw,width,height,types,meta
+                return path,raw,240,296,fields,meta
 
             def build(dev_type,n_seq,op,payload=b"",send_type=1):
                 # CEProtocolB wire header: byte1=device type, byte3=N sequence.
@@ -771,24 +770,24 @@ class App:
 
             async def work():
                 emit("1/9 · Cargando esfera aprobada como WF DINÁMICO 240×296…")
-                path,raw,target_w,target_h,wf_types,wf_meta=await asyncio.to_thread(build_dynamic_reference_v120)
+                path,raw,target_w,target_h,market_fields,wf_meta=await asyncio.to_thread(build_dynamic_reference_v120)
                 expected_cmd2=None
                 oem_stream,deflated=await asyncio.to_thread(oem_dial_compress,raw)
                 rep["single_face_install"]["candidate"]={
                     "path":path,
-                    "format":"UtraWatch WF dinámico · referencia aprobada",
-                    "visual_mode":"firmware-rendered dynamic WF",
-                    "target_source":"approved target layout + verified OEM dynamic resources",
+                    "format":"UtraWatch device-1180 MARKET dinámico · referencia aprobada",
+                    "visual_mode":"firmware-rendered MARKET dynamic face",
+                    "target_source":"real 2D7F MARKET analog engine + approved field layout",
                     "width":target_w,"height":target_h,
-                    "descriptor_types":[f"0x{x:04X}" for x in wf_types],
+                    "market_live_field_offsets":market_fields,
                     "dynamic_fields":{
-                        "analog_hour":"firmware live · 0x0501",
-                        "analog_minute":"firmware live · 0x0601",
-                        "analog_second":"firmware live · 0x0701",
-                        "time":"firmware live digits",
-                        "steps":"firmware live · 0x4104",
-                        "heart_rate":"firmware live · 0x4204",
-                        "battery":"firmware live · 0x4304"
+                        "analog_hour":"firmware dynamic · real MARKET 2D7F",
+                        "analog_minute":"firmware dynamic · real MARKET 2D7F",
+                        "analog_second":"firmware dynamic · real MARKET 2D7F",
+                        "time":"firmware live · fields 0x8001/0x8002",
+                        "steps":"firmware live · field 0x8009",
+                        "heart_rate":"firmware live · field 0x800E",
+                        "battery":"firmware live · field 0x8013"
                     },
                     "static_analog_note":None,
                     "raw_size":len(raw),
@@ -1063,13 +1062,13 @@ class App:
                         "oem_header_hex":oem_stream[:20].hex()
                     })
                     rep["single_face_install"]["live_bindings"]={
-                        "analog_hour":{"source":"WF descriptor 0x0501","continuous_live":True},
-                        "analog_minute":{"source":"WF descriptor 0x0601","continuous_live":True},
-                        "analog_second":{"source":"WF descriptor 0x0701","continuous_live":True},
-                        "time":{"source":"WF firmware clock digits","continuous_live":True},
-                        "steps":{"source":"WF descriptor 0x4104","continuous_live":True},
-                        "heart_rate":{"source":"WF descriptor 0x4204","continuous_live":True},
-                        "battery":{"source":"WF descriptor 0x4304","continuous_live":True,
+                        "analog_hour":{"source":"real MARKET 2D7F analog engine","continuous_live":True},
+                        "analog_minute":{"source":"real MARKET 2D7F analog engine","continuous_live":True},
+                        "analog_second":{"source":"real MARKET 2D7F analog engine","continuous_live":True},
+                        "time":{"source":"MARKET fields 0x8001/0x8002","continuous_live":True},
+                        "steps":{"source":"MARKET field 0x8009","continuous_live":True},
+                        "heart_rate":{"source":"MARKET field 0x800E","continuous_live":True},
+                        "battery":{"source":"MARKET field 0x8013","continuous_live":True,
                                    "value_seen_during_install":battery_percent}
                     }
                     emit("DATOS · agujas LIVE · hora LIVE · pasos LIVE · pulso LIVE · batería LIVE")
@@ -1140,11 +1139,11 @@ class App:
                         raise RuntimeError("El reloj ACKeó comandos pero no devolvió WATCH_FACE_INFO 0x84; transferencia NO iniciada para evitar falsos positivos.")
 
                     chunks=[file_bytes[i:i+300] for i in range(0,len(file_bytes),300)]
-                    emit("5/9 · Instalando WF dinámico en CUSTOMIZE cmd=2 · "+str(len(chunks))+" bloques…")
+                    emit("5/9 · Instalando MARKET dinámico real en CUSTOMIZE cmd=2 · "+str(len(chunks))+" bloques…")
                     dynamic_transfer=await transfer_slot(2,"DYNAMIC-CUSTOMIZE",file_bytes,chunks)
                     rep["single_face_install"]["dynamic_customize_transfer"]=dynamic_transfer
 
-                    emit("6/9 · WF dinámico completo; esperando render del firmware…")
+                    emit("6/9 · MARKET dinámico completo; esperando render del firmware…")
                     await asyncio.sleep(4.0)
 
                     emit("7/9 · Seleccionando y verificando CUSTOMIZE dinámico…")
@@ -1201,7 +1200,7 @@ class App:
 
                     rep["single_face_install"]["market_attempt"]={
                         "attempted":False,
-                        "reason":"V1.20 usa el WF dinámico dentro de CUSTOMIZE; evita la activación MARKET que quedó sin verificar en V0.85"
+                        "reason":"V1.20 usa un binario MARKET real dentro del slot CUSTOMIZE cuya selección ya quedó verificada en V1.19"
                     }
                     rep["single_face_install"]["factory_faces_deleted"]=False
                     rep["single_face_install"]["factory_faces_note"]="UtraWatch no expone comando de borrado para esferas integradas en firmware; sólo se reemplazaron los slots regrabables."

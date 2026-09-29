@@ -17,6 +17,12 @@ jobs:
       - name: Verify V1.20
         run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.20.0',v"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0
+      - name: Fetch verified device-1180 MARKET donors
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force assets | Out-Null
+          Invoke-WebRequest 'http://watchhealth.com.cn/k6File/clock/file/2D7F.bin' -OutFile assets/donor_2D7F.bin
+          Invoke-WebRequest 'http://watchhealth.com.cn/k6File/clock/file/04C2.bin' -OutFile assets/donor_04C2.bin
       - name: Build and validate dynamic watch face
         run: python prepare_v120_dynamic.py
       - run: python -m unittest discover -s tests
@@ -30,7 +36,7 @@ jobs:
             version='1.20.0'
             exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.20.0/RelojLab.exe'
             sha256=$sha
-            notes='V1.20: esfera aprobada reconstruida como WF dinámico real dentro del slot CUSTOMIZE verificado. Agujas horaria/minutera/segundero, hora, pasos, pulso y batería se validan como descriptores firmware antes de publicar.'
+            notes='V1.20: esfera dinámica real basada en el motor MARKET del reloj y cargada en el slot CUSTOMIZE verificado. Hora/minuto/segundo analógicos, hora digital, pasos, pulso y batería usan campos vivos del firmware.'
           } | ConvertTo-Json
           Set-Content -Path version.json -Value $manifest -Encoding UTF8
       - name: Publish V1.20 release asset
@@ -39,7 +45,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view v1.20.0 *> $null
-          if ($LASTEXITCODE -ne 0) { gh release create v1.20.0 dist/RelojLab.exe --title 'Reloj Lab V1.20' --notes 'V1.20: esfera dinámica real en CUSTOMIZE. Agujas, hora, pasos, pulso y batería se construyen con recursos OEM dinámicos y la build se cancela si falta cualquier binding requerido.' }
+          if ($LASTEXITCODE -ne 0) { gh release create v1.20.0 dist/RelojLab.exe --title 'Reloj Lab V1.20' --notes 'V1.20: esfera dinámica real. Conserva el motor analógico MARKET con hora/minuto/segundo en vivo y añade hora digital, pasos, pulso y batería como campos live. Se instala por el CUSTOMIZE que V1.19 verificó físicamente.' }
           else { gh release upload v1.20.0 dist/RelojLab.exe --clobber }
       - name: Publish updater manifest
         shell: pwsh

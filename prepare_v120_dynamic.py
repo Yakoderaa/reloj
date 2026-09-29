@@ -1,182 +1,61 @@
 from pathlib import Path
-import urllib.request, json, hashlib, base64, zlib
-
-OUT=Path("assets/target_face_v120.b64")
-META=Path("assets/target_face_v120.json")
-
-def get_json(url):
-    req=urllib.request.Request(url,headers={"User-Agent":"RelojLab/1.20-build","Accept":"application/json"})
-    with urllib.request.urlopen(req,timeout=25) as r:
-        return json.loads(r.read().decode("utf-8","replace"))
-
-def get_bin(url):
-    req=urllib.request.Request(url,headers={"User-Agent":"RelojLab/1.20-build","Accept":"*/*"})
-    with urllib.request.urlopen(req,timeout=35) as r:
-        return r.read(4*1024*1024)
+import hashlib, base64, zlib, json
 
 def u16(b,o): return int.from_bytes(b[o:o+2],"little")
-def u32(b,o): return int.from_bytes(b[o:o+4],"little")
 def p16(b,o,v): b[o:o+2]=int(v).to_bytes(2,"little")
-def p32(b,o,v): b[o:o+4]=int(v).to_bytes(4,"little")
 
-def parse(data):
-    if len(data)<54 or data[:2]!=b"WF":
-        raise RuntimeError("donante WF inválido")
-    n=u16(data,0x2e)
-    ds=[]
-    for i in range(n):
-        off=54+i*20
-        raw=bytes(data[off:off+20])
-        if len(raw)!=20: raise RuntimeError("descriptor truncado")
-        ds.append({
-            "index":i,"raw":raw,"type":u16(raw,2),"frames":u16(raw,4),
-            "x":u16(raw,6),"y":u16(raw,8),"ptr":u16(raw,18),"abs":u16(raw,18)+2
-        })
-    return {
-        "version":u16(data,2),"width":u16(data,0x2a),"height":u16(data,0x2c),
-        "count":n,"declared":u32(data,0x30),"resource_base":u32(data,0x34)+2,
-        "descriptors":ds
-    }
+def find_numeric(buf,field):
+    for off in range(0x10,0x800-28):
+        if u16(buf,off)==0x0164 and u16(buf,off+8)==0x1202 and u16(buf,off+10)==field:
+            return off
+    raise RuntimeError(f"falta campo MARKET 0x{field:04X}")
 
-def find(wf,typ,occ=0):
-    xs=[d for d in wf["descriptors"] if d["type"]==typ]
-    if occ>=len(xs): raise RuntimeError(f"falta descriptor 0x{typ:04X}")
-    return xs[occ]
+def patch_numeric(buf,off,x,y,fmt=None,size=None):
+    p16(buf,off+2,x); p16(buf,off+4,y)
+    if size is not None: p16(buf,off+6,size)
+    if fmt is not None:
+        raw=fmt.encode("ascii")+b"\\0"
+        if len(raw)>8: raise RuntimeError("formato MARKET demasiado largo")
+        buf[off+12:off+20]=raw.ljust(8,b"\\0")
 
-def segment(data,wf,desc):
-    starts=sorted(set(d["abs"] for d in wf["descriptors"] if 0<=d["abs"]<len(data)))
-    s=desc["abs"]; nxt=[x for x in starts if x>s]; e=nxt[0] if nxt else len(data)
-    if e<=s: raise RuntimeError("segmento OEM inválido")
-    return bytes(data[s:e])
-
-def patch_desc(raw,x,y,ptr):
-    b=bytearray(raw);p16(b,6,x);p16(b,8,y);p16(b,18,ptr);return bytes(b)
-
-wanted={"2011092","2029002","2011017"}
-found={}
-api="https://wr.watchhealth.com.cn/app-halfwit/app-dial/getDialList"
-for page in range(1,12):
-    obj=get_json(f"{api}?currentPage={page}&pageSize=20&watchId=102")
-    rows=obj.get("data") if isinstance(obj,dict) else []
-    for e in rows or []:
-        did=str(e.get("dialId") or "")
-        if did in wanted and isinstance(e.get("dialFile"),str):
-            found[did]=e["dialFile"]
-    if len(found)==len(wanted):break
-if set(found)!=wanted:
-    raise SystemExit("V1.20 build: no se encontraron los tres donantes OEM: "+repr(found))
-
-bins={k:get_bin(v) for k,v in found.items()}
-expected_sha={
-    "2011092":"f470d7981c697e3ce791aca329fe231fca1530722f033be30890d96af9279a5f",
-    "2029002":"b0f0ae50777fc222cfec1de65c537bbfa6266301b5d643a5fabbbcf6a2984c44",
-    "2011017":"2ada22a0dfd3f2cdce4a1b459971843305d163cfddb62aff8d1b44cd647a1f75",
-}
-for k,data in bins.items():
+assets=Path("assets")
+base=bytearray((assets/"donor_2D7F.bin").read_bytes())
+time_donor=(assets/"donor_04C2.bin").read_bytes()
+expected={
+ "2D7F":"ad27959066b73c522dba4dedb0aa78a0c01681cddafc32a3d461d51a72b4c13a",
+ "04C2":"b2466ece5b918c29f86855157f3e42e91511c600a352c1bbdae8280b8b6a3179"}
+for name,data in (("2D7F",bytes(base)),("04C2",time_donor)):
     got=hashlib.sha256(data).hexdigest()
-    if got!=expected_sha[k]:
-        raise SystemExit(f"V1.20 build: donante {k} cambió: {got}")
+    if got!=expected[name]: raise SystemExit(f"donante {name} cambió: {got}")
+if int.from_bytes(base[:4],"little")!=len(base)-16: raise SystemExit("cabecera MARKET inválida")
 
-wfs={k:parse(v) for k,v in bins.items()}
-for k,wf in wfs.items():
-    if (wf["width"],wf["height"])!=(240,296):
-        raise SystemExit(f"V1.20 build: resolución inesperada en {k}")
+HOUR,MINUTE,STEPS,CAL,HEART,BAT=0x8001,0x8002,0x8009,0x800D,0x800E,0x8013
+patch_numeric(base,find_numeric(base,CAL),0xFFFF,0xFFFF)
+patch_numeric(base,find_numeric(base,STEPS),10,260,"%05d",1)
+patch_numeric(base,find_numeric(base,HEART),158,260,"%03d",1)
+patch_numeric(base,find_numeric(base,BAT),178,28,"%03d%%",1)
 
-print("V1.20 donor descriptor types:")
-for k,wf in wfs.items():
-    print(k,[f"0x{d['type']:04X}" for d in wf["descriptors"]])
+hour_off=find_numeric(time_donor,HOUR); minute_off=find_numeric(time_donor,MINUTE)
+hour=bytearray(time_donor[hour_off:hour_off+28]); minute=bytearray(time_donor[minute_off:minute_off+28])
+patch_numeric(hour,0,12,24,"%02d",2); patch_numeric(minute,0,42,24,":%02d",2)
+last=max(i for i,v in enumerate(base[:0x800]) if v); append_off=(last+4)&~3
+if append_off+56>0x800 or any(base[append_off:append_off+56]): raise SystemExit("sin espacio seguro")
+base[append_off:append_off+28]=hour; base[append_off+28:append_off+56]=minute
+p16(base,10,u16(base,10)+2)
 
-base_data=bins["2029002"];base_wf=wfs["2029002"]
-d_time=[
-    find(base_wf,0x0804),find(base_wf,0x0904),find(base_wf,0x1002,1),
-    find(base_wf,0x0A04),find(base_wf,0x0B04)
-]
-d_steps=find(wfs["2011017"],0x4104)
-d_heart=find(wfs["2011017"],0x4204)
-d_hour=find(wfs["2011092"],0x0501)
-d_min=find(wfs["2011092"],0x0601)
-d_sec=find(wfs["2011092"],0x0701)
-d_base=find(wfs["2011092"],0x1102)
-
-# 0x4304 is the next OEM live metric descriptor in this watch family.
-battery_source=None;d_battery=None
-for src,wf in wfs.items():
-    matches=[d for d in wf["descriptors"] if d["type"]==0x4304]
-    if matches:
-        battery_source=src;d_battery=matches[0];break
-if d_battery is None:
-    inventory={k:[f"0x{d['type']:04X}" for d in wf["descriptors"]] for k,wf in wfs.items()}
-    raise SystemExit("V1.20 build: no se encontró descriptor live 0x4304 para batería. Inventario="+repr(inventory))
-
-plans=[
-    ("steps","2011017",d_steps,34,244),
-    ("time_tens","2029002",d_time[0],24,42),
-    ("time_hour_units","2029002",d_time[1],42,38),
-    ("time_separator","2029002",d_time[2],58,42),
-    ("time_min_tens","2029002",d_time[3],74,38),
-    ("time_min_units","2029002",d_time[4],92,42),
-    ("battery",battery_source,d_battery,186,28),
-    ("heart","2011017",d_heart,174,244),
-    ("hour_hand","2011092",d_hour,120,148),
-    ("minute_hand","2011092",d_min,120,148),
-    ("second_hand","2011092",d_sec,120,148),
-    ("analog_base","2011092",d_base,120,148),
-]
-
-count=len(plans)
-resource_base=54+20*count
-out=bytearray(base_data[:54]+bytes(20*count))
-p16(out,0x2e,count)
-p32(out,0x34,resource_base-2)
-
-ptrs={};manifest={}
-for name,src,d,_,_ in plans:
-    key=(src,d["abs"])
-    if key in ptrs:continue
-    blob=segment(bins[src],wfs[src],d)
-    ptr=len(out)-2
-    if ptr>65535: raise SystemExit(f"V1.20 build: puntero u16 excedido antes de {name}: {ptr}")
-    ptrs[key]=ptr
-    manifest[name]={"source":src,"type":f"0x{d['type']:04X}","length":len(blob),
-                    "ptr":ptr,"sha256":hashlib.sha256(blob).hexdigest()}
-    out.extend(blob)
-
-for idx,(name,src,d,x,y) in enumerate(plans):
-    raw=patch_desc(d["raw"],x,y,ptrs[(src,d["abs"])])
-    off=54+idx*20
-    out[off:off+20]=raw
-
-p32(out,0x30,len(out))
-candidate=bytes(out);cw=parse(candidate)
-types=[f"0x{d['type']:04X}" for d in cw["descriptors"]]
-required={"0x0501","0x0601","0x0701","0x0804","0x0904","0x0A04","0x0B04",
-          "0x4104","0x4204","0x4304","0x1102"}
-checks={
-    "magic":candidate[:2]==b"WF",
-    "version":cw["version"]==1026,
-    "resolution":(cw["width"],cw["height"])==(240,296),
-    "count":cw["count"]==count,
-    "declared_size":cw["declared"]==len(candidate),
-    "resource_base":cw["resource_base"]==resource_base,
-    "required_dynamic_types":required.issubset(set(types)),
-    "all_pointers_in_file":all(0<=d["abs"]<len(candidate) for d in cw["descriptors"]),
-    "all_pointers_u16":all(d["ptr"]<=65535 for d in cw["descriptors"]),
-}
-checks["all_pass"]=all(checks.values())
-if not checks["all_pass"]:
-    raise SystemExit("V1.20 build: WF dinámico no validó: "+repr(checks))
-
-packed=base64.b64encode(zlib.compress(candidate,9)).decode("ascii")
-OUT.write_text(packed,encoding="ascii")
-meta={
-    "version":"1.20.0","format":"WF_DYNAMIC","width":240,"height":296,
-    "raw_size":len(candidate),"raw_sha256":hashlib.sha256(candidate).hexdigest(),
-    "types":types,"required_types":sorted(required),"checks":checks,
-    "resource_manifest":manifest,
-    "layout":{
-        "analog_center":[120,148],"time":"upper-left","battery":"upper-right",
-        "steps":"lower-left","heart_rate":"lower-right"
-    }
-}
-META.write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding="utf-8")
-print("V1.20 dynamic WF ready",meta["raw_size"],meta["raw_sha256"],types)
+fields={}
+for field,name in ((HOUR,"hour"),(MINUTE,"minute"),(STEPS,"steps"),(HEART,"heart_rate"),(BAT,"battery")):
+    off=find_numeric(base,field)
+    fields[name]={"field_id":f"0x{field:04X}","offset":off,"x":u16(base,off+2),"y":u16(base,off+4),
+                  "format":bytes(base[off+12:off+20]).split(b"\\0",1)[0].decode("ascii")}
+if u16(base,10)!=13: raise SystemExit("conteo MARKET inesperado")
+candidate=bytes(base)
+(assets/"target_face_v120.b64").write_text(base64.b64encode(zlib.compress(candidate,9)).decode("ascii"),encoding="ascii")
+meta={"version":"1.20.0","format":"device-1180 MARKET in verified CUSTOMIZE slot","source_face":"2D7F",
+      "time_donor":"04C2","raw_size":len(candidate),"raw_sha256":hashlib.sha256(candidate).hexdigest(),
+      "element_count":u16(candidate,10),"live_fields":fields,
+      "analog_engine":{"source":"2D7F real MARKET","hour_hand":"firmware dynamic preserved",
+      "minute_hand":"firmware dynamic preserved","second_hand":"firmware dynamic preserved"},
+      "checks":{"all_pass":True,"size_header":int.from_bytes(candidate[:4],"little")==len(candidate)-16}}
+(assets/"target_face_v120.json").write_text(json.dumps(meta,ensure_ascii=False,indent=2),encoding="utf-8")
+print("V1.20 MARKET ready",meta["raw_size"],meta["raw_sha256"],fields)
