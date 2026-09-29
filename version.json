@@ -1,6 +1,6 @@
 {
-  "version": "1.21.0",
-  "notes": "V1.21: instala la esfera como MARKET real por cmd=3, verifica que el firmware registre su BinID 4CC6 y luego selecciona el índice MARKET. Base visual negra minimalista con agujas blancas, segundero rojo y campos vivos de hora, batería, pasos y pulso.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.21.0/RelojLab.exe",
-  "sha256": "81c3fee6a617455a19b347f431a0007d48f83d1853abfe613d572c8e36a2b26f"
+  "sha256": "132d95457e2d3d6c1d0f6d44a52d7dda340854ead23bad460511b159b7293aa7",
+  "notes": "V1.22: corrige el fallo de inicialización de V1.21 y conserva la instalación MARKET real por cmd=3 con verificación de BinID 4CC6 antes de seleccionar la esfera.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.22.0/RelojLab.exe",
+  "version": "1.22.0"
 }
