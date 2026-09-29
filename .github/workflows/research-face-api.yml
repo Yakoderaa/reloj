@@ -1,0 +1,27 @@
+name: Research Face API 1180
+on:
+  push:
+    branches: [research-v123-valid-market]
+    paths: ['.github/workflows/research-face-api.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe face APIs
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir evidence
+          for url in             'http://watchhealth.com.cn/YueDongService/app/faceMore.do?deviceId=1180&pageIndex=1'             'http://watchhealth.com.cn/YueDongService/app/faceMore?deviceId=1180&pageIndex=1'             'http://watchhealth.com.cn/YueDongService/app/getClockList.do?deviceId=1180&pageIndex=1' ; do
+            echo "URL=$url"
+            curl -L --fail --retry 2 "$url" || true
+            echo
+          done | tee evidence/api.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: face-api-1180
+          path: evidence
