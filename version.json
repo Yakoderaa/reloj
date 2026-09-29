@@ -1,6 +1,6 @@
 {
-  "notes": "V1.29: si una prueba anterior dejó cmd3=0000, primero restaura la MARKET 2D7F OEM exacta y la selecciona. Recién después prueba el parche mínimo que cambia sólo el fondo negro. Si ese parche es rechazado, vuelve a restaurar automáticamente la OEM.",
-  "sha256": "72f7218ab403fa842709d9ecfa70b1f64b21950d9b219de855955f92c8dfa10a",
-  "version": "1.29.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.29.0/RelojLab.exe"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.30.0/RelojLab.exe",
+  "notes": "V1.30 abandona los intentos MARKET para nuestra esfera y vuelve a la ruta CUSTOMIZE cmd=2 que ya instaló físicamente la referencia aprobada en V1.19. Instala el raster exacto 240x296, con hora/pasos/pulso del firmware y batería leída al instalar, y verifica custom_index + cmd2.",
+  "sha256": "32d0ba7013de5e69639bf323a664b0593d81666941f0dcbee836657030a693b8",
+  "version": "1.30.0"
 }
