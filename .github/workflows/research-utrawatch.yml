@@ -46,6 +46,28 @@ jobs:
                 ;;
             esac
           done < evidence/market-urls.txt
+          mkdir -p evidence/previews
+          for j in evidence/faces-1180-p*.json; do
+            jq -r '.result.pageData[]? | [.binid,.preview] | @tsv' "$j" 2>/dev/null | while IFS=          for f in evidence/market-*.bin; do
+            [ -f "$f" ] || continue
+            echo "=== $f ===" >> evidence/market-analysis.txt
+            file "$f" >> evidence/market-analysis.txt || true
+            wc -c "$f" >> evidence/market-analysis.txt || true
+            sha256sum "$f" >> evidence/market-analysis.txt || true
+            xxd -l 512 "$f" >> evidence/market-analysis.txt || true
+            strings -a -n 4 "$f" | head -120 >> evidence/market-analysis.txt || true
+          done
+          find evidence -maxdepth 1 -type f -printf '%f %s bytes\n' | sort
+      - uses: actions/upload-artifact@v4
+        with:
+          name: utrawatch-v120-market-evidence
+          path: evidence
+          if-no-files-found: error
+\t' read -r binid url; do
+              [ -n "$binid" ] || continue
+              curl -L -sS --fail --max-time 30 "$url" -o "evidence/previews/$binid.png" || rm -f "evidence/previews/$binid.png"
+            done
+          done
           : > evidence/market-analysis.txt
           for f in evidence/market-*.bin; do
             [ -f "$f" ] || continue
