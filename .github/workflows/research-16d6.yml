@@ -1,0 +1,21 @@
+name: Research Analog Candidate 16D6
+on:
+  push:
+    branches: [research-v123-valid-market]
+    paths: ['.github/workflows/research-16d6.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch preview
+        run: |
+          mkdir evidence
+          curl -L --fail --retry 3 'http://watchhealth.com.cn/k6File/clock/image/16D6.png' -o evidence/16D6.png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: analog-16d6
+          path: evidence
