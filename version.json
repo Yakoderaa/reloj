@@ -1,6 +1,6 @@
 {
-  "notes": "V1.23: corrige la tabla binaria MARKET: elimina el hueco de 2 bytes entre descriptores, valida continuidad completa y bloquea la selección hasta que el reloj confirme BinID 4CC6.",
-  "sha256": "b742da99ddc3a2a50930557ac487b16afd34c13643c55d2b8a08a155ddd52136",
-  "version": "1.23.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.23.0/RelojLab.exe"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.24.0/RelojLab.exe",
+  "notes": "V1.24: deja de enviar un MARKET sintetizado. Prueba MARKET OEM byte-por-byte 4CC6 y, si no registra, 2D7F; sólo selecciona el slot después de que WATCH_FACE_INFO confirme el BinID.",
+  "version": "1.24.0",
+  "sha256": "ada3a8c0e2e335ae820ca9485465407189acf23d13237b047bf1fcb204f707e0"
 }
