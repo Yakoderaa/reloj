@@ -1,0 +1,29 @@
+name: Research V1.28 Descriptor Positions
+on:
+  push:
+    branches: [research-v128-minpatch]
+    paths: ['.github/workflows/research-v128-desc.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch and parse 2D7F
+        shell: bash
+        run: |
+          curl -L --fail --retry 3 'http://watchhealth.com.cn/k6File/clock/file/2D7F.bin' -o /tmp/2D7F.bin
+          python - <<'PY'
+          b=open('/tmp/2D7F.bin','rb').read()
+          def u16(o): return int.from_bytes(b[o:o+2],'little')
+          off=0x10
+          for i in range(u16(10)):
+              kind=u16(off+8)
+              n=28 if kind==0x1202 else 18 if kind==0x0804 else 12
+              print(i,'off',hex(off),'kind',hex(kind),'x',u16(off+2),'y',u16(off+4),'p0',u16(off+6),
+                    'tail',b[off+10:off+n].hex())
+              off+=n
+          print('end',hex(off))
+          PY
