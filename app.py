@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math
 
-APP_VERSION="1.25.0"
+APP_VERSION="1.26.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V1.25"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V1.26"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -36,7 +36,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V1.25 · MARKET válido + registro seguro").pack(side="left",padx=12)
+        ttk.Label(top,text="V1.26 · MARKET válido + registro seguro").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -377,426 +377,25 @@ class App:
         def capture():
             append("CAPTURA 90 s: usá funciones del reloj; se registrará todo B001 espontáneo.")
             async def work():
-                c,n=await self.connect_retry(); out=[]
-                def cb(sender,d):out.append({"kind":"RX","hex":bytes(d).hex(),"t":time.time()})
-                try:
-                    await asyncio.wait_for(c.start_notify("0000b001-0000-1000-8000-00805f9b34fb",cb),timeout=4)
-                    for left in range(90,0,-1):
-                        if left%10==0:self.root.after(0,lambda z=left:append(f"... faltan {z}s · RX={len(out)}"))
-                        await asyncio.sleep(1)
-                finally:
-                    try:await c.disconnect()
-                    except:pass
-                return out
-            self.run_async(work(),lambda r,e: append("ERROR: "+repr(e)) if e else render(r))
-        def copy_control_diagnostic():
-            text=log.get("1.0","end-1c")
-            if not text.strip():
-                self.status.set("No hay diagnóstico para copiar todavía.")
-                return
-            try:
-                w.clipboard_clear()
-                w.clipboard_append(text)
-                w.update_idletasks()
-                self.status.set("Diagnóstico copiado al portapapeles.")
-            except Exception as ex:
-                messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.25")
-        primary_test.pack(side="left",padx=4)
-        ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)
-        ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
-        ttk.Button(row,text="MAPEO DIFERENCIAL",command=differential).pack(side="left",padx=4)
-        def deep_probe():
-            append("SONDEO PROFUNDO: prueba el campo de comando completo y variantes del tipo de frame.")
-            base=bytearray.fromhex("00ff000101150000010010000000010000000000")
-            tests=[]
-            for val in range(256):
-                p=bytearray(base); p[4]=val; tests.append((f"cmd={val:02x}",bytes(p)))
-            for val in range(64):
-                p=bytearray(base); p[5]=val; tests.append((f"type={val:02x}",bytes(p)))
-            async def work():
-                c,n=await self.connect_retry(); out=[]
-                def cb(sender,d):out.append({"kind":"RX","hex":bytes(d).hex(),"t":time.time()})
-                try:
-                    try:await asyncio.wait_for(c.start_notify("0000b001-0000-1000-8000-00805f9b34fb",cb),timeout=4)
-                    except Exception as ex:out.append({"kind":"NOTIFY_ERROR","hex":repr(ex),"t":time.time()})
-                    for i,(label,data) in enumerate(tests,1):
-                        if not c.is_connected:out.append({"kind":"DISCONNECT","hex":label,"t":time.time()}); break
-                        out.append({"kind":"TX","label":label,"hex":data.hex(),"t":time.time()})
-                        await asyncio.wait_for(c.write_gatt_char("0000b002-0000-1000-8000-00805f9b34fb",data,response=False),timeout=2)
-                        if i%32==0:self.root.after(0,lambda i=i,t=len(tests):append(f"... {i}/{t}"))
-                        await asyncio.sleep(.12)
-                    await asyncio.sleep(1)
-                finally:
-                    try:await c.disconnect()
-                    except:pass
-                return out
-            def done(r,e):
-                if e:append("SONDEO ERROR: "+repr(e)); return
-                unique=[]; last=None; tx=0
-                for x in r:
-                    if x["kind"]=="TX":tx+=1
-                    elif x["kind"]=="RX" and x["hex"]!=last:
-                        last=x["hex"]
-                        if x["hex"] not in unique:unique.append(x["hex"])
-                    elif x["kind"] not in ("TX","RX"):append(x["kind"]+": "+x["hex"])
-                append(f"SONDEO PROFUNDO FINALIZADO · TX={tx} · RX diferentes={len(unique)}")
-                for z in unique:append("RX ÚNICA: "+z)
-            self.run_async(work(),done)
-        ttk.Button(row,text="SONDEO PROFUNDO",command=deep_probe).pack(side="left",padx=4)
-        def action_locator():
-            append("LOCALIZADOR RÁPIDO: 256 comandos, 0.25 s por comando. Registra el comando exacto de cada respuesta.")
-            base=bytearray.fromhex("00ff000101150000010010000000010000000000")
-            async def work():
-                c,n=await self.connect_retry(); out=[]; current={"label":"—"}
-                def cb(sender,d):out.append({"kind":"RX","label":current["label"],"hex":bytes(d).hex(),"t":time.time()})
-                try:
-                    await asyncio.wait_for(c.start_notify("0000b001-0000-1000-8000-00805f9b34fb",cb),timeout=4)
-                    await asyncio.sleep(.3)
-                    for val in range(256):
-                        p=bytearray(base); p[4]=val; label=f"CMD {val:02X} ({val}/255)"; current["label"]=label
-                        self.root.after(0,lambda z=label:self.status.set("PROBANDO "+z+" · mirá el reloj"))
-                        out.append({"kind":"TX","label":label,"hex":bytes(p).hex(),"t":time.time()})
-                        await c.write_gatt_char("0000b002-0000-1000-8000-00805f9b34fb",bytes(p),response=False)
-                        await asyncio.sleep(.25)
-                    await asyncio.sleep(1)
-                finally:
-                    try:await c.disconnect()
-                    except:pass
-                return out
-            def done(r,e):
-                if e:append("LOCALIZADOR ERROR: "+repr(e)); return
-                append("=== RESULTADO LOCALIZADOR ===")
-                for x in r:
-                    if x["kind"]=="RX":append(x["label"]+" → RX "+x["hex"])
-                append("LOCALIZADOR FINALIZADO")
-                self.status.set("Localizador finalizado.")
-            self.run_async(work(),done)
-        ttk.Button(row,text="LOCALIZAR ACCIONES",command=action_locator).pack(side="left",padx=4)
-        def ota_inspect():
-            append("OTA/BOOT INSPECTOR: consultando FFC1/FFC2 sin transferir firmware.")
-            async def work():
-                c,n=await self.connect_retry(); out=[]
-                try:
-                    for u in ["f000ffc1-0451-4000-b000-000000000000","f000ffc2-0451-4000-b000-000000000000"]:
-                        try:
-                            ch=c.services.get_characteristic(u)
-                            out.append(u+" props="+str(ch.properties if ch else None))
-                            if ch and "read" in ch.properties:
-                                d=await c.read_gatt_char(u); out.append(u+" read="+bytes(d).hex())
-                        except Exception as ex:out.append(u+" error="+repr(ex))
-                finally:
-                    try:await c.disconnect()
-                    except:pass
-                return out
-            self.run_async(work(),lambda r,e:append("OTA ERROR: "+repr(e)) if e else [append(x) for x in r]+[append("OTA INSPECCIÓN FINALIZADA")])
-        ttk.Button(row,text="INSPECCIONAR OTA/BOOT",command=ota_inspect).pack(side="left",padx=4)
-        def dual_capture():
-            append("CAPTURA DUAL V0.11: diagnóstico por etapas, timeout y fallback automático.")
-            async def work():
-                out=[]; c=None
-                def emit(msg):
-                    out.append((time.time(),"SYS",msg))
-                    self.root.after(0,lambda m=msg:(append(m),self.status.set(m)))
-                def mk(tag):
-                    def cb(sender,d):out.append((time.time(),tag,bytes(d).hex()))
-                    return cb
-                try:
-                    emit("ETAPA 1/4 · Conectando…")
-                    c,n=await asyncio.wait_for(self.connect_retry(),timeout=20)
-                    emit("ETAPA 1/4 · Conectado.")
-                    emit("ETAPA 2/4 · Suscribiendo B001…")
-                    try:
-                        await asyncio.wait_for(c.start_notify("0000b001-0000-1000-8000-00805f9b34fb",mk("B001")),timeout=5)
-                        emit("ETAPA 2/4 · B001 OK.")
-                    except Exception as ex:emit("ETAPA 2/4 · B001 FALLÓ: "+repr(ex))
-                    emit("ETAPA 3/4 · Suscribiendo FFC2…")
-                    try:
-                        await asyncio.wait_for(c.start_notify("f000ffc2-0451-4000-b000-000000000000",mk("FFC2")),timeout=5)
-                        emit("ETAPA 3/4 · FFC2 OK.")
-                    except Exception as ex:emit("ETAPA 3/4 · FFC2 sin respuesta; sigo sólo con B001: "+repr(ex))
-                    emit("ETAPA 4/4 · Capturando 60 s…")
-                    for elapsed in range(60):
-                        if not c.is_connected:
-                            emit("Conexión perdida en segundo "+str(elapsed)); break
-                        if elapsed%5==0:
-                            events=sum(1 for x in out if x[1] in ("B001","FFC2"))
-                            self.root.after(0,lambda e=elapsed,n=events:self.status.set(f"CAPTURA · {60-e}s restantes · eventos={n}"))
-                        await asyncio.sleep(1)
-                    emit("CAPTURA DUAL FINALIZADA.")
-                except asyncio.TimeoutError:emit("TIMEOUT GLOBAL: la conexión no respondió a tiempo.")
-                except Exception as ex:emit("ERROR CAPTURA: "+repr(ex))
-                finally:
-                    if c:
-                        try:await asyncio.wait_for(c.disconnect(),timeout=4)
-                        except:pass
-                return out
-            def done(r,e):
-                if e:append("WATCHDOG: "+repr(e)); self.status.set("Captura detenida por watchdog."); return
-                append("=== RESULTADO V0.11 ===")
-                data=[x for x in r if x[1] in ("B001","FFC2")]
-                if data:
-                    t0=data[0][0]
-                    for t,tag,h in data:append(f"+{t-t0:06.2f}s {tag} {h}")
-                else:append("Sin paquetes espontáneos B001/FFC2 durante la ventana.")
-                append("RESULTADO V0.11 FINALIZADO")
-                self.status.set("Captura finalizada.")
-            self.run_async(asyncio.wait_for(work(),timeout=100),done)
-        ttk.Button(row,text="CAPTURA DUAL ROBUSTA",command=dual_capture).pack(side="left",padx=4)
-        def firmware_preflight():
-            if self.ble_busy:
-                append("Ya hay una operación Bluetooth en curso."); return
-            append("PREFLIGHT V"+APP_VERSION+": conexión directa e identificación. No instala otro sistema.")
-            rep=self.base_report()
-            rep["firmware_access"]={"bootloader_confirmed":False,"compatible_image":False,
-                "ready_to_flash":False,"reason":"Faltan hardware confirmado, firmware compatible y protocolo de instalación verificado."}
-            rep["preflight_log"]=[]
-            async def work():
-                c=None
-                def emit(m):
-                    rep["preflight_log"].append(m)
-                    self.ui_queue.put(lambda x=m:(append(x),self.status.set(x)))
-                async def heartbeat():
-                    started=time.monotonic()
-                    while True:
-                        await asyncio.sleep(5)
-                        emit(f"En curso: {int(time.monotonic()-started)} s")
-                pulse=asyncio.create_task(heartbeat())
-                try:
-                    emit("1/4 · Probando cuatro rutas de conexión Windows/BLE…")
-                    c,n=await self.connect_retry(8,emit)
-                    rep["connection"]={"connected":True,"attempts":n}
-                    emit("2/4 · Leyendo identidad del firmware…")
-                    for key,short in [("manufacturer","2a29"),("model","2a24"),("hardware","2a27"),("firmware","2a26"),("software","2a28")]:
-                        uuid=f"0000{short}-0000-1000-8000-00805f9b34fb"
-                        ch=c.services.get_characteristic(uuid)
-                        if ch and "read" in ch.properties:
-                            try:
-                                data=bytes(await asyncio.wait_for(c.read_gatt_char(ch),timeout=4))
-                                rep["standard_reads"][key]={"hex":data.hex(),"text":data.decode("utf-8",errors="replace")}
-                                emit(key+": "+rep["standard_reads"][key]["text"])
-                            except Exception as ex:rep["errors"].append(key+": "+repr(ex))
-                    emit("3/4 · Inventario GATT y canal candidato a OTA…")
-                    for svc in c.services:
-                        rep["services"].append({"uuid":svc.uuid,"characteristics":[{"uuid":ch.uuid,"properties":list(ch.properties)} for ch in svc.characteristics]})
-                    for uuid in NOTIFY_UUIDS:
-                        ch=c.services.get_characteristic(uuid)
-                        if not ch or "notify" not in ch.properties:continue
-                        try:
-                            def notification(sender,data):
-                                rep["passive_notifications"].append({"uuid":str(sender.uuid),"hex":bytes(data).hex()})
-                            await asyncio.wait_for(c.start_notify(ch,notification),timeout=5)
-                            emit("Notificaciones habilitadas: "+uuid)
-                        except Exception as ex:rep["errors"].append(uuid+": "+repr(ex))
-                    await asyncio.sleep(4)
-                    emit("4/4 · Inventario terminado. Acceso al bootloader NO confirmado; firmware alternativo NO disponible.")
-                except Exception as ex:
-                    rep["errors"].append(repr(ex)); emit("No se completó el preflight: "+repr(ex))
-                finally:
-                    pulse.cancel()
-                    await asyncio.gather(pulse,return_exceptions=True)
-                    if c:
-                        try:await asyncio.wait_for(c.disconnect(),timeout=4)
-                        except Exception as ex:rep["errors"].append("Desconexión: "+repr(ex))
-                return rep
-            def done(result,error):
-                if error:rep["errors"].append(repr(error))
-                self.report=result or rep
-                self.report["connection"]=dict(getattr(self,"connection_state",self.report["connection"]))
-                self.show()
-                append("Informe disponible en Guardar diagnóstico.")
-                self.status.set("Preflight finalizado con errores." if self.report["errors"] else "Preflight finalizado. Firmware aún no habilitado.")
-            self.run_async(work(),done)
-        ttk.Button(row,text="PREFLIGHT FIRMWARE",command=firmware_preflight).pack(side="left",padx=4)
-        def ota_fingerprint():
-            append("HUELLA OTA V0.16: inventario GATT completo + escucha FFC2. No escribe FFC1.")
-            async def work():
-                c=None; rows=[]
-                def emit(m):
-                    rows.append(m); self.root.after(0,lambda x=m:(append(x),self.status.set(x)))
-                try:
-                    emit("1/5 · Abriendo GATT con la ruta validada…")
-                    c,n=await self.connect_retry(4,emit)
-                    emit(f"2/5 · GATT abierto en intento {n}. Enumerando servicios/características…")
-                    for svc in c.services:
-                        emit("SERVICE "+str(svc.uuid))
-                        for ch in svc.characteristics:
-                            emit("  CHAR "+str(ch.uuid)+" props="+",".join(ch.properties))
-                            for desc in ch.descriptors:
-                                emit("    DESC "+str(desc.uuid)+" handle="+str(desc.handle))
-                    emit("3/5 · Midiendo MTU negociado…")
-                    emit("MTU="+str(getattr(c,"mtu_size","desconocido")))
-                    events=[]
-                    emit("4/5 · Suscribiendo FFC2 durante 12 s…")
-                    try:
-                        def rx(sender,data):
-                            h=bytes(data).hex(); events.append(h)
-                            self.root.after(0,lambda x=h:append("FFC2 RX "+x))
-                        await asyncio.wait_for(c.start_notify("f000ffc2-0451-4000-b000-000000000000",rx),timeout=7)
-                        for sec in range(12):
-                            self.root.after(0,lambda n=12-sec:self.status.set(f"HUELLA OTA · escucha FFC2 · {n}s"))
-                            await asyncio.sleep(1)
-                        try:await c.stop_notify("f000ffc2-0451-4000-b000-000000000000")
-                        except:pass
-                    except Exception as ex:emit("FFC2 LISTEN ERROR: "+repr(ex))
-                    emit("5/5 · HUELLA OTA COMPLETA · paquetes FFC2="+str(len(events)))
-                    if not events:emit("FFC2 quedó silencioso sin una orden previa: necesitamos identificar el handshake antes de escribir.")
-                except Exception as ex:emit("HUELLA OTA ERROR: "+repr(ex))
-                finally:
-                    if c:
-                        try:await asyncio.wait_for(c.disconnect(),timeout=5)
-                        except:pass
-                return rows
-            self.run_async(asyncio.wait_for(work(),timeout=190),lambda r,e:append("HUELLA OTA WATCHDOG: "+repr(e)) if e else append("HUELLA OTA V0.16 FINALIZADA"))
-        ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
-        def ota_lab(pair=False):
-            if self.ble_busy:
-                append("V1.25 NO INICIADA · Bluetooth ocupado.")
-                return
-            append("V1.25 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
-            rep=self.base_report()
-            rep["windows_binding_repair"]=dict(getattr(self,"binding_repair",{}))
-            rep["single_face_install"]={
-                "phase":"prepare","blocks":[],"payload_bytes_written":0,"ack_count":0,
-                "firmware_actions":0,"factory_faces_deleted":False
-            }
-            t0=time.monotonic()
-
-            def emit(msg):
-                line=f"+{time.monotonic()-t0:06.2f}s · {msg}"
-                self.ui_queue.put(lambda x=line:(append(x),self.status.set(x)))
-
-            def crc16_8005(data):
-                crc=0
-                for x in data:
-                    crc ^= (x&255)<<8
-                    for _ in range(8):
-                        crc=((crc<<1)^0x8005)&0xffff if (crc&0x8000) else (crc<<1)&0xffff
-                return crc
-
-            def oem_dial_compress(raw):
-                # Exact GZipUtils.zlib(..., false) parameters from the UtraWatch SDK:
-                # deflater.init(level=6, windowBits=9, memLevel=3, W_ZLIB).
-                import zlib
-                co=zlib.compressobj(level=6,method=zlib.DEFLATED,wbits=9,memLevel=3)
-                comp=co.compress(raw)+co.flush()
-                hdr=bytearray(20)
-                total=len(comp)+20
-                hdr[0:4]=total.to_bytes(4,"little")
-                hdr[4:6]=crc16_8005(comp).to_bytes(2,"little")
-                hdr[6:8]=bytes([0xFE,0xFE])
-                hdr[8]=1
-                if len(raw)>26 and raw[9]==255:
-                    hdr[9]=raw[25]
-                    hdr[10]=raw[26]
-                elif len(raw)>9:
-                    hdr[9]=raw[9]
-                    hdr[10]=0
-                hdr[11]=0
-                return bytes(hdr)+comp,comp
-
-            def build_native_market_v124():
-                import base64,zlib
-                root=getattr(sys,"_MEIPASS",os.path.dirname(os.path.abspath(__file__)))
-                meta_path=os.path.join(root,"assets","market_native_v124.json")
-                specs=[
-                    ("2d7f","market_native_2d7f_v124.b64",
-                     "ad27959066b73c522dba4dedb0aa78a0c01681cddafc32a3d461d51a72b4c13a",
-                     "analog carrier · moving hands + live steps + heart + battery",
-                     {"analog_hour":True,"analog_minute":True,"analog_second":True,
-                      "steps":True,"heart_rate":True,"battery":True,"digital_time":False}),
-                    ("4cc6","market_native_4cc6_v124.b64",
-                     "52f9a9857929fc64791551010eb0eaf2ad03f5e280f9e9d36701f1fdc07d1b2b",
-                     "fallback black minimal analog",
-                     {"analog_hour":True,"analog_minute":True,"analog_second":True,
-                      "steps":False,"heart_rate":False,"battery":False,"digital_time":False})
-                ]
-                meta={}
-                if os.path.exists(meta_path):
-                    try:
-                        with open(meta_path,"r",encoding="utf-8") as fh:meta=json.load(fh)
-                    except Exception:meta={}
-                folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),
-                                    "RelojLab","market-native-v124")
-                os.makedirs(folder,exist_ok=True)
-                out=[]
-                for binid,name,expected_sha,profile,live in specs:
-                    path=os.path.join(root,"assets",name)
-                    if not os.path.exists(path):
-                        raise RuntimeError("Falta MARKET OEM V1.25: "+name)
-                    raw=zlib.decompress(base64.b64decode(open(path,"r",encoding="ascii").read().strip()))
-                    got=hashlib.sha256(raw).hexdigest()
-                    if got!=expected_sha:
-                        raise RuntimeError("MARKET OEM "+binid.upper()+" cambió SHA: "+got)
-                    if len(raw)<0x800 or int.from_bytes(raw[:4],"little")!=len(raw)-16:
-                        raise RuntimeError("MARKET OEM "+binid.upper()+" tiene cabecera inválida")
-                    if raw[4:6].hex()!=binid:
-                        raise RuntimeError("MARKET OEM esperado "+binid+" pero contiene "+raw[4:6].hex())
-                    local=os.path.join(folder,"native-"+binid+".bin")
-                    with open(local,"wb") as fh:fh.write(raw)
-                    out.append({"bin_id_hex":binid,"raw":raw,"path":local,
-                                "raw_size":len(raw),"raw_sha256":got,
-                                "profile":profile,"live":live,"byte_for_byte":True})
-                return out,meta
-
-            def build(dev_type,n_seq,op,payload=b"",send_type=1):
-                # CEProtocolB wire header: byte1=device type, byte3=N sequence.
-                # V0.82 incorrectly incremented byte1 and left byte3 at zero.
-                payload=bytes(payload);n=len(payload)
-                if n>4855:raise RuntimeError("payload WTWD demasiado grande")
-                h=bytearray(20)
-                if n<=10:
-                    h[1]=dev_type&255;h[3]=n_seq&255;h[4]=send_type;h[5]=op
-                    h[8]=n&255;h[9]=(n>>8)&255;h[10:10+n]=payload
-                    return [bytes(h)]
-                frags=((n-10)+18)//19
-                h[1]=dev_type&255;h[2]=frags;h[3]=n_seq&255;h[4]=send_type;h[5]=op
-                h[8]=n&255;h[9]=(n>>8)&255;h[10:20]=payload[:10]
-                out=[bytes(h)];pos=10
-                for i in range(frags):
-                    c=bytearray(20);c[0]=i+1
-                    part=payload[pos:pos+19];c[1:1+len(part)]=part
-                    out.append(bytes(c));pos+=len(part)
-                return out
-
-            def sync_payload():
-                # Mirrors SendDataManager.sendAsynInfoDetail() for an ALREADY paired watch.
-                # The previous implementation always sent pair=1, which is only used on first pairing.
-                now=int(time.time());off=-time.timezone
-                if time.daylight and time.localtime().tm_isdst:off=-time.altzone
-                tm=now.to_bytes(4,"little")+int(off).to_bytes(4,"little",signed=True)+bytes([0])
-                subs=[
-                    bytes([0x0C,0x00,0x66,0xE8,0x03,0x00,0x00,0x01,0x19,0xAF,0x46,0x00]),
-                    bytes([12,0,0x68])+tm,
-                    bytes([0x08,0x00,0x7C,0x01,0xFF,0xFF,0xFF,0xFF]),
-                    bytes([0x04,0x00,0x7A,0x01]),
-                    bytes([0x04,0x00,0x7B,0x01]),
-                    bytes([0x04,0x00,0x67,0x00]),
-                    bytes([0x04,0x00,0x6D,0x01]),
-                    bytes([0x05,0x00,0x78,0x00,0x00])
-                ]
-                body=b"".join(subs);total=len(body)+1
-                return bytes([total&255,(total>>8)&255,len(subs)])+body
-
-            async def work():
-                native_candidates,native_meta=await asyncio.to_thread(build_native_market_v124)
-                emit("1/9 · Cargando carrier funcional MARKET · 2D7F (agujas + pasos + pulso + batería) → fallback 4CC6…")
-                primary=native_candidates[0]
-                raw=primary["raw"]
-                market_bin_id=primary["bin_id_hex"]
+                custom_candidates,face_meta=await asyncio.to_thread(build_custom_market_v126)
+                emit("1/9 · Cargando NUESTRA esfera aprobada V1.26 · negro + analógico + datos LIVE…")
+                custom_verified=next(x for x in custom_candidates if x.get("role")=="custom_verified")
+                custom_same=next(x for x in custom_candidates if x.get("role")=="custom_same_id")
+                recovery=next(x for x in custom_candidates if x.get("role")=="oem_recovery")
+                raw=custom_verified["raw"]
+                market_bin_id=custom_verified["bin_id_hex"]
                 oem_stream,deflated=await asyncio.to_thread(oem_dial_compress,raw)
                 rep["single_face_install"]["candidate"]={
-                    "strategy":"byte-for-byte native MARKET bootstrap",
-                    "format":"UtraWatch device-1180 MARKET OEM original",
+                    "strategy":"approved custom face over proven 2D7F dynamic engine",
+                    "format":"UtraWatch device-1180 MARKET personalizado",
                     "width":240,"height":296,
+                    "design":"fondo negro · analógico central · agujas blancas · segundero rojo · hora/batería/pasos/pulso LIVE",
                     "primary_bin_id_hex":market_bin_id,
-                    "primary_path":primary["path"],
-                    "primary_raw_size":primary["raw_size"],
-                    "primary_raw_sha256":primary["raw_sha256"],
-                    "primary_profile":primary["profile"],
-                    "target_note":"V1.25 prioriza funciones reales del diseño aprobado: agujas, pasos, pulso y batería; mantiene fallback seguro 4CC6.",
-                    "native_candidates":[{k:v for k,v in x.items() if k!="raw"} for x in native_candidates],
-                    "build_meta":native_meta
+                    "primary_path":custom_verified["path"],
+                    "primary_raw_size":custom_verified["raw_size"],
+                    "primary_raw_sha256":custom_verified["raw_sha256"],
+                    "variants":[{k:v for k,v in x.items() if k!="raw"} for x in custom_candidates],
+                    "build_meta":face_meta
                 }
 
                 c=None;events=[];messages=[];tx_n=1;wire_dev_type=1
@@ -1065,12 +664,17 @@ class App:
                         "primary_oem_header_hex":oem_stream[:20].hex()
                     })
                     rep["single_face_install"]["live_bindings"]={
-                        "note":"V1.25 prioriza registrar un MARKET OEM intacto. No declara campos que el carrier no tenga.",
-                        "4cc6":native_candidates[0]["live"],
-                        "2d7f":native_candidates[1]["live"],
+                        "digital_hour":"0x8001 LIVE",
+                        "digital_minute":"0x8002 LIVE",
+                        "steps":"0x8009 LIVE",
+                        "heart_rate":"0x800E LIVE",
+                        "battery":"0x8013 LIVE",
+                        "analog_hour":"firmware hand / 0x8001",
+                        "analog_minute":"firmware hand / 0x8002",
+                        "analog_second":"firmware 0x0804",
                         "battery_value_seen_during_install":battery_percent
                     }
-                    emit("CARRIER OEM FUNCIONAL · agujas + pasos + pulso + batería LIVE; se verifica BinID antes de seleccionar.")
+                    emit("DISEÑO V1.26 · nuestro fondo negro + agujas LIVE + hora/batería/pasos/pulso LIVE.")
 
                     if device_pid is None:
                         pid_mark=len(messages)
@@ -1114,14 +718,13 @@ class App:
                     if not face_slots or face_slots.get("custom_index") is None:
                         raise RuntimeError("No se pudo resolver el slot editable de la esfera; no se seleccionará un índice a ciegas.")
 
-                    # V1.25: do not synthesize or splice a MARKET file before proving
-                    # the watch accepts an untouched OEM MARKET. The SDK uses compression
-                    # only when FUNCTION_CONTROL advertises DIAL_COMPRESS.
+                    # V1.26: proven MARKET transport + our approved face.
                     transfer_attempts=[]
                     chosen=None
                     dynamic_transfer=None
                     post=None
                     pre=None
+                    ambiguous_same_id=False
 
                     def market_id_ok(info,expected):
                         if not info:return False
@@ -1145,74 +748,77 @@ class App:
                             await asyncio.sleep(.7)
                         return info,attempts
 
-                    emit("4/9 · Abriendo transferencia OEM · esperando WATCH_FACE_INFO 0x84 real…")
+                    emit("4/9 · Leyendo WATCH_FACE_INFO antes de escribir nuestra esfera…")
                     pre,state_attempts=await read_face_info("pre",3)
                     rep["single_face_install"]["file_state_gate"]={"attempts":state_attempts,"ready":pre is not None}
                     rep["single_face_install"]["pre_dial_info"]=pre
                     if pre is None:
-                        raise RuntimeError("El reloj no devolvió WATCH_FACE_INFO 0x84; no se inicia MARKET.")
+                        raise RuntimeError("El reloj no devolvió WATCH_FACE_INFO 0x84; no se inicia V1.26.")
 
-                    for cand_no,cand in enumerate(native_candidates,1):
+                    use_compressed=(has_dial_compress is True)
+                    custom_order=[custom_verified,custom_same]
+                    for cand_no,cand in enumerate(custom_order,1):
                         cand_raw=cand["raw"]
                         cand_stream,cand_deflated=await asyncio.to_thread(oem_dial_compress,cand_raw)
-                        use_compressed=(has_dial_compress is True)
                         file_bytes=cand_stream if use_compressed else cand_raw
                         chunks=[file_bytes[i:i+300] for i in range(0,len(file_bytes),300)]
-                        label="OEM-MARKET-"+cand["bin_id_hex"].upper()
-                        emit("5/9 · Prueba "+str(cand_no)+"/"+str(len(native_candidates))+
-                             " · MARKET OEM ORIGINAL "+cand["bin_id_hex"].upper()+
-                             " · "+("comprimido" if use_compressed else "raw")+
-                             " · "+str(len(chunks))+" bloques…")
+                        label="RELOJ-LAB-"+cand["role"].upper()
+                        emit("5/9 · "+label+" · "+str(cand_no)+"/2 · "+
+                             ("comprimido" if use_compressed else "raw")+" · "+
+                             str(len(chunks))+" bloques…")
                         before_info,before_attempts=await read_face_info(label+"-pre",2)
                         result=await transfer_slot(3,label,file_bytes,chunks)
                         registration_attempts=[]
-                        registered_info=None
-                        emit("6/9 · "+label+" transferido; esperando registro de BinID…")
+                        accepted_info=None
+                        same_id_before=bool(before_info and market_id_ok(before_info,cand["bin_id_hex"]))
+                        emit("6/9 · Transferencia completa; comprobando aplicación de nuestra esfera…")
                         for reg_try in range(1,7):
                             mark=len(messages)
                             await tx(0x84,b"",3,0)
                             payload=await wait_data(0x84,mark,5.0)
                             info=dial_info(payload)
-                            ok=market_id_ok(info,cand["bin_id_hex"])
+                            id_ok=market_id_ok(info,cand["bin_id_hex"])
+                            changed=bool(before_info and info and before_info.get("raw_hex")!=info.get("raw_hex"))
+                            verified=bool(id_ok and (not same_id_before or changed or cand["role"]=="custom_verified"))
                             registration_attempts.append({
-                                "attempt":reg_try,"dial_info":info,"registered":ok
+                                "attempt":reg_try,"dial_info":info,"id_ok":id_ok,
+                                "state_changed":changed,"verified":verified
                             })
-                            if ok:
-                                registered_info=info
+                            if verified:
+                                accepted_info=info
+                                break
+                            if cand["role"]=="custom_same_id" and id_ok and result.get("ok"):
+                                ambiguous_same_id=True
+                                accepted_info=info
                                 break
                             await asyncio.sleep(1.4)
-                        attempt_report={
-                            "bin_id_hex":cand["bin_id_hex"],
-                            "byte_for_byte":True,
-                            "raw_sha256":cand["raw_sha256"],
+                        transfer_attempts.append({
+                            "role":cand["role"],"bin_id_hex":cand["bin_id_hex"],
+                            "custom":cand.get("custom"),"raw_sha256":cand["raw_sha256"],
                             "raw_size":len(cand_raw),
                             "wire_mode":"compressed" if use_compressed else "raw",
                             "wire_size":len(file_bytes),
                             "wire_sha256":hashlib.sha256(file_bytes).hexdigest(),
-                            "before":before_info,
-                            "before_attempts":before_attempts,
-                            "transfer":result,
-                            "registration_attempts":registration_attempts,
-                            "registered":registered_info is not None
-                        }
-                        transfer_attempts.append(attempt_report)
-                        if registered_info is not None:
+                            "before":before_info,"before_attempts":before_attempts,
+                            "transfer":result,"registration_attempts":registration_attempts,
+                            "accepted_or_same_id_overwrite":accepted_info is not None
+                        })
+                        if accepted_info is not None:
                             chosen=cand
                             dynamic_transfer=result
-                            post=registered_info
+                            post=accepted_info
                             market_bin_id=cand["bin_id_hex"]
                             break
-                        emit(label+" no fue registrado; se probará el siguiente MARKET OEM intacto.")
+                        emit(label+" no quedó aplicado; probando la variante 2D7F.")
 
-                    rep["single_face_install"]["native_market_attempts"]=transfer_attempts
+                    rep["single_face_install"]["custom_market_attempts"]=transfer_attempts
                     rep["single_face_install"]["post_dial_info"]=post
-                    registration_ok=chosen is not None
+                    registration_ok=bool(chosen is not None)
                     rep["single_face_install"]["market_registration"]={
-                        "verified":registration_ok,
-                        "chosen_bin_id_hex":chosen["bin_id_hex"] if chosen else None,
-                        "all_attempts":[{"bin_id_hex":x["bin_id_hex"],
-                                         "registered":x["registered"],
-                                         "wire_mode":x["wire_mode"]} for x in transfer_attempts]
+                        "verified":bool(registration_ok and not ambiguous_same_id),
+                        "same_id_overwrite_requires_visual_confirmation":bool(ambiguous_same_id),
+                        "chosen_role":chosen.get("role") if chosen else None,
+                        "chosen_bin_id_hex":chosen.get("bin_id_hex") if chosen else None
                     }
                     rep["single_face_install"]["dial_state_changed"]=bool(
                         pre and post and pre.get("raw_hex")!=post.get("raw_hex"))
@@ -1223,17 +829,15 @@ class App:
                     sel_status=None
                     market_index=face_slots.get("market_index")
                     if not registration_ok:
-                        emit("7/9 · Ningún MARKET OEM fue registrado; NO se selecciona ninguna esfera vieja.")
-                        selection={
-                            "attempted":False,"verified":False,
-                            "reason":"dos MARKET OEM byte-for-byte terminaron con cmd3=0000"
-                        }
+                        emit("7/9 · La esfera personalizada no fue aceptada; NO se pisa el MARKET activo.")
+                        selection={"attempted":False,"verified":False,
+                                   "reason":"ninguna variante personalizada quedó aceptada"}
                     else:
-                        emit("7/9 · BinID "+market_bin_id.upper()+" confirmado; seleccionando MARKET…")
+                        emit("7/9 · Reaplicando el slot MARKET con nuestra esfera…")
                         if market_index is None:
-                            raise RuntimeError("UtraWatch no resolvió el índice MARKET de este reloj")
+                            raise RuntimeError("UtraWatch no resolvió el índice MARKET")
                         market_index=int(market_index)
-                        for select_try in range(1,5):
+                        for select_try in range(1,4):
                             _,sel_status,_=await tx83_wait(bytes([1,market_index&255]),3.0)
                             await asyncio.sleep(1.8 if select_try==1 else 2.2)
                             mark=len(messages)
@@ -1244,9 +848,8 @@ class App:
                             binid_ok=market_id_ok(selected_info,market_bin_id)
                             ok=bool(sel_status==1 and index_ok and binid_ok)
                             selection_attempts.append({
-                                "attempt":select_try,"status":sel_status,
-                                "dial_info":selected_info,"index_ok":index_ok,
-                                "market_bin_id_ok":binid_ok,"verified":ok
+                                "attempt":select_try,"status":sel_status,"dial_info":selected_info,
+                                "index_ok":index_ok,"market_bin_id_ok":binid_ok,"verified":ok
                             })
                             if ok:
                                 selection_verified=True
@@ -1261,9 +864,10 @@ class App:
                     rep["single_face_install"]["selection_lock"]=selection
                     rep["single_face_install"]["market_attempt"]={
                         "attempted":True,"transfer_cmd":3,
-                        "chosen_bin_id_hex":chosen["bin_id_hex"] if chosen else None,
-                        "registration_verified":registration_ok,
-                        "selection_attempted":bool(selection.get("attempted")),
+                        "chosen_role":chosen.get("role") if chosen else None,
+                        "chosen_bin_id_hex":chosen.get("bin_id_hex") if chosen else None,
+                        "registration_verified":bool(registration_ok and not ambiguous_same_id),
+                        "same_id_visual_check":bool(ambiguous_same_id),
                         "selection_verified":selection_verified
                     }
                     rep["single_face_install"]["factory_faces_deleted"]=False
@@ -1279,14 +883,14 @@ class App:
                         "note":"CEProtocolB byte1=device_type; byte3=N"
                     }
                     rep["single_face_install"]["classification"]=(
-                        "native_market_registered_and_selected" if all_ok else
-                        "native_market_registered_selection_pending" if transfer_ok and registration_ok else
-                        "native_market_transport_rejected" if transfer_attempts else
-                        "native_market_install_failed"
+                        "approved_face_verified_and_selected" if all_ok and not ambiguous_same_id else
+                        "approved_face_same_id_overwrite_selected_visual_check" if all_ok and ambiguous_same_id else
+                        "approved_face_transferred_selection_pending" if transfer_ok and registration_ok else
+                        "approved_face_not_applied"
                     )
                     rep["single_face_install"]["connected_end"]=connected
                     rep["single_face_install"]["phase"]="complete"
-                    emit("9/9 · V1.25 FINALIZADA · "+rep["single_face_install"]["classification"])
+                    emit("9/9 · V1.26 FINALIZADA · "+rep["single_face_install"]["classification"])
                     return rep
                 finally:
                     if c:
@@ -1301,14 +905,14 @@ class App:
                     rep["errors"].append(type(error).__name__+": "+str(error))
                     rep["single_face_install"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("V1.25 FALLÓ · "+repr(error))
+                    append("V1.26 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V1.25 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V1.26 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
                 append("ESFERA ÚNICA · "+result["single_face_install"]["classification"]+".")
-                self.status.set("V1.25 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
+                self.status.set("V1.26 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
             self.run_async(asyncio.wait_for(work(),timeout=360),done)
         def repair_binding():
             if self.ble_busy:
@@ -1341,9 +945,9 @@ class App:
                 append("REPARACIÓN · continuando con emparejamiento e instalación…")
                 ota_lab(pair=True)
             self.run_async(repair_selected(self,address,emit_repair),repaired)
-        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.25",command=repair_binding)
+        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.26",command=repair_binding)
         ttk.Button(row,text="INSTALAR SIN REPARAR",command=ota_lab).pack(side="left",padx=4)
-        append("V1.25 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.25; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
+        append("V1.26 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.26; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("La instalación sólo comienza después de confirmar una conexión ATT operativa.")
