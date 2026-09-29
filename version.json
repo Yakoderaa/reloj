@@ -1,6 +1,6 @@
 {
-  "version": "1.26.0",
-  "notes": "V1.26: usa el MARKET 2D7F ya validado como motor, pero reemplaza el fondo naranja por la esfera Reloj Lab aprobada: negro, analógico central, agujas blancas, segundero rojo y hora/batería/pasos/pulso LIVE en sus posiciones finales. Prueba identidad verificable 4CC6 y luego overwrite 2D7F si el firmware exige el mismo ID.",
-  "sha256": "d08600b324274731840a6b4f4006423833a990c2f2ec0e50c8a0065fccff861c",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.26.0/RelojLab.exe"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.27.0/RelojLab.exe",
+  "notes": "V1.27: corrige CONTROL ACTIVO, que en V1.26 quedó sin botones por una sustitución accidental de capture(). Mantiene la esfera personalizada negra sobre el motor 2D7F validado y conserva todos los controles de diagnóstico e instalación.",
+  "version": "1.27.0",
+  "sha256": "a7c335b7d7f1398bd4cd17d2ddceb07a2b1686703b0d65220c23699df1a3ee8e"
 }
