@@ -1,6 +1,6 @@
 {
-  "version": "1.19.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.19.0/RelojLab.exe",
-  "notes": "V1.19: conexión BLE fijada a la dirección seleccionada sin exigir un nuevo anuncio; reparación de vínculo best-effort y dos intentos GATT sobre el mismo reloj.",
-  "sha256": "524c044cd541c5668860bd73348fe472803735fd71a3931c35da561f41a275fb"
+  "version": "1.20.0",
+  "notes": "V1.20: esfera dinámica real basada en el motor MARKET del reloj y cargada en el slot CUSTOMIZE verificado. Hora/minuto/segundo analógicos, hora digital, pasos, pulso y batería usan campos vivos del firmware.",
+  "sha256": "0c57b44ef6f99f6d3b6212628ef7be6072a0de2e404d39f72305aba6b4a25d0d",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.20.0/RelojLab.exe"
 }
