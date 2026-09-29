@@ -1,6 +1,6 @@
 {
-  "sha256": "132d95457e2d3d6c1d0f6d44a52d7dda340854ead23bad460511b159b7293aa7",
-  "notes": "V1.22: corrige el fallo de inicialización de V1.21 y conserva la instalación MARKET real por cmd=3 con verificación de BinID 4CC6 antes de seleccionar la esfera.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.22.0/RelojLab.exe",
-  "version": "1.22.0"
+  "notes": "V1.23: corrige la tabla binaria MARKET: elimina el hueco de 2 bytes entre descriptores, valida continuidad completa y bloquea la selección hasta que el reloj confirme BinID 4CC6.",
+  "sha256": "b742da99ddc3a2a50930557ac487b16afd34c13643c55d2b8a08a155ddd52136",
+  "version": "1.23.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.23.0/RelojLab.exe"
 }
