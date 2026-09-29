@@ -1,6 +1,6 @@
 {
-  "version": "1.20.0",
-  "notes": "V1.20: esfera dinámica real basada en el motor MARKET del reloj y cargada en el slot CUSTOMIZE verificado. Hora/minuto/segundo analógicos, hora digital, pasos, pulso y batería usan campos vivos del firmware.",
-  "sha256": "0c57b44ef6f99f6d3b6212628ef7be6072a0de2e404d39f72305aba6b4a25d0d",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.20.0/RelojLab.exe"
+  "version": "1.21.0",
+  "notes": "V1.21: instala la esfera como MARKET real por cmd=3, verifica que el firmware registre su BinID 4CC6 y luego selecciona el índice MARKET. Base visual negra minimalista con agujas blancas, segundero rojo y campos vivos de hora, batería, pasos y pulso.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.21.0/RelojLab.exe",
+  "sha256": "81c3fee6a617455a19b347f431a0007d48f83d1853abfe613d572c8e36a2b26f"
 }
