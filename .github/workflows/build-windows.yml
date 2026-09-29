@@ -14,50 +14,49 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify V1.23
-        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.23.0',v"
+      - name: Verify V1.24
+        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.24.0',v"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0
-      - name: Fetch verified MARKET donors
+      - name: Fetch byte-exact native MARKET donors
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force assets | Out-Null
           Invoke-WebRequest 'http://watchhealth.com.cn/k6File/clock/file/4CC6.bin' -OutFile assets/donor_4CC6.bin
-          Invoke-WebRequest 'http://watchhealth.com.cn/k6File/clock/file/04C2.bin' -OutFile assets/donor_04C2.bin
           Invoke-WebRequest 'http://watchhealth.com.cn/k6File/clock/file/2D7F.bin' -OutFile assets/donor_2D7F.bin
-      - name: Build and validate V1.23 MARKET face
-        run: python prepare_v123_dynamic.py
+      - name: Prepare and validate native MARKET carriers
+        run: python prepare_v124_native.py
       - run: python -m unittest discover -s tests
-      - run: python -m py_compile app.py connection.py windows_binding.py prepare_v123_dynamic.py
-      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/target_face_v123.b64;assets" --add-data "assets/target_face_v123.json;assets" app.py
+      - run: python -m py_compile app.py connection.py windows_binding.py prepare_v124_native.py
+      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/market_native_4cc6_v124.b64;assets" --add-data "assets/market_native_2d7f_v124.b64;assets" --add-data "assets/market_native_v124.json;assets" app.py
       - name: Calculate EXE SHA256 and updater manifest
         shell: pwsh
         run: |
           $sha=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           $manifest=@{
-            version='1.23.0'
-            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.23.0/RelojLab.exe'
+            version='1.24.0'
+            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.24.0/RelojLab.exe'
             sha256=$sha
-            notes='V1.23: corrige la tabla binaria MARKET: elimina el hueco de 2 bytes entre descriptores, valida continuidad completa y bloquea la selección hasta que el reloj confirme BinID 4CC6.'
+            notes='V1.24: deja de enviar un MARKET sintetizado. Prueba MARKET OEM byte-por-byte 4CC6 y, si no registra, 2D7F; sólo selecciona el slot después de que WATCH_FACE_INFO confirme el BinID.'
           } | ConvertTo-Json
           Set-Content -Path version.json -Value $manifest -Encoding UTF8
-      - name: Publish V1.23 release asset
+      - name: Publish V1.24 release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.23.0 *> $null
-          if ($LASTEXITCODE -ne 0) { gh release create v1.23.0 dist/RelojLab.exe --title 'Reloj Lab V1.23' --notes 'V1.23 corrige el MARKET rechazado de V1.22: tabla de descriptores contigua sin padding, registro BinID obligatorio y ninguna selección de una esfera vieja si el registro falla.' }
-          else { gh release upload v1.23.0 dist/RelojLab.exe --clobber }
+          gh release view v1.24.0 *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create v1.24.0 dist/RelojLab.exe --title 'Reloj Lab V1.24' --notes 'V1.24 aísla el registro MARKET con archivos OEM intactos: primero 4CC6, luego 2D7F como fallback. No activa ningún slot viejo si cmd3 sigue en 0000.' }
+          else { gh release upload v1.24.0 dist/RelojLab.exe --clobber }
       - name: Publish updater manifest
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git commit -m 'Updater: publish V1.23' || echo 'manifest unchanged'
+          git commit -m 'Updater: publish V1.24' || echo 'manifest unchanged'
           git push
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.23
+          name: RelojLab-Windows-V1.24
           path: dist/RelojLab.exe
           if-no-files-found: error

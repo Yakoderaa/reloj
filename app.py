@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math
 
-APP_VERSION="1.23.0"
+APP_VERSION="1.24.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V1.23"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V1.24"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -36,7 +36,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V1.23 · MARKET válido + registro seguro").pack(side="left",padx=12)
+        ttk.Label(top,text="V1.24 · MARKET válido + registro seguro").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -401,7 +401,7 @@ class App:
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.23")
+        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.24")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)
         ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
@@ -651,9 +651,9 @@ class App:
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab(pair=False):
             if self.ble_busy:
-                append("V1.23 NO INICIADA · Bluetooth ocupado.")
+                append("V1.24 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V1.23 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
+            append("V1.24 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
             rep=self.base_report()
             rep["windows_binding_repair"]=dict(getattr(self,"binding_repair",{}))
             rep["single_face_install"]={
@@ -695,42 +695,49 @@ class App:
                 hdr[11]=0
                 return bytes(hdr)+comp,comp
 
-            def build_dynamic_reference_v123():
+            def build_native_market_v124():
                 import base64,zlib
                 root=getattr(sys,"_MEIPASS",os.path.dirname(os.path.abspath(__file__)))
-                b64_path=os.path.join(root,"assets","target_face_v123.b64")
-                meta_path=os.path.join(root,"assets","target_face_v123.json")
-                if not os.path.exists(b64_path):
-                    raise RuntimeError("Falta la esfera MARKET V1.23 en el paquete")
-                packed=open(b64_path,"r",encoding="ascii").read().strip()
-                raw=zlib.decompress(base64.b64decode(packed))
-                if len(raw)<0x800 or int.from_bytes(raw[:4],"little")!=len(raw)-16:
-                    raise RuntimeError("Esfera MARKET V1.23 inválida")
-                bin_id_hex=raw[4:6].hex()
-                if bin_id_hex!="4cc6":
-                    raise RuntimeError("BinID MARKET V1.23 inesperado: "+bin_id_hex)
-                def u16(off): return int.from_bytes(raw[off:off+2],"little")
-                def find_field(field):
-                    for off in range(0x10,0x800-28):
-                        if u16(off)==0x0164 and u16(off+8)==0x1202 and u16(off+10)==field:
-                            return off
-                    return None
-                fields={name:find_field(field) for field,name in (
-                    (0x8001,"hour"),(0x8002,"minute"),(0x8009,"steps"),
-                    (0x800E,"heart_rate"),(0x8013,"battery"))}
-                if any(v is None for v in fields.values()):
-                    raise RuntimeError("MARKET V1.23 no contiene todos los campos vivos requeridos: "+repr(fields))
+                meta_path=os.path.join(root,"assets","market_native_v124.json")
+                specs=[
+                    ("4cc6","market_native_4cc6_v124.b64",
+                     "52f9a9857929fc64791551010eb0eaf2ad03f5e280f9e9d36701f1fdc07d1b2b",
+                     "black minimal analog · white hour/minute · red second",
+                     {"analog_hour":True,"analog_minute":True,"analog_second":True,
+                      "steps":False,"heart_rate":False,"battery":False,"digital_time":False}),
+                    ("2d7f","market_native_2d7f_v124.b64",
+                     "ad27959066b73c522dba4dedb0aa78a0c01681cddafc32a3d461d51a72b4c13a",
+                     "native analog carrier · steps + heart + battery",
+                     {"analog_hour":True,"analog_minute":True,"analog_second":True,
+                      "steps":True,"heart_rate":True,"battery":True,"digital_time":False})
+                ]
                 meta={}
                 if os.path.exists(meta_path):
                     try:
-                        with open(meta_path,"r",encoding="utf-8") as fh: meta=json.load(fh)
-                    except Exception: meta={}
+                        with open(meta_path,"r",encoding="utf-8") as fh:meta=json.load(fh)
+                    except Exception:meta={}
                 folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),
-                                    "RelojLab","wf-analysis-v123")
+                                    "RelojLab","market-native-v124")
                 os.makedirs(folder,exist_ok=True)
-                path=os.path.join(folder,"approved-market-v123.bin")
-                with open(path,"wb") as fh:fh.write(raw)
-                return path,raw,240,296,fields,bin_id_hex,meta
+                out=[]
+                for binid,name,expected_sha,profile,live in specs:
+                    path=os.path.join(root,"assets",name)
+                    if not os.path.exists(path):
+                        raise RuntimeError("Falta MARKET OEM V1.24: "+name)
+                    raw=zlib.decompress(base64.b64decode(open(path,"r",encoding="ascii").read().strip()))
+                    got=hashlib.sha256(raw).hexdigest()
+                    if got!=expected_sha:
+                        raise RuntimeError("MARKET OEM "+binid.upper()+" cambió SHA: "+got)
+                    if len(raw)<0x800 or int.from_bytes(raw[:4],"little")!=len(raw)-16:
+                        raise RuntimeError("MARKET OEM "+binid.upper()+" tiene cabecera inválida")
+                    if raw[4:6].hex()!=binid:
+                        raise RuntimeError("MARKET OEM esperado "+binid+" pero contiene "+raw[4:6].hex())
+                    local=os.path.join(folder,"native-"+binid+".bin")
+                    with open(local,"wb") as fh:fh.write(raw)
+                    out.append({"bin_id_hex":binid,"raw":raw,"path":local,
+                                "raw_size":len(raw),"raw_sha256":got,
+                                "profile":profile,"live":live,"byte_for_byte":True})
+                return out,meta
 
             def build(dev_type,n_seq,op,payload=b"",send_type=1):
                 # CEProtocolB wire header: byte1=device type, byte3=N sequence.
@@ -772,31 +779,23 @@ class App:
                 return bytes([total&255,(total>>8)&255,len(subs)])+body
 
             async def work():
-                path,raw,target_w,target_h,market_fields,market_bin_id,wf_meta=await asyncio.to_thread(build_dynamic_reference_v123)
-                emit("1/9 · Cargando esfera aprobada como MARKET REAL 240×296 · BinID "+market_bin_id.upper()+"…")
-                expected_cmd2=None
+                native_candidates,native_meta=await asyncio.to_thread(build_native_market_v124)
+                emit("1/9 · Cargando dos MARKET OEM ORIGINALES sin modificar · 4CC6 → fallback 2D7F…")
+                primary=native_candidates[0]
+                raw=primary["raw"]
+                market_bin_id=primary["bin_id_hex"]
                 oem_stream,deflated=await asyncio.to_thread(oem_dial_compress,raw)
                 rep["single_face_install"]["candidate"]={
-                    "path":path,
-                    "format":"UtraWatch device-1180 MARKET dinámico · referencia aprobada",
-                    "visual_mode":"firmware-rendered MARKET dynamic face",
-                    "target_source":"real 4CC6 MARKET minimal analog engine + approved field layout",
-                    "width":target_w,"height":target_h,
-                    "market_live_field_offsets":market_fields,
-                    "dynamic_fields":{
-                        "analog_hour":"firmware dynamic · real MARKET 4CC6",
-                        "analog_minute":"firmware dynamic · real MARKET 4CC6",
-                        "analog_second":"firmware dynamic · real MARKET 4CC6",
-                        "time":"firmware live · fields 0x8001/0x8002",
-                        "steps":"firmware live · field 0x8009",
-                        "heart_rate":"firmware live · field 0x800E",
-                        "battery":"firmware live · field 0x8013"
-                    },
-                    "static_analog_note":None,
-                    "raw_size":len(raw),
-                    "raw_sha256":hashlib.sha256(raw).hexdigest(),
-                    "market_bin_id_hex":market_bin_id,
-                    "build_meta":wf_meta
+                    "strategy":"byte-for-byte native MARKET bootstrap",
+                    "format":"UtraWatch device-1180 MARKET OEM original",
+                    "width":240,"height":296,
+                    "primary_bin_id_hex":market_bin_id,
+                    "primary_path":primary["path"],
+                    "primary_raw_size":primary["raw_size"],
+                    "primary_raw_sha256":primary["raw_sha256"],
+                    "primary_profile":primary["profile"],
+                    "native_candidates":[{k:v for k,v in x.items() if k!="raw"} for x in native_candidates],
+                    "build_meta":native_meta
                 }
 
                 c=None;events=[];messages=[];tx_n=1;wire_dev_type=1
@@ -1058,24 +1057,19 @@ class App:
                         battery_percent=None
                     rep["single_face_install"]["candidate"].update({
                         "battery_percent_seen_during_install":battery_percent,
-                        "raw_header_hex":raw[:16].hex(),
-                        "oem_stream_size":len(oem_stream),
-                        "deflate_size":len(deflated),
-                        "oem_stream_sha256":hashlib.sha256(oem_stream).hexdigest(),
-                        "oem_crc16":f"0x{crc16_8005(deflated):04X}",
-                        "oem_header_hex":oem_stream[:20].hex()
+                        "primary_raw_header_hex":raw[:16].hex(),
+                        "primary_oem_stream_size":len(oem_stream),
+                        "primary_oem_stream_sha256":hashlib.sha256(oem_stream).hexdigest(),
+                        "primary_oem_crc16":f"0x{crc16_8005(deflated):04X}",
+                        "primary_oem_header_hex":oem_stream[:20].hex()
                     })
                     rep["single_face_install"]["live_bindings"]={
-                        "analog_hour":{"source":"real MARKET 4CC6 analog engine","continuous_live":True},
-                        "analog_minute":{"source":"real MARKET 4CC6 analog engine","continuous_live":True},
-                        "analog_second":{"source":"real MARKET 2D7F analog engine","continuous_live":True},
-                        "time":{"source":"MARKET fields 0x8001/0x8002","continuous_live":True},
-                        "steps":{"source":"MARKET field 0x8009","continuous_live":True},
-                        "heart_rate":{"source":"MARKET field 0x800E","continuous_live":True},
-                        "battery":{"source":"MARKET field 0x8013","continuous_live":True,
-                                   "value_seen_during_install":battery_percent}
+                        "note":"V1.24 prioriza registrar un MARKET OEM intacto. No declara campos que el carrier no tenga.",
+                        "4cc6":native_candidates[0]["live"],
+                        "2d7f":native_candidates[1]["live"],
+                        "battery_value_seen_during_install":battery_percent
                     }
-                    emit("DATOS · agujas LIVE · hora LIVE · pasos LIVE · pulso LIVE · batería LIVE")
+                    emit("CARRIER OEM · sin injertos binarios; se verificará BinID antes de seleccionar.")
 
                     if device_pid is None:
                         pid_mark=len(messages)
@@ -1119,128 +1113,164 @@ class App:
                     if not face_slots or face_slots.get("custom_index") is None:
                         raise RuntimeError("No se pudo resolver el slot editable de la esfera; no se seleccionará un índice a ciegas.")
 
-                    # Compression is optional in the OEM SDK. Unknown capability must
-                    # fall back to the raw WF, never to compressed data.
-                    file_bytes=oem_stream if has_dial_compress is True else raw
-                    rep["single_face_install"]["transfer_compressed"]=has_dial_compress is True
-                    rep["single_face_install"]["transfer_size"]=len(file_bytes)
+                    # V1.24: do not synthesize or splice a MARKET file before proving
+                    # the watch accepts an untouched OEM MARKET. The SDK uses compression
+                    # only when FUNCTION_CONTROL advertises DIAL_COMPRESS.
+                    transfer_attempts=[]
+                    chosen=None
+                    dynamic_transfer=None
+                    post=None
+                    pre=None
 
-                    emit("4/9 · Abriendo transferencia OEM · esperando WATCH_FACE_INFO 0x84 real…")
-                    pre=None;state_attempts=[]
-                    for attempt in range(1,4):
-                        before_mark=len(messages)
-                        await tx(0x84,b"",3,0)
-                        pre_payload=await wait_data(0x84,before_mark,5.0)
-                        info=dial_info(pre_payload)
-                        state_attempts.append({"attempt":attempt,"received":info is not None,
-                                               "raw_hex":pre_payload.hex() if pre_payload else None})
-                        if info is not None:
-                            pre=info;break
-                        await asyncio.sleep(.7)
-                    rep["single_face_install"]["file_state_gate"]={"attempts":state_attempts,"ready":pre is not None}
-                    rep["single_face_install"]["pre_dial_info"]=pre
-                    if pre is None:
-                        raise RuntimeError("El reloj ACKeó comandos pero no devolvió WATCH_FACE_INFO 0x84; transferencia NO iniciada para evitar falsos positivos.")
-
-                    chunks=[file_bytes[i:i+300] for i in range(0,len(file_bytes),300)]
-                    emit("5/9 · Instalando la esfera NUEVA en MARKET cmd=3 · "+str(len(chunks))+" bloques…")
-                    dynamic_transfer=await transfer_slot(3,"DYNAMIC-MARKET",file_bytes,chunks)
-                    rep["single_face_install"]["dynamic_market_transfer"]=dynamic_transfer
-
-                    def market_id_ok(info):
+                    def market_id_ok(info,expected):
                         if not info:return False
                         raw_hex=(info.get("cmd3_raw") or "").lower()
-                        wanted=market_bin_id.lower()
+                        wanted=expected.lower()
                         try: reverse=bytes.fromhex(wanted)[::-1].hex()
                         except Exception: reverse=wanted
                         return raw_hex in (wanted,reverse)
 
-                    emit("6/9 · MARKET transferido; esperando que el firmware registre BinID "+market_bin_id.upper()+"…")
-                    registration_attempts=[]
-                    post=None
-                    for reg_try in range(1,6):
-                        post_mark=len(messages)
-                        await tx(0x84,b"",3,0)
-                        post_payload=await wait_data(0x84,post_mark,5.0)
-                        post=dial_info(post_payload)
-                        registered=market_id_ok(post)
-                        registration_attempts.append({"attempt":reg_try,"dial_info":post,"registered":registered})
-                        if registered:break
-                        await asyncio.sleep(1.4)
-                    rep["single_face_install"]["post_dial_info"]=post
-                    rep["single_face_install"]["market_registration"]={
-                        "expected_bin_id_hex":market_bin_id,
-                        "verified":market_id_ok(post),
-                        "attempts":registration_attempts
-                    }
-                    state_changed=bool(pre and post and pre.get("raw_hex")!=post.get("raw_hex"))
-                    rep["single_face_install"]["dial_state_changed"]=state_changed
+                    async def read_face_info(label,tries=3):
+                        attempts=[];info=None
+                        for attempt in range(1,tries+1):
+                            mark=len(messages)
+                            await tx(0x84,b"",3,0)
+                            payload=await wait_data(0x84,mark,5.0)
+                            info=dial_info(payload)
+                            attempts.append({"label":label,"attempt":attempt,
+                                             "raw_hex":payload.hex() if payload else None,
+                                             "dial_info":info})
+                            if info is not None:break
+                            await asyncio.sleep(.7)
+                        return info,attempts
 
-                    registration_ok=bool(rep["single_face_install"]["market_registration"]["verified"])
+                    emit("4/9 · Abriendo transferencia OEM · esperando WATCH_FACE_INFO 0x84 real…")
+                    pre,state_attempts=await read_face_info("pre",3)
+                    rep["single_face_install"]["file_state_gate"]={"attempts":state_attempts,"ready":pre is not None}
+                    rep["single_face_install"]["pre_dial_info"]=pre
+                    if pre is None:
+                        raise RuntimeError("El reloj no devolvió WATCH_FACE_INFO 0x84; no se inicia MARKET.")
+
+                    for cand_no,cand in enumerate(native_candidates,1):
+                        cand_raw=cand["raw"]
+                        cand_stream,cand_deflated=await asyncio.to_thread(oem_dial_compress,cand_raw)
+                        use_compressed=(has_dial_compress is True)
+                        file_bytes=cand_stream if use_compressed else cand_raw
+                        chunks=[file_bytes[i:i+300] for i in range(0,len(file_bytes),300)]
+                        label="OEM-MARKET-"+cand["bin_id_hex"].upper()
+                        emit("5/9 · Prueba "+str(cand_no)+"/"+str(len(native_candidates))+
+                             " · MARKET OEM ORIGINAL "+cand["bin_id_hex"].upper()+
+                             " · "+("comprimido" if use_compressed else "raw")+
+                             " · "+str(len(chunks))+" bloques…")
+                        before_info,before_attempts=await read_face_info(label+"-pre",2)
+                        result=await transfer_slot(3,label,file_bytes,chunks)
+                        registration_attempts=[]
+                        registered_info=None
+                        emit("6/9 · "+label+" transferido; esperando registro de BinID…")
+                        for reg_try in range(1,7):
+                            mark=len(messages)
+                            await tx(0x84,b"",3,0)
+                            payload=await wait_data(0x84,mark,5.0)
+                            info=dial_info(payload)
+                            ok=market_id_ok(info,cand["bin_id_hex"])
+                            registration_attempts.append({
+                                "attempt":reg_try,"dial_info":info,"registered":ok
+                            })
+                            if ok:
+                                registered_info=info
+                                break
+                            await asyncio.sleep(1.4)
+                        attempt_report={
+                            "bin_id_hex":cand["bin_id_hex"],
+                            "byte_for_byte":True,
+                            "raw_sha256":cand["raw_sha256"],
+                            "raw_size":len(cand_raw),
+                            "wire_mode":"compressed" if use_compressed else "raw",
+                            "wire_size":len(file_bytes),
+                            "wire_sha256":hashlib.sha256(file_bytes).hexdigest(),
+                            "before":before_info,
+                            "before_attempts":before_attempts,
+                            "transfer":result,
+                            "registration_attempts":registration_attempts,
+                            "registered":registered_info is not None
+                        }
+                        transfer_attempts.append(attempt_report)
+                        if registered_info is not None:
+                            chosen=cand
+                            dynamic_transfer=result
+                            post=registered_info
+                            market_bin_id=cand["bin_id_hex"]
+                            break
+                        emit(label+" no fue registrado; se probará el siguiente MARKET OEM intacto.")
+
+                    rep["single_face_install"]["native_market_attempts"]=transfer_attempts
+                    rep["single_face_install"]["post_dial_info"]=post
+                    registration_ok=chosen is not None
+                    rep["single_face_install"]["market_registration"]={
+                        "verified":registration_ok,
+                        "chosen_bin_id_hex":chosen["bin_id_hex"] if chosen else None,
+                        "all_attempts":[{"bin_id_hex":x["bin_id_hex"],
+                                         "registered":x["registered"],
+                                         "wire_mode":x["wire_mode"]} for x in transfer_attempts]
+                    }
+                    rep["single_face_install"]["dial_state_changed"]=bool(
+                        pre and post and pre.get("raw_hex")!=post.get("raw_hex"))
+
                     selection_attempts=[]
                     selection_verified=False
                     selected_info=None
                     sel_status=None
                     market_index=face_slots.get("market_index")
                     if not registration_ok:
-                        emit("7/9 · MARKET todavía no registrado; NO se selecciona ningún slot viejo.")
+                        emit("7/9 · Ningún MARKET OEM fue registrado; NO se selecciona ninguna esfera vieja.")
                         selection={
-                            "attempted":False,
-                            "verified":False,
-                            "reason":"BinID MARKET no confirmado; selección bloqueada para no activar/modificar una esfera anterior"
+                            "attempted":False,"verified":False,
+                            "reason":"dos MARKET OEM byte-for-byte terminaron con cmd3=0000"
                         }
                     else:
-                        emit("7/9 · BinID confirmado; seleccionando el slot MARKET nuevo…")
+                        emit("7/9 · BinID "+market_bin_id.upper()+" confirmado; seleccionando MARKET…")
                         if market_index is None:
                             raise RuntimeError("UtraWatch no resolvió el índice MARKET de este reloj")
                         market_index=int(market_index)
                         for select_try in range(1,5):
                             _,sel_status,_=await tx83_wait(bytes([1,market_index&255]),3.0)
-                            await asyncio.sleep(1.6 if select_try==1 else 2.2)
-                            verify_mark=len(messages)
+                            await asyncio.sleep(1.8 if select_try==1 else 2.2)
+                            mark=len(messages)
                             await tx(0x84,b"",3,0)
-                            selected_payload=await wait_data(0x84,verify_mark,5.0)
-                            selected_info=dial_info(selected_payload)
+                            payload=await wait_data(0x84,mark,5.0)
+                            selected_info=dial_info(payload)
                             index_ok=bool(selected_info and selected_info.get("index")==market_index)
-                            binid_ok=market_id_ok(selected_info)
+                            binid_ok=market_id_ok(selected_info,market_bin_id)
                             ok=bool(sel_status==1 and index_ok and binid_ok)
                             selection_attempts.append({
                                 "attempt":select_try,"status":sel_status,
-                                "dial_info":selected_info,
-                                "index_ok":index_ok,"market_bin_id_ok":binid_ok,
-                                "verified":ok
+                                "dial_info":selected_info,"index_ok":index_ok,
+                                "market_bin_id_ok":binid_ok,"verified":ok
                             })
                             if ok:
                                 selection_verified=True
                                 break
-                        if sel_status!=1:
-                            raise RuntimeError("El reloj rechazó la selección del slot MARKET "+str(market_index))
                         selection={
-                            "attempted":True,
-                            "index":market_index,
+                            "attempted":True,"index":market_index,
                             "show_order":face_slots.get("market_show_order"),
-                            "status":sel_status,
-                            "verified":selection_verified,
+                            "status":sel_status,"verified":selection_verified,
                             "expected_market_bin_id_hex":market_bin_id,
-                            "dial_info":selected_info,
-                            "attempts":selection_attempts
+                            "dial_info":selected_info,"attempts":selection_attempts
                         }
                     rep["single_face_install"]["selection_lock"]=selection
                     rep["single_face_install"]["market_attempt"]={
-                        "attempted":True,
-                        "transfer_cmd":3,
-                        "bin_id_hex":market_bin_id,
+                        "attempted":True,"transfer_cmd":3,
+                        "chosen_bin_id_hex":chosen["bin_id_hex"] if chosen else None,
                         "registration_verified":registration_ok,
                         "selection_attempted":bool(selection.get("attempted")),
                         "selection_verified":selection_verified
                     }
                     rep["single_face_install"]["factory_faces_deleted"]=False
-                    rep["single_face_install"]["factory_faces_note"]="UtraWatch no expone comando de borrado para esferas integradas en firmware; sólo se reemplazaron los slots regrabables."
+                    rep["single_face_install"]["factory_faces_note"]="No se tocan esferas integradas de fábrica."
 
                     emit("8/9 · Postcheck de conexión y selección…")
                     connected=bool(getattr(c,"is_connected",False))
-                    transfer_ok=bool(dynamic_transfer.get("ok") and connected)
-                    registration_ok=bool(rep["single_face_install"].get("market_registration",{}).get("verified"))
+                    transfer_ok=bool(dynamic_transfer and dynamic_transfer.get("ok") and connected)
                     all_ok=bool(transfer_ok and registration_ok and sel_status==1 and selection_verified)
                     rep["single_face_install"]["protocol_acks_sent"]=protocol_acks_sent
                     rep["single_face_install"]["wire_protocol"]={
@@ -1248,14 +1278,14 @@ class App:
                         "note":"CEProtocolB byte1=device_type; byte3=N"
                     }
                     rep["single_face_install"]["classification"]=(
-                        "approved_market_face_installed_and_selected" if all_ok else
-                        "approved_market_face_registered_selection_pending" if transfer_ok and registration_ok else
-                        "approved_market_face_transferred_registration_pending" if transfer_ok else
-                        "approved_market_face_install_failed"
+                        "native_market_registered_and_selected" if all_ok else
+                        "native_market_registered_selection_pending" if transfer_ok and registration_ok else
+                        "native_market_transport_rejected" if transfer_attempts else
+                        "native_market_install_failed"
                     )
                     rep["single_face_install"]["connected_end"]=connected
                     rep["single_face_install"]["phase"]="complete"
-                    emit("9/9 · V1.23 FINALIZADA · "+rep["single_face_install"]["classification"])
+                    emit("9/9 · V1.24 FINALIZADA · "+rep["single_face_install"]["classification"])
                     return rep
                 finally:
                     if c:
@@ -1270,14 +1300,14 @@ class App:
                     rep["errors"].append(type(error).__name__+": "+str(error))
                     rep["single_face_install"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("V1.23 FALLÓ · "+repr(error))
+                    append("V1.24 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V1.23 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V1.24 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
                 append("ESFERA ÚNICA · "+result["single_face_install"]["classification"]+".")
-                self.status.set("V1.23 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
+                self.status.set("V1.24 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
             self.run_async(asyncio.wait_for(work(),timeout=360),done)
         def repair_binding():
             if self.ble_busy:
@@ -1310,9 +1340,9 @@ class App:
                 append("REPARACIÓN · continuando con emparejamiento e instalación…")
                 ota_lab(pair=True)
             self.run_async(repair_selected(self,address,emit_repair),repaired)
-        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.23",command=repair_binding)
+        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.24",command=repair_binding)
         ttk.Button(row,text="INSTALAR SIN REPARAR",command=ota_lab).pack(side="left",padx=4)
-        append("V1.23 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.23; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
+        append("V1.24 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.24; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("La instalación sólo comienza después de confirmar una conexión ATT operativa.")
