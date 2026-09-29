@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math
 
-APP_VERSION="1.30.0"
+APP_VERSION="1.31.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V1.30"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V1.31"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -36,7 +36,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V1.30 · MARKET válido + registro seguro").pack(side="left",padx=12)
+        ttk.Label(top,text="V1.31 · MARKET válido + registro seguro").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -333,7 +333,7 @@ class App:
         ttk.Label(w,text="Analizador B002 → B001",font=("Segoe UI",14,"bold")).pack(anchor="w",padx=12,pady=(12,4))
         ttk.Label(w,text="Captura respuestas completas y compara bytes. El canal OTA FFC1 permanece separado.").pack(anchor="w",padx=12)
         row=ttk.Frame(w,padding=12); row.pack(fill="x")
-        # V1.30 regression guard: CONTROL ACTIVO toolbar is created before the log
+        # V1.31 regression guard: CONTROL ACTIVO toolbar is created before the log
         # and must remain intact; V1.26 accidentally replaced capture() with installer code.
         ttk.Entry(row,textvariable=self.raw_hex,width=70).pack(side="left",fill="x",expand=True)
         log=tk.Text(w,font=("Consolas",9),wrap="none"); log.pack(fill="both",expand=True,padx=12,pady=(0,12))
@@ -403,7 +403,7 @@ class App:
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.30")
+        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.31")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)
         ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
@@ -653,9 +653,9 @@ class App:
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab(pair=False):
             if self.ble_busy:
-                append("V1.30 NO INICIADA · Bluetooth ocupado.")
+                append("V1.31 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V1.30 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
+            append("V1.31 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
             rep=self.base_report()
             rep["windows_binding_repair"]=dict(getattr(self,"binding_repair",{}))
             rep["single_face_install"]={
@@ -705,7 +705,7 @@ class App:
                     raise RuntimeError("Falta la referencia aprobada target_face_v086.b64")
                 raw=zlib.decompress(base64.b64decode(open(asset,"r",encoding="ascii").read().strip()))
                 if len(raw)!=142090:
-                    raise RuntimeError("Referencia aprobada V1.30 con tamaño inesperado: "+str(len(raw)))
+                    raise RuntimeError("Referencia aprobada V1.31 con tamaño inesperado: "+str(len(raw)))
                 if raw[5]!=2 or int.from_bytes(raw[6:8],"little")!=240 or int.from_bytes(raw[8:10],"little")!=296:
                     raise RuntimeError("Cabecera CUSTOMIZE aprobada inválida: "+raw[:10].hex())
                 folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),
@@ -720,12 +720,12 @@ class App:
                 # time/steps/heart fields. Battery is stamped from DEV_SYNC at install.
                 raw=bytearray(base_raw)
                 if len(raw)!=142090 or raw[5]!=2:
-                    raise RuntimeError("Base CUSTOMIZE V1.30 inválida")
+                    raise RuntimeError("Base CUSTOMIZE V1.31 inválida")
                 raw[0]=0       # firmware clock at top
                 raw[1]=8       # live steps
                 raw[2]=4       # live heart rate
-                raw[3]=0x9D    # approved accent color
-                raw[4]=0x42
+                raw[3]=0xFF    # white live text, closer to approved design
+                raw[4]=0xFF
                 raw[5]=2
 
                 w=240;h=296;pix0=10
@@ -773,7 +773,7 @@ class App:
 
                 battery_text=(str(int(battery_percent))+"%") if battery_percent is not None else "--%"
                 x=max(174,236-len(battery_text)*12)
-                text5(battery_text,x,27,2,0x429D)
+                text5(battery_text,x,27,2,0xFFFF)
                 return bytes(raw),battery_text
 
             def build(dev_type,n_seq,op,payload=b"",send_type=1):
@@ -829,14 +829,14 @@ class App:
                     "visual_mode":"approved raster + firmware live fields",
                     "target_source":"assets/target_face_v086.b64",
                     "width":target_w,"height":target_h,"picture_mode":2,
-                    "design":"fondo negro · analógico central · hora arriba izquierda · batería arriba derecha · pasos abajo izquierda · pulso abajo derecha",
+                    "design":"fondo negro · analógico central · datos en blanco; firmware agrupa hora/pasos/pulso arriba; batería arriba derecha",
                     "dynamic_fields":{
                         "time":"firmware live",
                         "steps":"firmware live · CUSTOMIZE value 8",
                         "heart_rate":"firmware live · CUSTOMIZE value 4",
                         "battery":"read from watch at install time"
                     },
-                    "analog_note":"El raster aprobado se instala exacto; CUSTOMIZE no anima las agujas del raster.",
+                    "analog_note":"CUSTOMIZE mantiene las agujas del raster estáticas; V1.31 prioriza aspecto aprobado + hora/pasos/pulso funcionales.",
                     "base_raw_size":len(base_raw),
                     "base_raw_sha256":hashlib.sha256(base_raw).hexdigest()
                 }
@@ -1114,6 +1114,7 @@ class App:
                         "oem_crc16":f"0x{crc16_8005(deflated):04X}",
                         "oem_header_hex":oem_stream[:20].hex()
                     })
+                    rep["single_face_install"]["customize_layout_limit"]={"time_position":0,"firmware_group":"top-center","note":"UtraWatch CUSTOMIZE sólo permite grupo de hora arriba o abajo; no posiciona cada dato en una esquina."}
                     rep["single_face_install"]["live_bindings"]={
                         "time":{"source":"watch firmware clock","time_pos":raw[0],"continuous_live":True},
                         "steps":{"source":"watch firmware","field_value":raw[1],"continuous_live":True},
@@ -1122,7 +1123,7 @@ class App:
                                    "continuous_live":False},
                         "analog_hands":{"source":"approved raster","continuous_live":False}
                     }
-                    emit("DISEÑO APROBADO · hora LIVE · pasos LIVE · pulso LIVE · batería="+battery_text+".")
+                    emit("DISEÑO V1.31 · datos LIVE en blanco; pasos azul + pulso rojo del firmware; batería="+battery_text+".")
 
                     if device_pid is None:
                         pid_mark=len(messages)
@@ -1166,7 +1167,7 @@ class App:
                     if not face_slots or face_slots.get("custom_index") is None:
                         raise RuntimeError("No se pudo resolver el slot editable de la esfera; no se seleccionará un índice a ciegas.")
 
-                    # V1.30: stop using MARKET for our custom artwork. The same
+                    # V1.31: stop using MARKET for our custom artwork. The same
                     # approved cBin already installed successfully on this physical watch
                     # through CUSTOMIZE cmd=2 in V1.19.
                     post=None
@@ -1251,7 +1252,7 @@ class App:
                     }
                     rep["single_face_install"]["market_attempt"]={
                         "attempted":False,
-                        "reason":"V1.30 vuelve a la ruta CUSTOMIZE cmd=2 físicamente validada; MARKET personalizado fue rechazado por firmware."
+                        "reason":"V1.31 vuelve a la ruta CUSTOMIZE cmd=2 físicamente validada; MARKET personalizado fue rechazado por firmware."
                     }
                     rep["single_face_install"]["factory_faces_deleted"]=False
                     rep["single_face_install"]["factory_faces_note"]="No se tocan esferas integradas de fábrica."
@@ -1275,7 +1276,7 @@ class App:
 
                     rep["single_face_install"]["connected_end"]=connected
                     rep["single_face_install"]["phase"]="complete"
-                    emit("9/9 · V1.30 FINALIZADA · "+rep["single_face_install"]["classification"])
+                    emit("9/9 · V1.31 FINALIZADA · "+rep["single_face_install"]["classification"])
                     return rep
                 finally:
                     if c:
@@ -1290,14 +1291,14 @@ class App:
                     rep["errors"].append(type(error).__name__+": "+str(error))
                     rep["single_face_install"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("V1.30 FALLÓ · "+repr(error))
+                    append("V1.31 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V1.30 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V1.31 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
                 append("ESFERA ÚNICA · "+result["single_face_install"]["classification"]+".")
-                self.status.set("V1.30 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
+                self.status.set("V1.31 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
             self.run_async(asyncio.wait_for(work(),timeout=420),done)
         def repair_binding():
             if self.ble_busy:
@@ -1330,9 +1331,9 @@ class App:
                 append("REPARACIÓN · continuando con emparejamiento e instalación…")
                 ota_lab(pair=True)
             self.run_async(repair_selected(self,address,emit_repair),repaired)
-        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.30",command=repair_binding)
+        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.31",command=repair_binding)
         ttk.Button(row,text="INSTALAR SIN REPARAR",command=ota_lab).pack(side="left",padx=4)
-        append("V1.30 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.30; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
+        append("V1.31 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.31; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("La instalación sólo comienza después de confirmar una conexión ATT operativa.")

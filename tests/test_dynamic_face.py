@@ -19,7 +19,7 @@ class ExactCustomizeV130Tests(unittest.TestCase):
 
     def test_app_uses_proven_customize_cmd2_route(self):
         source=(ROOT/"app.py").read_text(encoding="utf-8")
-        self.assertIn('APP_VERSION="1.30.0"',source)
+        self.assertIn('APP_VERSION="1.31.0"',source)
         self.assertIn("build_exact_customize_v130",source)
         self.assertIn("build_live_customize_v130",source)
         self.assertIn('transfer_slot(2,"EXACT-CUSTOMIZE"',source)
@@ -41,10 +41,13 @@ class ExactCustomizeV130Tests(unittest.TestCase):
         self.assertIn("raw[3]=0x9D",source)
         self.assertIn("raw[4]=0x42",source)
         self.assertIn('expected_cmd2=raw[:6].hex()',source)
+        self.assertIn('raw[3]=0xFF',source)
+        self.assertIn('raw[4]=0xFF',source)
+        self.assertIn('customize_layout_limit',source)
 
     def test_control_active_toolbar_still_present(self):
         source=(ROOT/"app.py").read_text(encoding="utf-8")
-        self.assertIn('REPARAR VÍNCULO E INSTALAR V1.30',source)
+        self.assertIn('REPARAR VÍNCULO E INSTALAR V1.31',source)
         self.assertIn('COPIAR DIAGNÓSTICO',source)
         self.assertIn('ENVIAR HEX',source)
 

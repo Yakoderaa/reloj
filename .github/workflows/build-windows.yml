@@ -14,8 +14,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify V1.30
-        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.30.0',v"
+      - name: Verify V1.31
+        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.31.0',v"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0
       - name: Validate approved face asset
         run: python -c "import base64,zlib,hashlib; r=zlib.decompress(base64.b64decode(open('assets/target_face_v086.b64',encoding='ascii').read().strip())); assert len(r)==142090; assert hashlib.sha256(r).hexdigest()=='61b86e4f5f998a436c88785e14436b00d797a705dcea6879e96a7828c4cb62a2'; assert r[5]==2 and int.from_bytes(r[6:8],'little')==240 and int.from_bytes(r[8:10],'little')==296"
@@ -27,30 +27,30 @@ jobs:
         run: |
           $sha=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           $manifest=@{
-            version='1.30.0'
-            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.30.0/RelojLab.exe'
+            version='1.31.0'
+            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.31.0/RelojLab.exe'
             sha256=$sha
-            notes='V1.30 abandona los intentos MARKET para nuestra esfera y vuelve a la ruta CUSTOMIZE cmd=2 que ya instaló físicamente la referencia aprobada en V1.19. Instala el raster exacto 240x296, con hora/pasos/pulso del firmware y batería leída al instalar, y verifica custom_index + cmd2.'
+            notes='V1.31 mantiene la ruta CUSTOMIZE cmd=2 que ya funciona físicamente y ajusta la estética según la foto real: hora, pasos y pulso del firmware ahora se renderizan en blanco y la batería estampada también pasa a blanco. Conserva fondo negro, dial analógico central y verificación custom_index + cmd2.'
           } | ConvertTo-Json
           Set-Content -Path version.json -Value $manifest -Encoding UTF8
-      - name: Publish V1.30 release asset
+      - name: Publish V1.31 release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.30.0 *> $null
-          if ($LASTEXITCODE -ne 0) { gh release create v1.30.0 dist/RelojLab.exe --title 'Reloj Lab V1.30' --notes 'V1.30 vuelve a la única ruta que ya instaló nuestra esfera aprobada en este reloj: CUSTOMIZE cmd=2. No modifica MARKET. Reinstala la referencia exacta 240x296, activa el slot CUSTOMIZE real y verifica cmd2=0008049d4202.' }
-          else { gh release upload v1.30.0 dist/RelojLab.exe --clobber }
+          gh release view v1.31.0 *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create v1.31.0 dist/RelojLab.exe --title 'Reloj Lab V1.31' --notes 'V1.31 refina la esfera que ya apareció en el reloj: mantiene CUSTOMIZE cmd=2 y cambia los datos vivos a blanco para acercarla al diseño aprobado. Conserva hora/pasos/pulso funcionales, batería superior derecha y fondo negro.' }
+          else { gh release upload v1.31.0 dist/RelojLab.exe --clobber }
       - name: Publish updater manifest
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git commit -m 'Updater: publish V1.30' || echo 'manifest unchanged'
+          git commit -m 'Updater: publish V1.31' || echo 'manifest unchanged'
           git push
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.30
+          name: RelojLab-Windows-V1.31
           path: dist/RelojLab.exe
           if-no-files-found: error
