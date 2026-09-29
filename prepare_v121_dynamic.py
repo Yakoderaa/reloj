@@ -63,7 +63,7 @@ for field in (HOUR,MINUTE,STEPS,HEART,BAT):
 assets.mkdir(parents=True,exist_ok=True)
 (assets/"target_face_v121.b64").write_text(base64.b64encode(zlib.compress(candidate,9)).decode("ascii"),encoding="ascii")
 meta={
- "version":"1.21.0",
+ "version":"1.22.0",
  "format":"device-1180 MARKET real",
  "source_face":"4CC6",
  "source_visual":"black minimal analog, white hour/minute hands, red second hand",

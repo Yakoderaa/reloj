@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math
 
-APP_VERSION="1.21.0"
+APP_VERSION="1.22.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V1.21"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V1.22"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -36,7 +36,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V1.21 · esfera MARKET propia").pack(side="left",padx=12)
+        ttk.Label(top,text="V1.22 · esfera MARKET propia").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -401,7 +401,7 @@ class App:
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.21")
+        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.22")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)
         ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
@@ -651,9 +651,9 @@ class App:
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab(pair=False):
             if self.ble_busy:
-                append("V1.21 NO INICIADA · Bluetooth ocupado.")
+                append("V1.22 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V1.21 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
+            append("V1.22 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
             rep=self.base_report()
             rep["windows_binding_repair"]=dict(getattr(self,"binding_repair",{}))
             rep["single_face_install"]={
@@ -701,14 +701,14 @@ class App:
                 b64_path=os.path.join(root,"assets","target_face_v121.b64")
                 meta_path=os.path.join(root,"assets","target_face_v121.json")
                 if not os.path.exists(b64_path):
-                    raise RuntimeError("Falta la esfera MARKET V1.21 en el paquete")
+                    raise RuntimeError("Falta la esfera MARKET V1.22 en el paquete")
                 packed=open(b64_path,"r",encoding="ascii").read().strip()
                 raw=zlib.decompress(base64.b64decode(packed))
                 if len(raw)<0x800 or int.from_bytes(raw[:4],"little")!=len(raw)-16:
-                    raise RuntimeError("Esfera MARKET V1.21 inválida")
+                    raise RuntimeError("Esfera MARKET V1.22 inválida")
                 bin_id_hex=raw[4:6].hex()
                 if bin_id_hex!="4cc6":
-                    raise RuntimeError("BinID MARKET V1.21 inesperado: "+bin_id_hex)
+                    raise RuntimeError("BinID MARKET V1.22 inesperado: "+bin_id_hex)
                 def u16(off): return int.from_bytes(raw[off:off+2],"little")
                 def find_field(field):
                     for off in range(0x10,0x800-28):
@@ -719,7 +719,7 @@ class App:
                     (0x8001,"hour"),(0x8002,"minute"),(0x8009,"steps"),
                     (0x800E,"heart_rate"),(0x8013,"battery"))}
                 if any(v is None for v in fields.values()):
-                    raise RuntimeError("MARKET V1.21 no contiene todos los campos vivos requeridos: "+repr(fields))
+                    raise RuntimeError("MARKET V1.22 no contiene todos los campos vivos requeridos: "+repr(fields))
                 meta={}
                 if os.path.exists(meta_path):
                     try:
@@ -772,8 +772,8 @@ class App:
                 return bytes([total&255,(total>>8)&255,len(subs)])+body
 
             async def work():
-                emit("1/9 · Cargando esfera aprobada como MARKET REAL 240×296 · BinID "+market_bin_id.upper()+"…")
                 path,raw,target_w,target_h,market_fields,market_bin_id,wf_meta=await asyncio.to_thread(build_dynamic_reference_v121)
+                emit("1/9 · Cargando esfera aprobada como MARKET REAL 240×296 · BinID "+market_bin_id.upper()+"…")
                 expected_cmd2=None
                 oem_stream,deflated=await asyncio.to_thread(oem_dial_compress,raw)
                 rep["single_face_install"]["candidate"]={
@@ -1244,7 +1244,7 @@ class App:
                     )
                     rep["single_face_install"]["connected_end"]=connected
                     rep["single_face_install"]["phase"]="complete"
-                    emit("9/9 · V1.21 FINALIZADA · "+rep["single_face_install"]["classification"])
+                    emit("9/9 · V1.22 FINALIZADA · "+rep["single_face_install"]["classification"])
                     return rep
                 finally:
                     if c:
@@ -1259,14 +1259,14 @@ class App:
                     rep["errors"].append(type(error).__name__+": "+str(error))
                     rep["single_face_install"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("V1.21 FALLÓ · "+repr(error))
+                    append("V1.22 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V1.21 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V1.22 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
                 append("ESFERA ÚNICA · "+result["single_face_install"]["classification"]+".")
-                self.status.set("V1.21 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
+                self.status.set("V1.22 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
             self.run_async(asyncio.wait_for(work(),timeout=360),done)
         def repair_binding():
             if self.ble_busy:
@@ -1299,9 +1299,9 @@ class App:
                 append("REPARACIÓN · continuando con emparejamiento e instalación…")
                 ota_lab(pair=True)
             self.run_async(repair_selected(self,address,emit_repair),repaired)
-        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.21",command=repair_binding)
+        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.22",command=repair_binding)
         ttk.Button(row,text="INSTALAR SIN REPARAR",command=ota_lab).pack(side="left",padx=4)
-        append("V1.21 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.21; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
+        append("V1.22 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.22; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("La instalación sólo comienza después de confirmar una conexión ATT operativa.")
