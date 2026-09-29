@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math
 
-APP_VERSION="1.26.0"
+APP_VERSION="1.27.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V1.26"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V1.27"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -36,7 +36,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V1.26 · MARKET válido + registro seguro").pack(side="left",padx=12)
+        ttk.Label(top,text="V1.27 · MARKET válido + registro seguro").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -333,6 +333,8 @@ class App:
         ttk.Label(w,text="Analizador B002 → B001",font=("Segoe UI",14,"bold")).pack(anchor="w",padx=12,pady=(12,4))
         ttk.Label(w,text="Captura respuestas completas y compara bytes. El canal OTA FFC1 permanece separado.").pack(anchor="w",padx=12)
         row=ttk.Frame(w,padding=12); row.pack(fill="x")
+        # V1.27 regression guard: CONTROL ACTIVO toolbar is created before the log
+        # and must remain intact; V1.26 accidentally replaced capture() with installer code.
         ttk.Entry(row,textvariable=self.raw_hex,width=70).pack(side="left",fill="x",expand=True)
         log=tk.Text(w,font=("Consolas",9),wrap="none"); log.pack(fill="both",expand=True,padx=12,pady=(0,12))
         def append(x): log.insert("end",x+"\n"); log.see("end")
@@ -377,8 +379,398 @@ class App:
         def capture():
             append("CAPTURA 90 s: usá funciones del reloj; se registrará todo B001 espontáneo.")
             async def work():
-                custom_candidates,face_meta=await asyncio.to_thread(build_custom_market_v126)
-                emit("1/9 · Cargando NUESTRA esfera aprobada V1.26 · negro + analógico + datos LIVE…")
+                c,n=await self.connect_retry(); out=[]
+                def cb(sender,d):out.append({"kind":"RX","hex":bytes(d).hex(),"t":time.time()})
+                try:
+                    await asyncio.wait_for(c.start_notify("0000b001-0000-1000-8000-00805f9b34fb",cb),timeout=4)
+                    for left in range(90,0,-1):
+                        if left%10==0:self.root.after(0,lambda z=left:append(f"... faltan {z}s · RX={len(out)}"))
+                        await asyncio.sleep(1)
+                finally:
+                    try:await c.disconnect()
+                    except:pass
+                return out
+            self.run_async(work(),lambda r,e: append("ERROR: "+repr(e)) if e else render(r))
+        def copy_control_diagnostic():
+            text=log.get("1.0","end-1c")
+            if not text.strip():
+                self.status.set("No hay diagnóstico para copiar todavía.")
+                return
+            try:
+                w.clipboard_clear()
+                w.clipboard_append(text)
+                w.update_idletasks()
+                self.status.set("Diagnóstico copiado al portapapeles.")
+            except Exception as ex:
+                messagebox.showerror("Copiar diagnóstico",repr(ex))
+        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.27")
+        primary_test.pack(side="left",padx=4)
+        ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)
+        ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
+        ttk.Button(row,text="MAPEO DIFERENCIAL",command=differential).pack(side="left",padx=4)
+        def deep_probe():
+            append("SONDEO PROFUNDO: prueba el campo de comando completo y variantes del tipo de frame.")
+            base=bytearray.fromhex("00ff000101150000010010000000010000000000")
+            tests=[]
+            for val in range(256):
+                p=bytearray(base); p[4]=val; tests.append((f"cmd={val:02x}",bytes(p)))
+            for val in range(64):
+                p=bytearray(base); p[5]=val; tests.append((f"type={val:02x}",bytes(p)))
+            async def work():
+                c,n=await self.connect_retry(); out=[]
+                def cb(sender,d):out.append({"kind":"RX","hex":bytes(d).hex(),"t":time.time()})
+                try:
+                    try:await asyncio.wait_for(c.start_notify("0000b001-0000-1000-8000-00805f9b34fb",cb),timeout=4)
+                    except Exception as ex:out.append({"kind":"NOTIFY_ERROR","hex":repr(ex),"t":time.time()})
+                    for i,(label,data) in enumerate(tests,1):
+                        if not c.is_connected:out.append({"kind":"DISCONNECT","hex":label,"t":time.time()}); break
+                        out.append({"kind":"TX","label":label,"hex":data.hex(),"t":time.time()})
+                        await asyncio.wait_for(c.write_gatt_char("0000b002-0000-1000-8000-00805f9b34fb",data,response=False),timeout=2)
+                        if i%32==0:self.root.after(0,lambda i=i,t=len(tests):append(f"... {i}/{t}"))
+                        await asyncio.sleep(.12)
+                    await asyncio.sleep(1)
+                finally:
+                    try:await c.disconnect()
+                    except:pass
+                return out
+            def done(r,e):
+                if e:append("SONDEO ERROR: "+repr(e)); return
+                unique=[]; last=None; tx=0
+                for x in r:
+                    if x["kind"]=="TX":tx+=1
+                    elif x["kind"]=="RX" and x["hex"]!=last:
+                        last=x["hex"]
+                        if x["hex"] not in unique:unique.append(x["hex"])
+                    elif x["kind"] not in ("TX","RX"):append(x["kind"]+": "+x["hex"])
+                append(f"SONDEO PROFUNDO FINALIZADO · TX={tx} · RX diferentes={len(unique)}")
+                for z in unique:append("RX ÚNICA: "+z)
+            self.run_async(work(),done)
+        ttk.Button(row,text="SONDEO PROFUNDO",command=deep_probe).pack(side="left",padx=4)
+        def action_locator():
+            append("LOCALIZADOR RÁPIDO: 256 comandos, 0.25 s por comando. Registra el comando exacto de cada respuesta.")
+            base=bytearray.fromhex("00ff000101150000010010000000010000000000")
+            async def work():
+                c,n=await self.connect_retry(); out=[]; current={"label":"—"}
+                def cb(sender,d):out.append({"kind":"RX","label":current["label"],"hex":bytes(d).hex(),"t":time.time()})
+                try:
+                    await asyncio.wait_for(c.start_notify("0000b001-0000-1000-8000-00805f9b34fb",cb),timeout=4)
+                    await asyncio.sleep(.3)
+                    for val in range(256):
+                        p=bytearray(base); p[4]=val; label=f"CMD {val:02X} ({val}/255)"; current["label"]=label
+                        self.root.after(0,lambda z=label:self.status.set("PROBANDO "+z+" · mirá el reloj"))
+                        out.append({"kind":"TX","label":label,"hex":bytes(p).hex(),"t":time.time()})
+                        await c.write_gatt_char("0000b002-0000-1000-8000-00805f9b34fb",bytes(p),response=False)
+                        await asyncio.sleep(.25)
+                    await asyncio.sleep(1)
+                finally:
+                    try:await c.disconnect()
+                    except:pass
+                return out
+            def done(r,e):
+                if e:append("LOCALIZADOR ERROR: "+repr(e)); return
+                append("=== RESULTADO LOCALIZADOR ===")
+                for x in r:
+                    if x["kind"]=="RX":append(x["label"]+" → RX "+x["hex"])
+                append("LOCALIZADOR FINALIZADO")
+                self.status.set("Localizador finalizado.")
+            self.run_async(work(),done)
+        ttk.Button(row,text="LOCALIZAR ACCIONES",command=action_locator).pack(side="left",padx=4)
+        def ota_inspect():
+            append("OTA/BOOT INSPECTOR: consultando FFC1/FFC2 sin transferir firmware.")
+            async def work():
+                c,n=await self.connect_retry(); out=[]
+                try:
+                    for u in ["f000ffc1-0451-4000-b000-000000000000","f000ffc2-0451-4000-b000-000000000000"]:
+                        try:
+                            ch=c.services.get_characteristic(u)
+                            out.append(u+" props="+str(ch.properties if ch else None))
+                            if ch and "read" in ch.properties:
+                                d=await c.read_gatt_char(u); out.append(u+" read="+bytes(d).hex())
+                        except Exception as ex:out.append(u+" error="+repr(ex))
+                finally:
+                    try:await c.disconnect()
+                    except:pass
+                return out
+            self.run_async(work(),lambda r,e:append("OTA ERROR: "+repr(e)) if e else [append(x) for x in r]+[append("OTA INSPECCIÓN FINALIZADA")])
+        ttk.Button(row,text="INSPECCIONAR OTA/BOOT",command=ota_inspect).pack(side="left",padx=4)
+        def dual_capture():
+            append("CAPTURA DUAL V0.11: diagnóstico por etapas, timeout y fallback automático.")
+            async def work():
+                out=[]; c=None
+                def emit(msg):
+                    out.append((time.time(),"SYS",msg))
+                    self.root.after(0,lambda m=msg:(append(m),self.status.set(m)))
+                def mk(tag):
+                    def cb(sender,d):out.append((time.time(),tag,bytes(d).hex()))
+                    return cb
+                try:
+                    emit("ETAPA 1/4 · Conectando…")
+                    c,n=await asyncio.wait_for(self.connect_retry(),timeout=20)
+                    emit("ETAPA 1/4 · Conectado.")
+                    emit("ETAPA 2/4 · Suscribiendo B001…")
+                    try:
+                        await asyncio.wait_for(c.start_notify("0000b001-0000-1000-8000-00805f9b34fb",mk("B001")),timeout=5)
+                        emit("ETAPA 2/4 · B001 OK.")
+                    except Exception as ex:emit("ETAPA 2/4 · B001 FALLÓ: "+repr(ex))
+                    emit("ETAPA 3/4 · Suscribiendo FFC2…")
+                    try:
+                        await asyncio.wait_for(c.start_notify("f000ffc2-0451-4000-b000-000000000000",mk("FFC2")),timeout=5)
+                        emit("ETAPA 3/4 · FFC2 OK.")
+                    except Exception as ex:emit("ETAPA 3/4 · FFC2 sin respuesta; sigo sólo con B001: "+repr(ex))
+                    emit("ETAPA 4/4 · Capturando 60 s…")
+                    for elapsed in range(60):
+                        if not c.is_connected:
+                            emit("Conexión perdida en segundo "+str(elapsed)); break
+                        if elapsed%5==0:
+                            events=sum(1 for x in out if x[1] in ("B001","FFC2"))
+                            self.root.after(0,lambda e=elapsed,n=events:self.status.set(f"CAPTURA · {60-e}s restantes · eventos={n}"))
+                        await asyncio.sleep(1)
+                    emit("CAPTURA DUAL FINALIZADA.")
+                except asyncio.TimeoutError:emit("TIMEOUT GLOBAL: la conexión no respondió a tiempo.")
+                except Exception as ex:emit("ERROR CAPTURA: "+repr(ex))
+                finally:
+                    if c:
+                        try:await asyncio.wait_for(c.disconnect(),timeout=4)
+                        except:pass
+                return out
+            def done(r,e):
+                if e:append("WATCHDOG: "+repr(e)); self.status.set("Captura detenida por watchdog."); return
+                append("=== RESULTADO V0.11 ===")
+                data=[x for x in r if x[1] in ("B001","FFC2")]
+                if data:
+                    t0=data[0][0]
+                    for t,tag,h in data:append(f"+{t-t0:06.2f}s {tag} {h}")
+                else:append("Sin paquetes espontáneos B001/FFC2 durante la ventana.")
+                append("RESULTADO V0.11 FINALIZADO")
+                self.status.set("Captura finalizada.")
+            self.run_async(asyncio.wait_for(work(),timeout=100),done)
+        ttk.Button(row,text="CAPTURA DUAL ROBUSTA",command=dual_capture).pack(side="left",padx=4)
+        def firmware_preflight():
+            if self.ble_busy:
+                append("Ya hay una operación Bluetooth en curso."); return
+            append("PREFLIGHT V"+APP_VERSION+": conexión directa e identificación. No instala otro sistema.")
+            rep=self.base_report()
+            rep["firmware_access"]={"bootloader_confirmed":False,"compatible_image":False,
+                "ready_to_flash":False,"reason":"Faltan hardware confirmado, firmware compatible y protocolo de instalación verificado."}
+            rep["preflight_log"]=[]
+            async def work():
+                c=None
+                def emit(m):
+                    rep["preflight_log"].append(m)
+                    self.ui_queue.put(lambda x=m:(append(x),self.status.set(x)))
+                async def heartbeat():
+                    started=time.monotonic()
+                    while True:
+                        await asyncio.sleep(5)
+                        emit(f"En curso: {int(time.monotonic()-started)} s")
+                pulse=asyncio.create_task(heartbeat())
+                try:
+                    emit("1/4 · Probando cuatro rutas de conexión Windows/BLE…")
+                    c,n=await self.connect_retry(8,emit)
+                    rep["connection"]={"connected":True,"attempts":n}
+                    emit("2/4 · Leyendo identidad del firmware…")
+                    for key,short in [("manufacturer","2a29"),("model","2a24"),("hardware","2a27"),("firmware","2a26"),("software","2a28")]:
+                        uuid=f"0000{short}-0000-1000-8000-00805f9b34fb"
+                        ch=c.services.get_characteristic(uuid)
+                        if ch and "read" in ch.properties:
+                            try:
+                                data=bytes(await asyncio.wait_for(c.read_gatt_char(ch),timeout=4))
+                                rep["standard_reads"][key]={"hex":data.hex(),"text":data.decode("utf-8",errors="replace")}
+                                emit(key+": "+rep["standard_reads"][key]["text"])
+                            except Exception as ex:rep["errors"].append(key+": "+repr(ex))
+                    emit("3/4 · Inventario GATT y canal candidato a OTA…")
+                    for svc in c.services:
+                        rep["services"].append({"uuid":svc.uuid,"characteristics":[{"uuid":ch.uuid,"properties":list(ch.properties)} for ch in svc.characteristics]})
+                    for uuid in NOTIFY_UUIDS:
+                        ch=c.services.get_characteristic(uuid)
+                        if not ch or "notify" not in ch.properties:continue
+                        try:
+                            def notification(sender,data):
+                                rep["passive_notifications"].append({"uuid":str(sender.uuid),"hex":bytes(data).hex()})
+                            await asyncio.wait_for(c.start_notify(ch,notification),timeout=5)
+                            emit("Notificaciones habilitadas: "+uuid)
+                        except Exception as ex:rep["errors"].append(uuid+": "+repr(ex))
+                    await asyncio.sleep(4)
+                    emit("4/4 · Inventario terminado. Acceso al bootloader NO confirmado; firmware alternativo NO disponible.")
+                except Exception as ex:
+                    rep["errors"].append(repr(ex)); emit("No se completó el preflight: "+repr(ex))
+                finally:
+                    pulse.cancel()
+                    await asyncio.gather(pulse,return_exceptions=True)
+                    if c:
+                        try:await asyncio.wait_for(c.disconnect(),timeout=4)
+                        except Exception as ex:rep["errors"].append("Desconexión: "+repr(ex))
+                return rep
+            def done(result,error):
+                if error:rep["errors"].append(repr(error))
+                self.report=result or rep
+                self.report["connection"]=dict(getattr(self,"connection_state",self.report["connection"]))
+                self.show()
+                append("Informe disponible en Guardar diagnóstico.")
+                self.status.set("Preflight finalizado con errores." if self.report["errors"] else "Preflight finalizado. Firmware aún no habilitado.")
+            self.run_async(work(),done)
+        ttk.Button(row,text="PREFLIGHT FIRMWARE",command=firmware_preflight).pack(side="left",padx=4)
+        def ota_fingerprint():
+            append("HUELLA OTA V0.16: inventario GATT completo + escucha FFC2. No escribe FFC1.")
+            async def work():
+                c=None; rows=[]
+                def emit(m):
+                    rows.append(m); self.root.after(0,lambda x=m:(append(x),self.status.set(x)))
+                try:
+                    emit("1/5 · Abriendo GATT con la ruta validada…")
+                    c,n=await self.connect_retry(4,emit)
+                    emit(f"2/5 · GATT abierto en intento {n}. Enumerando servicios/características…")
+                    for svc in c.services:
+                        emit("SERVICE "+str(svc.uuid))
+                        for ch in svc.characteristics:
+                            emit("  CHAR "+str(ch.uuid)+" props="+",".join(ch.properties))
+                            for desc in ch.descriptors:
+                                emit("    DESC "+str(desc.uuid)+" handle="+str(desc.handle))
+                    emit("3/5 · Midiendo MTU negociado…")
+                    emit("MTU="+str(getattr(c,"mtu_size","desconocido")))
+                    events=[]
+                    emit("4/5 · Suscribiendo FFC2 durante 12 s…")
+                    try:
+                        def rx(sender,data):
+                            h=bytes(data).hex(); events.append(h)
+                            self.root.after(0,lambda x=h:append("FFC2 RX "+x))
+                        await asyncio.wait_for(c.start_notify("f000ffc2-0451-4000-b000-000000000000",rx),timeout=7)
+                        for sec in range(12):
+                            self.root.after(0,lambda n=12-sec:self.status.set(f"HUELLA OTA · escucha FFC2 · {n}s"))
+                            await asyncio.sleep(1)
+                        try:await c.stop_notify("f000ffc2-0451-4000-b000-000000000000")
+                        except:pass
+                    except Exception as ex:emit("FFC2 LISTEN ERROR: "+repr(ex))
+                    emit("5/5 · HUELLA OTA COMPLETA · paquetes FFC2="+str(len(events)))
+                    if not events:emit("FFC2 quedó silencioso sin una orden previa: necesitamos identificar el handshake antes de escribir.")
+                except Exception as ex:emit("HUELLA OTA ERROR: "+repr(ex))
+                finally:
+                    if c:
+                        try:await asyncio.wait_for(c.disconnect(),timeout=5)
+                        except:pass
+                return rows
+            self.run_async(asyncio.wait_for(work(),timeout=190),lambda r,e:append("HUELLA OTA WATCHDOG: "+repr(e)) if e else append("HUELLA OTA V0.16 FINALIZADA"))
+        ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
+        def ota_lab(pair=False):
+            if self.ble_busy:
+                append("V1.27 NO INICIADA · Bluetooth ocupado.")
+                return
+            append("V1.27 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
+            rep=self.base_report()
+            rep["windows_binding_repair"]=dict(getattr(self,"binding_repair",{}))
+            rep["single_face_install"]={
+                "phase":"prepare","blocks":[],"payload_bytes_written":0,"ack_count":0,
+                "firmware_actions":0,"factory_faces_deleted":False
+            }
+            t0=time.monotonic()
+
+            def emit(msg):
+                line=f"+{time.monotonic()-t0:06.2f}s · {msg}"
+                self.ui_queue.put(lambda x=line:(append(x),self.status.set(x)))
+
+            def crc16_8005(data):
+                crc=0
+                for x in data:
+                    crc ^= (x&255)<<8
+                    for _ in range(8):
+                        crc=((crc<<1)^0x8005)&0xffff if (crc&0x8000) else (crc<<1)&0xffff
+                return crc
+
+            def oem_dial_compress(raw):
+                # Exact GZipUtils.zlib(..., false) parameters from the UtraWatch SDK:
+                # deflater.init(level=6, windowBits=9, memLevel=3, W_ZLIB).
+                import zlib
+                co=zlib.compressobj(level=6,method=zlib.DEFLATED,wbits=9,memLevel=3)
+                comp=co.compress(raw)+co.flush()
+                hdr=bytearray(20)
+                total=len(comp)+20
+                hdr[0:4]=total.to_bytes(4,"little")
+                hdr[4:6]=crc16_8005(comp).to_bytes(2,"little")
+                hdr[6:8]=bytes([0xFE,0xFE])
+                hdr[8]=1
+                if len(raw)>26 and raw[9]==255:
+                    hdr[9]=raw[25]
+                    hdr[10]=raw[26]
+                elif len(raw)>9:
+                    hdr[9]=raw[9]
+                    hdr[10]=0
+                hdr[11]=0
+                return bytes(hdr)+comp,comp
+
+            def build_custom_market_v127():
+                import base64,zlib
+                root=getattr(sys,"_MEIPASS",os.path.dirname(os.path.abspath(__file__)))
+                meta_path=os.path.join(root,"assets","face_v126.json")
+                if not os.path.exists(meta_path):
+                    raise RuntimeError("Falta el manifiesto de la esfera V1.27")
+                with open(meta_path,"r",encoding="utf-8") as fh:
+                    meta=json.load(fh)
+                folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),
+                                    "RelojLab","face-v127")
+                os.makedirs(folder,exist_ok=True)
+                out=[]
+                for spec in meta.get("variants",[]):
+                    name=spec.get("file")
+                    path=os.path.join(root,"assets",name)
+                    if not name or not os.path.exists(path):
+                        raise RuntimeError("Falta recurso V1.27: "+str(name))
+                    raw=zlib.decompress(base64.b64decode(open(path,"r",encoding="ascii").read().strip()))
+                    got=hashlib.sha256(raw).hexdigest()
+                    if got!=spec.get("raw_sha256") or len(raw)!=int(spec.get("raw_size",0)):
+                        raise RuntimeError("Recurso V1.27 corrupto: "+str(name))
+                    if raw[4:6].hex()!=spec.get("bin_id_hex"):
+                        raise RuntimeError("BinID V1.27 no coincide: "+str(name))
+                    local=os.path.join(folder,spec.get("role","candidate")+".bin")
+                    with open(local,"wb") as fh:fh.write(raw)
+                    row=dict(spec);row.update({"raw":raw,"path":local})
+                    out.append(row)
+                roles={x.get("role") for x in out}
+                if not {"custom_verified","custom_same_id","oem_recovery"}.issubset(roles):
+                    raise RuntimeError("V1.27 no contiene todas las variantes requeridas")
+                return out,meta
+
+            def build(dev_type,n_seq,op,payload=b"",send_type=1):
+                # CEProtocolB wire header: byte1=device type, byte3=N sequence.
+                # V0.82 incorrectly incremented byte1 and left byte3 at zero.
+                payload=bytes(payload);n=len(payload)
+                if n>4855:raise RuntimeError("payload WTWD demasiado grande")
+                h=bytearray(20)
+                if n<=10:
+                    h[1]=dev_type&255;h[3]=n_seq&255;h[4]=send_type;h[5]=op
+                    h[8]=n&255;h[9]=(n>>8)&255;h[10:10+n]=payload
+                    return [bytes(h)]
+                frags=((n-10)+18)//19
+                h[1]=dev_type&255;h[2]=frags;h[3]=n_seq&255;h[4]=send_type;h[5]=op
+                h[8]=n&255;h[9]=(n>>8)&255;h[10:20]=payload[:10]
+                out=[bytes(h)];pos=10
+                for i in range(frags):
+                    c=bytearray(20);c[0]=i+1
+                    part=payload[pos:pos+19];c[1:1+len(part)]=part
+                    out.append(bytes(c));pos+=len(part)
+                return out
+
+            def sync_payload():
+                # Mirrors SendDataManager.sendAsynInfoDetail() for an ALREADY paired watch.
+                # The previous implementation always sent pair=1, which is only used on first pairing.
+                now=int(time.time());off=-time.timezone
+                if time.daylight and time.localtime().tm_isdst:off=-time.altzone
+                tm=now.to_bytes(4,"little")+int(off).to_bytes(4,"little",signed=True)+bytes([0])
+                subs=[
+                    bytes([0x0C,0x00,0x66,0xE8,0x03,0x00,0x00,0x01,0x19,0xAF,0x46,0x00]),
+                    bytes([12,0,0x68])+tm,
+                    bytes([0x08,0x00,0x7C,0x01,0xFF,0xFF,0xFF,0xFF]),
+                    bytes([0x04,0x00,0x7A,0x01]),
+                    bytes([0x04,0x00,0x7B,0x01]),
+                    bytes([0x04,0x00,0x67,0x00]),
+                    bytes([0x04,0x00,0x6D,0x01]),
+                    bytes([0x05,0x00,0x78,0x00,0x00])
+                ]
+                body=b"".join(subs);total=len(body)+1
+                return bytes([total&255,(total>>8)&255,len(subs)])+body
+
+            async def work():
+                custom_candidates,face_meta=await asyncio.to_thread(build_custom_market_v127)
+                emit("1/9 · Cargando NUESTRA esfera aprobada V1.27 · negro + analógico + datos LIVE…")
                 custom_verified=next(x for x in custom_candidates if x.get("role")=="custom_verified")
                 custom_same=next(x for x in custom_candidates if x.get("role")=="custom_same_id")
                 recovery=next(x for x in custom_candidates if x.get("role")=="oem_recovery")
@@ -674,7 +1066,7 @@ class App:
                         "analog_second":"firmware 0x0804",
                         "battery_value_seen_during_install":battery_percent
                     }
-                    emit("DISEÑO V1.26 · nuestro fondo negro + agujas LIVE + hora/batería/pasos/pulso LIVE.")
+                    emit("DISEÑO V1.27 · fondo negro aprobado + agujas LIVE + hora/batería/pasos/pulso LIVE.")
 
                     if device_pid is None:
                         pid_mark=len(messages)
@@ -718,7 +1110,7 @@ class App:
                     if not face_slots or face_slots.get("custom_index") is None:
                         raise RuntimeError("No se pudo resolver el slot editable de la esfera; no se seleccionará un índice a ciegas.")
 
-                    # V1.26: proven MARKET transport + our approved face.
+                    # V1.27: keep the proven MARKET transport, apply our approved face.
                     transfer_attempts=[]
                     chosen=None
                     dynamic_transfer=None
@@ -753,7 +1145,7 @@ class App:
                     rep["single_face_install"]["file_state_gate"]={"attempts":state_attempts,"ready":pre is not None}
                     rep["single_face_install"]["pre_dial_info"]=pre
                     if pre is None:
-                        raise RuntimeError("El reloj no devolvió WATCH_FACE_INFO 0x84; no se inicia V1.26.")
+                        raise RuntimeError("El reloj no devolvió WATCH_FACE_INFO 0x84; no se inicia V1.27.")
 
                     use_compressed=(has_dial_compress is True)
                     custom_order=[custom_verified,custom_same]
@@ -890,7 +1282,7 @@ class App:
                     )
                     rep["single_face_install"]["connected_end"]=connected
                     rep["single_face_install"]["phase"]="complete"
-                    emit("9/9 · V1.26 FINALIZADA · "+rep["single_face_install"]["classification"])
+                    emit("9/9 · V1.27 FINALIZADA · "+rep["single_face_install"]["classification"])
                     return rep
                 finally:
                     if c:
@@ -905,14 +1297,14 @@ class App:
                     rep["errors"].append(type(error).__name__+": "+str(error))
                     rep["single_face_install"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("V1.26 FALLÓ · "+repr(error))
+                    append("V1.27 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V1.26 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V1.27 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
                 append("ESFERA ÚNICA · "+result["single_face_install"]["classification"]+".")
-                self.status.set("V1.26 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
+                self.status.set("V1.27 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
             self.run_async(asyncio.wait_for(work(),timeout=360),done)
         def repair_binding():
             if self.ble_busy:
@@ -945,9 +1337,9 @@ class App:
                 append("REPARACIÓN · continuando con emparejamiento e instalación…")
                 ota_lab(pair=True)
             self.run_async(repair_selected(self,address,emit_repair),repaired)
-        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.26",command=repair_binding)
+        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.27",command=repair_binding)
         ttk.Button(row,text="INSTALAR SIN REPARAR",command=ota_lab).pack(side="left",padx=4)
-        append("V1.26 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.26; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
+        append("V1.27 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.27; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("La instalación sólo comienza después de confirmar una conexión ATT operativa.")

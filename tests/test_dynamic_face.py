@@ -23,7 +23,7 @@ def parse_descs(raw):
         rows.append(row);off+=n
     return rows,off
 
-class ApprovedFaceV126Tests(unittest.TestCase):
+class ApprovedFaceV127Tests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.meta=json.loads((ROOT/"assets"/"face_v126.json").read_text(encoding="utf-8"))
@@ -83,9 +83,9 @@ class ApprovedFaceV126Tests(unittest.TestCase):
 
     def test_app_uses_custom_face_and_visual_check_fallback(self):
         source=(ROOT/"app.py").read_text(encoding="utf-8")
-        self.assertIn('APP_VERSION="1.26.0"',source)
-        self.assertIn("build_custom_market_v126",source)
-        self.assertIn("NUESTRA esfera aprobada V1.26",source)
+        self.assertIn('APP_VERSION="1.27.0"',source)
+        self.assertIn("build_custom_market_v127",source)
+        self.assertIn("NUESTRA esfera aprobada V1.27",source)
         self.assertIn("custom_verified",source)
         self.assertIn("custom_same_id",source)
         self.assertIn("same_id_overwrite_requires_visual_confirmation",source)
@@ -93,3 +93,27 @@ class ApprovedFaceV126Tests(unittest.TestCase):
 
 if __name__=="__main__":
     unittest.main()
+
+
+class ControlActiveV127Tests(unittest.TestCase):
+    def test_control_active_toolbar_restored(self):
+        source=(ROOT/"app.py").read_text(encoding="utf-8")
+        self.assertIn('def open_control(self):',source)
+        self.assertIn('def capture():',source)
+        self.assertIn('def ota_lab(pair=False):',source)
+        self.assertIn('REPARAR VÍNCULO E INSTALAR V1.27',source)
+        self.assertIn('COPIAR DIAGNÓSTICO',source)
+        self.assertIn('ENVIAR HEX',source)
+        self.assertIn('MAPEO DIFERENCIAL',source)
+        self.assertIn('SONDEO PROFUNDO',source)
+        self.assertIn('INSTALAR SIN REPARAR',source)
+
+    def test_capture_is_not_replaced_by_installer(self):
+        source=(ROOT/"app.py").read_text(encoding="utf-8")
+        capture_start=source.index('        def capture():')
+        ota_start=source.index('        def ota_lab(pair=False):')
+        capture_block=source[capture_start:ota_start]
+        self.assertIn('CAPTURA 90 s',capture_block)
+        self.assertIn('await asyncio.sleep(1)',capture_block)
+        self.assertNotIn('build_custom_market_v127',capture_block)
+        self.assertNotIn('single_face_install',capture_block)
