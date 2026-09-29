@@ -32,13 +32,14 @@ jobs:
           APK=$(find xapk -type f -name '*.apk' | sort | head -1)
           mkdir decompiled evidence
           jadx/bin/jadx -d decompiled "$APK" || true
-          find decompiled/sources -type f \( -name 'CEDevData.java' -o -name 'CEProtocolB.java' -o -name 'SendDataManager.java' -o -name 'SendQueue*.java' -o -name 'CEDevK6Proxy.java' -o -name 'CEBluetoothProxyBase.java' \) -print | tee evidence/files.txt
+          find decompiled -type f | head -200 > evidence/tree-head.txt || true
+          grep -R -n -E 'sendWatchFileData|setItemNumber|setItemL|class CEDevData|DATA_TYPE_WATCH_FACE_SYNC|FileTransControl|startFileTrans|870558583' decompiled > evidence/grep.txt || true
+          cut -d: -f1 evidence/grep.txt | sort -u | head -100 > evidence/files.txt || true
           while IFS= read -r f; do
             [ -f "$f" ] || continue
             cp "$f" "evidence/$(echo "$f" | sed 's#^decompiled/##;s#/#__#g')" || true
           done < evidence/files.txt
-          grep -R -n -E 'itemNumber|itemL|toByte|toBytes|protocol|build|sendData|push\(|CEDevData|DATA_TYPE_WATCH_FILE|131' decompiled/sources/com/wr/sdk > evidence/grep.txt || true
-          sed -n '1,1200p' evidence/grep.txt
+          sed -n '1,1600p' evidence/grep.txt
       - uses: actions/upload-artifact@v4
         with:
           name: v124-wire-evidence
