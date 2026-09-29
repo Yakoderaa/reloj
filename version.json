@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.24.0/RelojLab.exe",
-  "notes": "V1.24: deja de enviar un MARKET sintetizado. Prueba MARKET OEM byte-por-byte 4CC6 y, si no registra, 2D7F; sólo selecciona el slot después de que WATCH_FACE_INFO confirme el BinID.",
-  "version": "1.24.0",
-  "sha256": "ada3a8c0e2e335ae820ca9485465407189acf23d13237b047bf1fcb204f707e0"
+  "version": "1.25.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.25.0/RelojLab.exe",
+  "sha256": "4b24235383541de65cb86f56b7684446687d9fc895d6aa420429c68ce94f3a22",
+  "notes": "V1.25: usa como carrier principal 2D7F porque conserva agujas analógicas móviles y agrega pasos, pulso y batería reales. Si no registra, vuelve automáticamente al 4CC6 ya validado. La selección sólo ocurre con BinID confirmado."
 }
