@@ -1,0 +1,36 @@
+name: Research V1.21 Market Donor
+on:
+  push:
+    branches: [research-v121-market]
+    paths: ['.github/workflows/research-v121.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch 4CC6 donor
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          curl -L --fail --retry 3 'http://watchhealth.com.cn/k6File/clock/file/4CC6.bin' -o evidence/4CC6.bin
+          curl -L --fail --retry 3 'http://watchhealth.com.cn/k6File/clock/image/4CC6.png' -o evidence/4CC6.png
+          sha256sum evidence/4CC6.bin
+          python - <<'PY'
+          from pathlib import Path
+          b=Path('evidence/4CC6.bin').read_bytes()
+          def u16(o): return int.from_bytes(b[o:o+2],'little')
+          print('LEN',len(b),'HEAD',b[:32].hex(),'COUNT?',u16(10))
+          for off in range(0x10,0x300):
+              if u16(off)==0x0164 and u16(off+8)==0x1202:
+                  raw=b[off:off+28]
+                  print('NUM',hex(off),hex(u16(off+10)),'x',u16(off+2),'y',u16(off+4),'size',u16(off+6),'fmt',raw[12:20])
+          print('JPEG',b.find(bytes([0xff,0xd8,0xff])))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v121-market-donor
+          path: evidence
