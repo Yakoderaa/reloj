@@ -1,0 +1,58 @@
+name: Research V1.26 Full Dynamic Carrier
+on:
+  push:
+    branches: [research-v123-valid-market]
+    paths: ['.github/workflows/research-v126-full.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan all device-1180 faces
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence/bins evidence/previews
+          IDS='971E D8EC 16D6 9570 0A9B 04C2 B4D6 C513 D1AC 2D7F F435 8498 0F70 B802 5648 33BF 4078 F3A7 4CF4 D8D3 AD47 B48D C4D3 2ECC 939D C11C C442 FB8D 0719 1CE5 3A1F B474 936A CEB2 2F68 11C7 C92F B5F7 0BC9 FE61 D719 3914 1506 3300 C899 DA05 5A76 DFA9 1E17 0BDD D19C 5DF3 7480 07D4 DBBF D83B 0A40 A886 97C3 61C0 23F6 D4DB FE37 61BD 2830 AD3E 3B45 FC01 6298 7B35 2801 425D 6B85 1031 9798 0583 4CC6 D535 630F DFE9 0E71 0295 B4E1 366D 5168 EE31 BE15 B045'
+          for id in $IDS; do
+            curl -L --fail --retry 2 "http://watchhealth.com.cn/k6File/clock/file/$id.bin" -o "evidence/bins/$id.bin" || true
+          done
+          python - <<'PY' | tee evidence/report.txt
+          from pathlib import Path
+          def u16(b,o):return int.from_bytes(b[o:o+2],'little')
+          wanted={0x8001,0x8002,0x8009,0x800E,0x8013}
+          rows=[]
+          for p in sorted(Path('evidence/bins').glob('*.bin')):
+              b=p.read_bytes(); count=u16(b,10) if len(b)>12 else 0; off=0x10
+              fields=set(); analog_h=False;analog_m=False;second=False;types=[]
+              ok=True
+              for i in range(count):
+                  if off+12>len(b) or u16(b,off)!=0x0164:ok=False;break
+                  kind=u16(b,off+8);types.append(kind)
+                  if kind==0x1202:
+                      n=28;fields.add(u16(b,off+10))
+                  elif kind==0x0804:
+                      n=18;second=True
+                  else:
+                      n=12
+                      if kind==0x0203:
+                          if u16(b,off+10)==0x8001:analog_h=True
+                          if u16(b,off+10)==0x8002:analog_m=True
+                  off+=n
+              analog=analog_h and analog_m and second
+              score=len(fields&wanted)+(5 if analog else 0)
+              rows.append((score,analog,p.stem,len(b),count,sorted(fields&wanted),types))
+          for row in sorted(rows,reverse=True):
+              score,analog,name,n,count,fields,types=row
+              if analog or len(fields)>=4:
+                  print(name,'score',score,'analog',analog,'fields',[f'{x:04X}' for x in fields],
+                        'count',count,'len',n,'kinds',[f'{x:04X}' for x in types])
+          print('BEST',[(x[0],x[2],x[1],[f'{f:04X}' for f in x[5]]) for x in sorted(rows,reverse=True)[:20]])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v126-full-dynamic-carrier
+          path: evidence
