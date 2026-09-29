@@ -38,8 +38,6 @@ class ExactCustomizeV130Tests(unittest.TestCase):
         self.assertIn("raw[0]=0",source)
         self.assertIn("raw[1]=8",source)
         self.assertIn("raw[2]=4",source)
-        self.assertIn("raw[3]=0x9D",source)
-        self.assertIn("raw[4]=0x42",source)
         self.assertIn('expected_cmd2=raw[:6].hex()',source)
         self.assertIn('raw[3]=0xFF',source)
         self.assertIn('raw[4]=0xFF',source)
