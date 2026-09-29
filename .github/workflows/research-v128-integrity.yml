@@ -1,0 +1,75 @@
+name: Research V1.28 Resource Integrity
+on:
+  push:
+    branches: [research-v128-minpatch]
+    paths: ['.github/workflows/research-v128-integrity.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Fetch donors
+        run: |
+          mkdir -p evidence
+          curl -L --fail --retry 3 'http://watchhealth.com.cn/k6File/clock/file/2D7F.bin' -o evidence/2D7F.bin
+          curl -L --fail --retry 3 'http://watchhealth.com.cn/k6File/clock/file/4CC6.bin' -o evidence/4CC6.bin
+      - name: Analyze resource table and checksums
+        shell: bash
+        run: |
+          python - <<'PY' | tee evidence/report.txt
+          from pathlib import Path
+          import zlib, hashlib, struct, binascii
+          def u16(b,o):return int.from_bytes(b[o:o+2],'little')
+          def u32(b,o):return int.from_bytes(b[o:o+4],'little')
+          def crc16_8005(data):
+              crc=0
+              for x in data:
+                  crc ^= x<<8
+                  for _ in range(8):
+                      crc=((crc<<1)^0x8005)&0xffff if crc&0x8000 else (crc<<1)&0xffff
+              return crc
+          for name in ('2D7F','4CC6'):
+              b=Path('evidence/'+name+'.bin').read_bytes()
+              bg=b[0x1000:0x23B00] if len(b)>=0x23B00 else b''
+              vals={
+                'len':len(b),'sha':hashlib.sha256(b).hexdigest(),
+                'bg_len':len(bg),'bg_crc32':zlib.crc32(bg)&0xffffffff,
+                'bg_adler32':zlib.adler32(bg)&0xffffffff,
+                'bg_crc16':crc16_8005(bg),
+                'bg_sum16':sum(bg)&0xffff,
+                'bg_sum32':sum(bg)&0xffffffff,
+              }
+              print('\n===',name,vals)
+              table=b[0x800:0x1000]
+              print('table_hex',table.hex())
+              needles=[]
+              for k,v in vals.items():
+                  if not isinstance(v,int):continue
+                  for width in (2,4):
+                      if v >= (1<<(8*width)): continue
+                      enc=v.to_bytes(width,'little')
+                      start=0
+                      while True:
+                          j=table.find(enc,start)
+                          if j<0:break
+                          needles.append((k,width,hex(0x800+j),enc.hex()))
+                          start=j+1
+              print('matches',needles)
+              # Print 16-byte rows with LE16/LE32 interpretations where nonzero.
+              for o in range(0,len(table),16):
+                  row=table[o:o+16]
+                  if any(row):
+                      print(hex(0x800+o),row.hex(),
+                            'u16',[u16(row,i) for i in range(0,16,2)],
+                            'u32',[u32(row,i) for i in range(0,16,4)])
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v128-resource-integrity
+          path: evidence
