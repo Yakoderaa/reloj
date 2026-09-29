@@ -29,7 +29,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          APK=$(find xapk -type f -name '*.apk' | sort | head -1)
+          APK=$(find xapk -type f -name '*.apk' -printf '%s %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
           mkdir decompiled evidence
           jadx/bin/jadx -d decompiled "$APK" || true
           find decompiled -type f | head -200 > evidence/tree-head.txt || true
