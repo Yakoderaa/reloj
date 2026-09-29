@@ -17,7 +17,7 @@ jobs:
         run: |
           set -u
           mkdir -p evidence/previews
-          for page in 0 1 2 3 4 5; do
+          for page in 0 1 2 3 4 5 6 7 8; do
             curl -L -sS --max-time 20 "http://watchhealth.com.cn/YueDongService/app/faces.do?deviceId=1180&pageIndex=$page" -o "evidence/faces-1180-p$page.json" || true
           done
           curl -L -sS --max-time 20 "http://watchhealth.com.cn/YueDongService/app/faceConfig.do?deviceId=1180&pageIndex=1" -o evidence/faceConfig-1180-p1.json || true
