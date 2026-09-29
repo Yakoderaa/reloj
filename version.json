@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.18.0/RelojLab.exe",
-  "sha256": "4488de8bc1ad4740bf30884b96957851ccbd5d1407e2a68a0b8d0de600623cc7",
-  "notes": "V1.18: reparación del vínculo BLE seleccionado con confirmación; nuevo emparejamiento antes de GATT e instalación. Sin reset del adaptador ni del reloj. Verificación física pendiente.",
-  "version": "1.18.0"
+  "version": "1.19.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.19.0/RelojLab.exe",
+  "notes": "V1.19: conexión BLE fijada a la dirección seleccionada sin exigir un nuevo anuncio; reparación de vínculo best-effort y dos intentos GATT sobre el mismo reloj.",
+  "sha256": "524c044cd541c5668860bd73348fe472803735fd71a3931c35da561f41a275fb"
 }
