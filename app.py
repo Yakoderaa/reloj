@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math
 
-APP_VERSION="1.19.0"
+APP_VERSION="1.20.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V1.19"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V1.20"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -36,7 +36,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V1.19 · esfera única OEM").pack(side="left",padx=12)
+        ttk.Label(top,text="V1.20 · esfera única OEM").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -401,7 +401,7 @@ class App:
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.19")
+        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.20")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)
         ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
@@ -651,9 +651,9 @@ class App:
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab(pair=False):
             if self.ble_busy:
-                append("V1.19 NO INICIADA · Bluetooth ocupado.")
+                append("V1.20 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V1.19 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
+            append("V1.20 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
             rep=self.base_report()
             rep["windows_binding_repair"]=dict(getattr(self,"binding_repair",{}))
             rep["single_face_install"]={
@@ -695,95 +695,41 @@ class App:
                 hdr[11]=0
                 return bytes(hdr)+comp,comp
 
-            def build_exact_reference_customize():
-                # Exact approved reference, cropped to the physical 240x296 display.
-                # UtraWatch CUSTOMIZE cBinFile:
-                # 10-byte config + 240*296 BGR565 pixels.
+            def build_dynamic_reference_v120():
                 import base64,zlib
-                packed='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'
+                root=getattr(sys,"_MEIPASS",os.path.dirname(os.path.abspath(__file__)))
+                b64_path=os.path.join(root,"assets","target_face_v120.b64")
+                meta_path=os.path.join(root,"assets","target_face_v120.json")
+                if not os.path.exists(b64_path):
+                    raise RuntimeError("Falta el WF dinámico V1.20 en el paquete de la aplicación")
+                packed=open(b64_path,"r",encoding="ascii").read().strip()
                 raw=zlib.decompress(base64.b64decode(packed))
-                expected='61b86e4f5f998a436c88785e14436b00d797a705dcea6879e96a7828c4cb62a2'
-                if len(raw)!=142090 or hashlib.sha256(raw).hexdigest()!=expected:
-                    raise RuntimeError("Referencia visual V1.19 embebida corrupta")
-                if raw[:10].hex()!="000000000002f0002801":
-                    raise RuntimeError("Cabecera CUSTOMIZE V1.19 inválida")
+                if len(raw)<54 or raw[:2]!=b"WF":
+                    raise RuntimeError("WF dinámico V1.20 inválido")
+                width=int.from_bytes(raw[0x2a:0x2c],"little")
+                height=int.from_bytes(raw[0x2c:0x2e],"little")
+                count=int.from_bytes(raw[0x2e:0x30],"little")
+                types=[]
+                for i in range(count):
+                    off=54+i*20
+                    if off+20>len(raw): raise RuntimeError("Descriptor WF V1.20 truncado")
+                    types.append(int.from_bytes(raw[off+2:off+4],"little"))
+                required={0x0501,0x0601,0x0701,0x0804,0x0904,0x0A04,0x0B04,
+                          0x4104,0x4204,0x4304,0x1102}
+                if (width,height)!=(240,296) or not required.issubset(set(types)):
+                    raise RuntimeError("WF V1.20 no contiene todos los bindings dinámicos requeridos")
+                meta={}
+                if os.path.exists(meta_path):
+                    try:
+                        with open(meta_path,"r",encoding="utf-8") as fh: meta=json.load(fh)
+                    except Exception: meta={}
                 folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),
-                                    "RelojLab","wf-analysis-v086")
+                                    "RelojLab","wf-analysis-v120")
                 os.makedirs(folder,exist_ok=True)
-                path=os.path.join(folder,"exact-approved-reference-v086.bin")
+                path=os.path.join(folder,"approved-dynamic-v120.bin")
                 with open(path,"wb") as fh:fh.write(raw)
-                return path,raw,240,296
+                return path,raw,width,height,types,meta
 
-            def build_live_customize(base_raw,battery_percent=None):
-                # CUSTOMIZE supports three live firmware fields:
-                # time_pos plus one field above and one below the time.
-                # UtraWatch exposes: date=1, sleep=2, heart=4, steps=8.
-                # Use time at the top, steps above it and heart rate below it.
-                raw=bytearray(base_raw)
-                if len(raw)!=142090 or raw[5]!=2:
-                    raise RuntimeError("Base CUSTOMIZE V1.19 inválida")
-
-                # Live metadata. Target orange sampled from the approved design:
-                # RGB ~= (239,83,64) -> BGR565 0x429D -> little-endian 9d42.
-                raw[0]=0       # time at top
-                raw[1]=8       # live steps
-                raw[2]=4       # live heart rate
-                raw[3]=0x9D
-                raw[4]=0x42
-                raw[5]=2
-
-                w=240;h=296;pix0=10
-                def setpix(x,y,v=0):
-                    if 0<=x<w and 0<=y<h:
-                        off=pix0+((y*w+x)*2)
-                        raw[off]=(v>>8)&255
-                        raw[off+1]=v&255
-
-                # Remove the four baked sample-value areas from the approved raster.
-                # Keep the central analog artwork untouched for visual continuity.
-                for x0,y0,x1,y1 in [
-                    (5,15,102,68),      # old 10:09
-                    (174,13,238,66),    # old 87%
-                    (3,235,120,294),    # old 8,426 pasos
-                    (143,235,239,294),  # old 72 lpm
-                ]:
-                    for yy in range(y0,y1):
-                        for xx in range(x0,x1):
-                            setpix(xx,yy,0)
-
-                # Battery is not an official live CUSTOMIZE complication.
-                # Render the battery value read from DEV_SYNC at install time.
-                font={
-                    "0":["01110","10001","10011","10101","11001","10001","01110"],
-                    "1":["00100","01100","00100","00100","00100","00100","01110"],
-                    "2":["01110","10001","00001","00010","00100","01000","11111"],
-                    "3":["11110","00001","00001","01110","00001","00001","11110"],
-                    "4":["00010","00110","01010","10010","11111","00010","00010"],
-                    "5":["11111","10000","10000","11110","00001","00001","11110"],
-                    "6":["01110","10000","10000","11110","10001","10001","01110"],
-                    "7":["11111","00001","00010","00100","01000","01000","01000"],
-                    "8":["01110","10001","10001","01110","10001","10001","01110"],
-                    "9":["01110","10001","10001","01111","00001","00001","01110"],
-                    "%":["10001","00010","00100","01000","10001","00000","00000"],
-                    "-":["00000","00000","11111","00000","00000","00000","00000"],
-                }
-                def text5(txt,x,y,scale=2,color=0x429D):
-                    for ch in txt:
-                        pat=font.get(ch,font["-"])
-                        for ry,row in enumerate(pat):
-                            for rx,on in enumerate(row):
-                                if on=="1":
-                                    for sy in range(scale):
-                                        for sx in range(scale):
-                                            setpix(x+rx*scale+sx,y+ry*scale+sy,color)
-                        x+=6*scale
-
-                battery_text=(str(int(battery_percent))+"%") if battery_percent is not None else "--%"
-                # Right-align in the same upper-right area as the approved design.
-                x=max(174,236-len(battery_text)*12)
-                text5(battery_text,x,27,2,0x429D)
-
-                return bytes(raw),battery_text
             def build(dev_type,n_seq,op,payload=b"",send_type=1):
                 # CEProtocolB wire header: byte1=device type, byte3=N sequence.
                 # V0.82 incorrectly incremented byte1 and left byte3 at zero.
@@ -824,27 +770,30 @@ class App:
                 return bytes([total&255,(total>>8)&255,len(subs)])+body
 
             async def work():
-                emit("1/9 · Cargando diseño aprobado 240×296; los datos se vincularán al reloj tras DEV_SYNC…")
-                path,raw,target_w,target_h=await asyncio.to_thread(build_exact_reference_customize)
+                emit("1/9 · Cargando esfera aprobada como WF DINÁMICO 240×296…")
+                path,raw,target_w,target_h,wf_types,wf_meta=await asyncio.to_thread(build_dynamic_reference_v120)
                 expected_cmd2=None
-                oem_stream=None
-                deflated=None
+                oem_stream,deflated=await asyncio.to_thread(oem_dial_compress,raw)
                 rep["single_face_install"]["candidate"]={
                     "path":path,
-                    "format":"UtraWatch CUSTOMIZE cBinFile · referencia aprobada + datos vivos",
-                    "visual_mode":"approved raster + firmware live fields",
-                    "target_source":"approved target image",
+                    "format":"UtraWatch WF dinámico · referencia aprobada",
+                    "visual_mode":"firmware-rendered dynamic WF",
+                    "target_source":"approved target layout + verified OEM dynamic resources",
                     "width":target_w,"height":target_h,
-                    "picture_mode":2,
+                    "descriptor_types":[f"0x{x:04X}" for x in wf_types],
                     "dynamic_fields":{
-                        "time":"firmware live",
-                        "steps":"firmware live · CUSTOMIZE value 8",
-                        "heart_rate":"firmware live · CUSTOMIZE value 4",
-                        "battery":"read from watch at install time"
+                        "analog_hour":"firmware live · 0x0501",
+                        "analog_minute":"firmware live · 0x0601",
+                        "analog_second":"firmware live · 0x0701",
+                        "time":"firmware live digits",
+                        "steps":"firmware live · 0x4104",
+                        "heart_rate":"firmware live · 0x4204",
+                        "battery":"firmware live · 0x4304"
                     },
-                    "static_analog_note":"Las agujas/segundero del raster siguen siendo gráficos; V1.19 no los declara dinámicos.",
-                    "base_raw_size":len(raw),
-                    "base_raw_sha256":hashlib.sha256(raw).hexdigest()
+                    "static_analog_note":None,
+                    "raw_size":len(raw),
+                    "raw_sha256":hashlib.sha256(raw).hexdigest(),
+                    "build_meta":wf_meta
                 }
 
                 c=None;events=[];messages=[];tx_n=1;wire_dev_type=1
@@ -1104,16 +1053,9 @@ class App:
                     battery_percent=(int(battery_payload[0]) if battery_payload and len(battery_payload)>=1 else None)
                     if battery_percent is not None and not (0<=battery_percent<=100):
                         battery_percent=None
-                    raw,battery_text=build_live_customize(raw,battery_percent)
-                    expected_cmd2=raw[:6].hex()
-                    oem_stream,deflated=await asyncio.to_thread(oem_dial_compress,raw)
                     rep["single_face_install"]["candidate"].update({
-                        "battery_percent_at_install":battery_percent,
-                        "battery_text":battery_text,
-                        "raw_size":len(raw),
-                        "raw_sha256":hashlib.sha256(raw).hexdigest(),
-                        "raw_header_hex":raw[:10].hex(),
-                        "expected_cmd2_hex":expected_cmd2,
+                        "battery_percent_seen_during_install":battery_percent,
+                        "raw_header_hex":raw[:16].hex(),
                         "oem_stream_size":len(oem_stream),
                         "deflate_size":len(deflated),
                         "oem_stream_sha256":hashlib.sha256(oem_stream).hexdigest(),
@@ -1121,13 +1063,16 @@ class App:
                         "oem_header_hex":oem_stream[:20].hex()
                     })
                     rep["single_face_install"]["live_bindings"]={
-                        "time":{"source":"watch firmware clock","time_pos":raw[0]},
-                        "steps":{"source":"watch firmware","field_value":raw[1]},
-                        "heart_rate":{"source":"watch firmware","field_value":raw[2]},
-                        "battery":{"source":"DEV_SYNC DATA_TYPE_BATTERY_INFO=3","value_at_install":battery_percent,
-                                   "continuous_live":False}
+                        "analog_hour":{"source":"WF descriptor 0x0501","continuous_live":True},
+                        "analog_minute":{"source":"WF descriptor 0x0601","continuous_live":True},
+                        "analog_second":{"source":"WF descriptor 0x0701","continuous_live":True},
+                        "time":{"source":"WF firmware clock digits","continuous_live":True},
+                        "steps":{"source":"WF descriptor 0x4104","continuous_live":True},
+                        "heart_rate":{"source":"WF descriptor 0x4204","continuous_live":True},
+                        "battery":{"source":"WF descriptor 0x4304","continuous_live":True,
+                                   "value_seen_during_install":battery_percent}
                     }
-                    emit("DATOS · hora firmware LIVE · pasos LIVE · pulso LIVE · batería="+battery_text)
+                    emit("DATOS · agujas LIVE · hora LIVE · pasos LIVE · pulso LIVE · batería LIVE")
 
                     if device_pid is None:
                         pid_mark=len(messages)
@@ -1195,14 +1140,14 @@ class App:
                         raise RuntimeError("El reloj ACKeó comandos pero no devolvió WATCH_FACE_INFO 0x84; transferencia NO iniciada para evitar falsos positivos.")
 
                     chunks=[file_bytes[i:i+300] for i in range(0,len(file_bytes),300)]
-                    emit("5/9 · Instalando referencia exacta en CUSTOMIZE cmd=2 · "+str(len(chunks))+" bloques…")
-                    exact_transfer=await transfer_slot(2,"EXACT-CUSTOMIZE",file_bytes,chunks)
-                    rep["single_face_install"]["exact_customize_transfer"]=exact_transfer
+                    emit("5/9 · Instalando WF dinámico en CUSTOMIZE cmd=2 · "+str(len(chunks))+" bloques…")
+                    dynamic_transfer=await transfer_slot(2,"DYNAMIC-CUSTOMIZE",file_bytes,chunks)
+                    rep["single_face_install"]["dynamic_customize_transfer"]=dynamic_transfer
 
-                    emit("6/9 · CUSTOMIZE exacto completo; esperando aplicación física…")
+                    emit("6/9 · WF dinámico completo; esperando render del firmware…")
                     await asyncio.sleep(4.0)
 
-                    emit("7/9 · Seleccionando y verificando el slot CUSTOMIZE exacto…")
+                    emit("7/9 · Seleccionando y verificando CUSTOMIZE dinámico…")
                     post_mark=len(messages)
                     await tx(0x84,b"",3,0)
                     post_payload=await wait_data(0x84,post_mark,5.0)
@@ -1210,6 +1155,9 @@ class App:
                     rep["single_face_install"]["post_dial_info"]=post
                     state_changed=bool(pre and post and pre.get("raw_hex")!=post.get("raw_hex"))
                     rep["single_face_install"]["dial_state_changed"]=state_changed
+                    if post and post.get("cmd2_hex") and post.get("cmd2_hex")!="000000000000":
+                        expected_cmd2=post.get("cmd2_hex")
+                    rep["single_face_install"]["candidate"]["expected_cmd2_hex"]=expected_cmd2
 
                     custom_index=face_slots.get("custom_index")
                     if custom_index is None:
@@ -1253,14 +1201,14 @@ class App:
 
                     rep["single_face_install"]["market_attempt"]={
                         "attempted":False,
-                        "reason":"V1.19 usa exclusivamente CUSTOMIZE, la ruta ya confirmada visualmente en V0.83"
+                        "reason":"V1.20 usa el WF dinámico dentro de CUSTOMIZE; evita la activación MARKET que quedó sin verificar en V0.85"
                     }
                     rep["single_face_install"]["factory_faces_deleted"]=False
                     rep["single_face_install"]["factory_faces_note"]="UtraWatch no expone comando de borrado para esferas integradas en firmware; sólo se reemplazaron los slots regrabables."
 
                     emit("8/9 · Postcheck de conexión y selección…")
                     connected=bool(getattr(c,"is_connected",False))
-                    transfer_ok=bool(exact_transfer.get("ok") and connected)
+                    transfer_ok=bool(dynamic_transfer.get("ok") and connected)
                     all_ok=bool(transfer_ok and sel_status==1 and selection_verified)
                     rep["single_face_install"]["protocol_acks_sent"]=protocol_acks_sent
                     rep["single_face_install"]["wire_protocol"]={
@@ -1268,13 +1216,13 @@ class App:
                         "note":"CEProtocolB byte1=device_type; byte3=N"
                     }
                     rep["single_face_install"]["classification"]=(
-                        "exact_approved_reference_installed_and_selected" if all_ok else
-                        "exact_approved_reference_transferred_selection_pending" if transfer_ok and sel_status==1 else
-                        "exact_approved_reference_install_failed"
+                        "approved_dynamic_wf_installed_and_selected" if all_ok else
+                        "approved_dynamic_wf_transferred_selection_pending" if transfer_ok and sel_status==1 else
+                        "approved_dynamic_wf_install_failed"
                     )
                     rep["single_face_install"]["connected_end"]=connected
                     rep["single_face_install"]["phase"]="complete"
-                    emit("9/9 · V1.19 FINALIZADA · "+rep["single_face_install"]["classification"])
+                    emit("9/9 · V1.20 FINALIZADA · "+rep["single_face_install"]["classification"])
                     return rep
                 finally:
                     if c:
@@ -1289,14 +1237,14 @@ class App:
                     rep["errors"].append(type(error).__name__+": "+str(error))
                     rep["single_face_install"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("V1.19 FALLÓ · "+repr(error))
+                    append("V1.20 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V1.19 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V1.20 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
                 append("ESFERA ÚNICA · "+result["single_face_install"]["classification"]+".")
-                self.status.set("V1.19 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
+                self.status.set("V1.20 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
             self.run_async(asyncio.wait_for(work(),timeout=360),done)
         def repair_binding():
             if self.ble_busy:
@@ -1329,9 +1277,9 @@ class App:
                 append("REPARACIÓN · continuando con emparejamiento e instalación…")
                 ota_lab(pair=True)
             self.run_async(repair_selected(self,address,emit_repair),repaired)
-        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.19",command=repair_binding)
+        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.20",command=repair_binding)
         ttk.Button(row,text="INSTALAR SIN REPARAR",command=ota_lab).pack(side="left",padx=4)
-        append("V1.19 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.19; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
+        append("V1.20 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.20; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("La instalación sólo comienza después de confirmar una conexión ATT operativa.")

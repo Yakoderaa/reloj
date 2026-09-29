@@ -14,41 +14,43 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify V1.19
-        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.19.0',v"
+      - name: Verify V1.20
+        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.20.0',v"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0
+      - name: Build and validate dynamic watch face
+        run: python prepare_v120_dynamic.py
       - run: python -m unittest discover -s tests
-      - run: python -m py_compile app.py connection.py windows_binding.py
-      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab app.py
+      - run: python -m py_compile app.py connection.py windows_binding.py prepare_v120_dynamic.py
+      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/target_face_v120.b64;assets" --add-data "assets/target_face_v120.json;assets" app.py
       - name: Calculate EXE SHA256 and updater manifest
         shell: pwsh
         run: |
           $sha=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           $manifest=@{
-            version='1.19.0'
-            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.19.0/RelojLab.exe'
+            version='1.20.0'
+            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.20.0/RelojLab.exe'
             sha256=$sha
-            notes='V1.19: conexión BLE fijada a la dirección seleccionada sin exigir un nuevo anuncio; reparación de vínculo best-effort y dos intentos GATT sobre el mismo reloj.'
+            notes='V1.20: esfera aprobada reconstruida como WF dinámico real dentro del slot CUSTOMIZE verificado. Agujas horaria/minutera/segundero, hora, pasos, pulso y batería se validan como descriptores firmware antes de publicar.'
           } | ConvertTo-Json
           Set-Content -Path version.json -Value $manifest -Encoding UTF8
-      - name: Publish V1.19 release asset
+      - name: Publish V1.20 release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.19.0 *> $null
-          if ($LASTEXITCODE -ne 0) { gh release create v1.19.0 dist/RelojLab.exe --title 'Reloj Lab V1.19' --notes 'V1.19: conexión BLE fijada a la dirección seleccionada sin exigir un nuevo anuncio; reparación de vínculo best-effort y dos intentos GATT sobre el mismo reloj.' }
-          else { gh release upload v1.19.0 dist/RelojLab.exe --clobber }
+          gh release view v1.20.0 *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create v1.20.0 dist/RelojLab.exe --title 'Reloj Lab V1.20' --notes 'V1.20: esfera dinámica real en CUSTOMIZE. Agujas, hora, pasos, pulso y batería se construyen con recursos OEM dinámicos y la build se cancela si falta cualquier binding requerido.' }
+          else { gh release upload v1.20.0 dist/RelojLab.exe --clobber }
       - name: Publish updater manifest
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git commit -m 'Updater: publish V1.19' || echo 'manifest unchanged'
+          git commit -m 'Updater: publish V1.20' || echo 'manifest unchanged'
           git push
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.19
+          name: RelojLab-Windows-V1.20
           path: dist/RelojLab.exe
           if-no-files-found: error
