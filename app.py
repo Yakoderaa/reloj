@@ -821,7 +821,7 @@ class App:
                 expected_cmd2=None
                 oem_stream=None
                 deflated=None
-                emit("1/9 · Cargando NUESTRA esfera aprobada exacta 240×296 en CUSTOMIZE…")
+                emit("1/9 · Cargando NUESTRA esfera aprobada exacta 240×296 en CUSTOMIZE · perfil visual V1.31…")
                 rep["single_face_install"]["candidate"]={
                     "path":path,
                     "strategy":"proven V1.19 CUSTOMIZE cmd=2 route",
