@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.27.0/RelojLab.exe",
-  "notes": "V1.27: corrige CONTROL ACTIVO, que en V1.26 quedó sin botones por una sustitución accidental de capture(). Mantiene la esfera personalizada negra sobre el motor 2D7F validado y conserva todos los controles de diagnóstico e instalación.",
-  "version": "1.27.0",
-  "sha256": "a7c335b7d7f1398bd4cd17d2ddceb07a2b1686703b0d65220c23699df1a3ee8e"
+  "notes": "V1.28: parche mínimo sobre la MARKET 2D7F que ya funciona en el reloj. Conserva byte por byte header, BinID, descriptores, tabla de recursos y recursos dinámicos; cambia únicamente el bitmap de fondo por el diseño negro Reloj Lab. Si cmd3 cae a 0000, restaura automáticamente la 2D7F OEM.",
+  "sha256": "d5cbc33a81f0814f51e81b2ca38453109f483242013e30c3d3c939e99773a53e",
+  "version": "1.28.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.28.0/RelojLab.exe"
 }
