@@ -1,0 +1,41 @@
+name: Research V1.26 Compare MARKET Descriptors
+on:
+  push:
+    branches: [research-v123-valid-market]
+    paths: ['.github/workflows/research-v126-compare.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch carriers
+        run: |
+          mkdir -p evidence
+          for id in 2D7F 4CC6 04C2 D1AC C513; do
+            curl -L --fail --retry 3 "http://watchhealth.com.cn/k6File/clock/file/$id.bin" -o "evidence/$id.bin"
+          done
+      - name: Parse descriptor chains and resource tails
+        shell: bash
+        run: |
+          python - <<'PY' | tee evidence/report.txt
+          from pathlib import Path
+          def u16(b,o):return int.from_bytes(b[o:o+2],'little')
+          for p in sorted(Path('evidence').glob('*.bin')):
+            b=p.read_bytes(); print('\n===',p.stem,'len',len(b),'count',u16(b,10),'bin',b[4:6].hex(),'===')
+            off=0x10
+            for i in range(u16(b,10)):
+                typ=u16(b,off); x=u16(b,off+2);y=u16(b,off+4);p0=u16(b,off+6);kind=u16(b,off+8)
+                if kind==0x1202:n=28
+                elif kind==0x0804:n=18
+                else:n=12
+                print(i,hex(off),'n',n,'x',x,'y',y,'p0',hex(p0),'kind',hex(kind),'tail',b[off+10:off+n].hex())
+                off+=n
+            print('config_end',hex(off),'next64',b[off:off+64].hex())
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v126-compare
+          path: evidence
