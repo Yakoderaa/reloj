@@ -73,6 +73,19 @@ class ConnectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.kw['services'], [c.E91A])
         self.assertEqual(client.gate, [{'use_cached':False}])
 
+    async def test_pairing_is_explicit_and_attempted_only_once(self):
+        self.failures=[TimeoutError(),TimeoutError()]
+        with self.assertRaises(RuntimeError):
+            await c.connect_watch(self.app, services=[c.E91A], pair=True)
+        self.assertEqual(len(self.clients),1)
+        self.assertTrue(self.clients[0].kw['pair'])
+        self.assertEqual(self.clients[0].kw['timeout'],60)
+        self.assertTrue(self.clients[0].closed)
+
+    async def test_normal_connection_does_not_request_pairing(self):
+        client,_=await c.connect_watch(self.app)
+        self.assertNotIn('pair',client.kw)
+
     async def test_general_diagnostics_keep_full_catalog(self):
         client, _ = await c.connect_watch(self.app)
         self.assertNotIn('services', client.kw)

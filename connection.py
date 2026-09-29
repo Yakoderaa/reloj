@@ -30,14 +30,15 @@ def advertisement_metadata(device):
     return address_type, getattr(event, 'is_connectable', None)
 
 
-async def connect_watch(app, attempts=2, progress=None, *, services=None):
+async def connect_watch(app, attempts=2, progress=None, *, services=None, pair=False):
     progress = progress or (lambda message: None)
-    limit = min(2, max(1, attempts))
+    limit = 1 if pair else min(2, max(1, attempts))
     selected = app.selected or {}
     address = selected.get('address') or getattr(selected.get('device'), 'address', None)
     state = app.connection_state = dict(connected=False, attempts=0, phase='scan', history=[], native=[])
     requested = list(services) if services else None
     state['requested_services'] = requested
+    state['pair_requested'] = pair
     started = time.monotonic()
     active_row = None
     logger = logging.getLogger('bleak.backends.winrt.client')
@@ -83,7 +84,10 @@ async def connect_watch(app, attempts=2, progress=None, *, services=None):
                 if connectable is False:
                     raise RuntimeError('El reloj anuncia que no acepta conexiones BLE en este momento.')
                 cache = index == 1
-                kwargs = {'timeout': 30}
+                kwargs = {'timeout': 60 if pair else 30}
+                if pair:
+                    kwargs['pair'] = True
+                    progress('EMPAREJAMIENTO WINDOWS · solicitando vínculo nuevo antes de consultar GATT…')
                 if requested is not None:
                     kwargs['services'] = requested
                 if sys.platform == 'win32':
@@ -96,7 +100,7 @@ async def connect_watch(app, attempts=2, progress=None, *, services=None):
                     progress('GATT DIRECTO · consultando sólo ' + ', '.join(requested))
                 progress('ABRIENDO GATT · ' + ('catálogo en caché; se validará con lectura real' if cache else 'servicios leídos del reloj'))
                 client = BleakClient(target, **kwargs)
-                await asyncio.wait_for(client.connect(), timeout=35)
+                await asyncio.wait_for(client.connect(), timeout=65 if pair else 35)
                 if not client.is_connected:
                     raise RuntimeError('Windows no confirmó la conexión')
                 b1 = client.services.get_characteristic(B1)
@@ -137,8 +141,7 @@ async def connect_watch(app, attempts=2, progress=None, *, services=None):
                 await asyncio.sleep(3)
         state['phase'] = 'failed'
         raise RuntimeError('No se pudo abrir una conexión BLE utilizable. La esfera no se transfirió. '
-                           'Apagá temporalmente Bluetooth en el teléfono, acercá y reiniciá el reloj; '
-                           'después reintentá. Último error: ' + (str(last) or type(last).__name__))
+                           'El diagnóstico conserva los errores de cada intento. Último error: ' + (str(last) or type(last).__name__))
     finally:
         logger.removeHandler(handler)
         logger.setLevel(old_level)
