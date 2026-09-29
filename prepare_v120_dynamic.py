@@ -14,9 +14,9 @@ def patch_numeric(buf,off,x,y,fmt=None,size=None):
     p16(buf,off+2,x); p16(buf,off+4,y)
     if size is not None: p16(buf,off+6,size)
     if fmt is not None:
-        raw=fmt.encode("ascii")+b"\\0"
+        raw=fmt.encode("ascii")+bytes([0])
         if len(raw)>8: raise RuntimeError("formato MARKET demasiado largo")
-        buf[off+12:off+20]=raw.ljust(8,b"\\0")
+        buf[off+12:off+20]=raw.ljust(8,bytes([0]))
 
 assets=Path("assets")
 base=bytearray((assets/"donor_2D7F.bin").read_bytes())
@@ -47,7 +47,7 @@ fields={}
 for field,name in ((HOUR,"hour"),(MINUTE,"minute"),(STEPS,"steps"),(HEART,"heart_rate"),(BAT,"battery")):
     off=find_numeric(base,field)
     fields[name]={"field_id":f"0x{field:04X}","offset":off,"x":u16(base,off+2),"y":u16(base,off+4),
-                  "format":bytes(base[off+12:off+20]).split(b"\\0",1)[0].decode("ascii")}
+                  "format":bytes(base[off+12:off+20]).split(bytes([0]),1)[0].decode("ascii")}
 if u16(base,10)!=13: raise SystemExit("conteo MARKET inesperado")
 candidate=bytes(base)
 (assets/"target_face_v120.b64").write_text(base64.b64encode(zlib.compress(candidate,9)).decode("ascii"),encoding="ascii")
