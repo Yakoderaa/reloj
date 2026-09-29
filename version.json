@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.30.0/RelojLab.exe",
-  "notes": "V1.30 abandona los intentos MARKET para nuestra esfera y vuelve a la ruta CUSTOMIZE cmd=2 que ya instaló físicamente la referencia aprobada en V1.19. Instala el raster exacto 240x296, con hora/pasos/pulso del firmware y batería leída al instalar, y verifica custom_index + cmd2.",
-  "sha256": "32d0ba7013de5e69639bf323a664b0593d81666941f0dcbee836657030a693b8",
-  "version": "1.30.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.31.0/RelojLab.exe",
+  "notes": "V1.31 mantiene la ruta CUSTOMIZE cmd=2 que ya funciona físicamente y ajusta la estética según la foto real: hora, pasos y pulso del firmware ahora se renderizan en blanco y la batería estampada también pasa a blanco. Conserva fondo negro, dial analógico central y verificación custom_index + cmd2.",
+  "version": "1.31.0",
+  "sha256": "5a7967baebb1d6b45c633d0d95bbb78054f47dc2bbf76cb33ce78bb0967c5d59"
 }
