@@ -1,0 +1,27 @@
+name: Research V1.24 Native MARKET
+on:
+  push:
+    branches: [research-v123-valid-market]
+    paths: ['.github/workflows/research-v124.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch native full-field MARKET candidates
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p evidence
+          for id in D1AC C513 B4D6 0A9B 04C2; do
+            curl -L --fail --retry 3 "http://watchhealth.com.cn/k6File/clock/file/$id.bin" -o "evidence/$id.bin"
+            curl -L --fail --retry 3 "http://watchhealth.com.cn/k6File/clock/image/$id.png" -o "evidence/$id.png" || true
+            sha256sum "evidence/$id.bin"
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v124-native-market
+          path: evidence
