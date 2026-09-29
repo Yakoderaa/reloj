@@ -24,7 +24,7 @@ out=[]
 for i,e in enumerate(rows):
     did=str(e.get('dialId') or '')
     file=e.get('dialFile')
-    preview=e.get('preview') or e.get('dialPreview') or e.get('previewUrl') or e.get('imgUrl')
+    preview=e.get('previewImg') or e.get('preview') or e.get('dialPreview') or e.get('previewUrl') or e.get('imgUrl')
     rec={'i':i,'dialId':did,'file':file,'preview':preview}
     if isinstance(preview,str) and preview.startswith('http'):
         try:get(preview,root/'previews'/f'{did}.png')
