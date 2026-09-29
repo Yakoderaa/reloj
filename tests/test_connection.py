@@ -23,7 +23,7 @@ def advert():
 
 class ConnectionTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.app = NS(selected={'address': 'AA'})
+        self.app = NS(selected={'address': 'AA', 'device': device()})
         self.clients = []
         self.failures = []
         self.gate_failure = False
@@ -58,6 +58,8 @@ class ConnectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(n,1)
         self.assertEqual(client.kw['winrt'],dict(use_cached_services=False,address_type='random'))
         self.assertEqual(client.gate,[{'use_cached':False}])
+        self.discover.assert_not_awaited()
+        self.assertTrue(self.app.connection_state['history'][0]['scan_bypassed'])
         self.assertFalse(client.closed)
 
     async def test_filtered_discovery_avoids_full_catalog_failure(self):
@@ -73,14 +75,16 @@ class ConnectionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.kw['services'], [c.E91A])
         self.assertEqual(client.gate, [{'use_cached':False}])
 
-    async def test_pairing_is_explicit_and_attempted_only_once(self):
+    async def test_pairing_is_exact_and_bounded_to_two_attempts(self):
         self.failures=[TimeoutError(),TimeoutError()]
         with self.assertRaises(RuntimeError):
             await c.connect_watch(self.app, services=[c.E91A], pair=True)
-        self.assertEqual(len(self.clients),1)
-        self.assertTrue(self.clients[0].kw['pair'])
-        self.assertEqual(self.clients[0].kw['timeout'],60)
-        self.assertTrue(self.clients[0].closed)
+        self.assertEqual(len(self.clients),2)
+        self.discover.assert_not_awaited()
+        self.assertTrue(all(x.kw['pair'] for x in self.clients))
+        self.assertTrue(all(x.kw['timeout']==60 for x in self.clients))
+        self.assertTrue(all(x.target.address=='AA' for x in self.clients))
+        self.assertTrue(all(x.closed for x in self.clients))
 
     async def test_normal_connection_does_not_request_pairing(self):
         client,_=await c.connect_watch(self.app)
@@ -136,13 +140,17 @@ class ConnectionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_other_watch_is_never_substituted(self):
         self.discover.return_value={'BB':(device('BB'),advert())}
+        self.failures=[TimeoutError(),TimeoutError()]
         with self.assertRaises(RuntimeError):await c.connect_watch(self.app)
-        self.assertEqual(self.clients,[])
+        self.discover.assert_not_awaited()
+        self.assertTrue(all(x.target.address=='AA' for x in self.clients))
 
-    async def test_nonconnectable_advertisement_does_not_open_client(self):
-        self.discover.return_value={'AA':(device(connectable=False),advert())}
-        with self.assertRaises(RuntimeError):await c.connect_watch(self.app)
-        self.assertEqual(self.clients,[])
+    async def test_selected_address_does_not_depend_on_fresh_advertisement(self):
+        self.discover.return_value={}
+        client,n=await c.connect_watch(self.app)
+        self.assertEqual(n,1)
+        self.discover.assert_not_awaited()
+        self.assertEqual(client.target.address,'AA')
 
     async def test_ambiguous_discovery_stops(self):
         self.app.selected=None
@@ -160,9 +168,13 @@ class ConnectionTests(unittest.IsolatedAsyncioTestCase):
     async def test_unselected_unique_watch_pinned_across_attempts(self):
         self.app.selected=None
         self.failures=[TimeoutError()]
-        self.discover.side_effect=[{'AA':(device(),advert())},{'BB':(device('BB'),advert())}]
-        with self.assertRaises(RuntimeError):await c.connect_watch(self.app)
-        self.assertEqual(len(self.clients),1)
+        self.discover.return_value={'AA':(device(),advert())}
+        client,n=await c.connect_watch(self.app)
+        self.assertEqual(n,2)
+        self.assertEqual(self.discover.await_count,1)
+        self.assertEqual(len(self.clients),2)
+        self.assertTrue(all(x.target.address=='AA' for x in self.clients))
+        self.assertEqual(client.target.address,'AA')
 
     def test_missing_native_metadata_does_not_invent_address_type(self):
         self.assertEqual(c.advertisement_metadata(NS()),(None,None))
