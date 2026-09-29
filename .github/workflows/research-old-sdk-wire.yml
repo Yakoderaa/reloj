@@ -1,0 +1,41 @@
+name: Research Old SDK CEDevData
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download older UtraWatch APK
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p pkg evidence
+          for url in             'https://d.apkpure.net/b/APK/com.wtwd.utrawatch?version=latest'             'https://d.apkpure.net/b/XAPK/com.wtwd.utrawatch?version=latest'; do
+            curl -L --fail --retry 2 "$url" -o pkg/u.bin && break || true
+          done
+          file pkg/u.bin
+          ls -lh pkg/u.bin
+      - name: Install JADX
+        run: |
+          curl -L --fail --retry 3 https://github.com/skylot/jadx/releases/download/v1.5.3/jadx-1.5.3.zip -o jadx.zip
+          unzip -q jadx.zip -d jadx
+          chmod +x jadx/bin/jadx
+      - name: Decompile and find protocol serialization
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir decompiled
+          jadx/bin/jadx -d decompiled pkg/u.bin || true
+          grep -R -n -E 'setItemNumber|setItemL|itemNumber|itemL|class CEDevData|class CEProtocolB|DATA_TYPE_WATCH_FACE_SYNC|sendWatchFileData' decompiled > evidence/grep.txt || true
+          cut -d: -f1 evidence/grep.txt | sort -u | head -200 > evidence/files.txt || true
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            cp "$f" "evidence/$(echo "$f" | sed 's#^decompiled/##;s#/#__#g')" || true
+          done < evidence/files.txt
+          sed -n '1,1600p' evidence/grep.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: old-sdk-wire-evidence
+          path: evidence
