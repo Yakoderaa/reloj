@@ -15,7 +15,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          URL='https://04.apk.dog/storage/22/088/475/1088475/split/379294/UtraWatch.zip?apk_id=1232604&e=1790631237&file_id=3328642&lang=en&premium_speed=0&s=iCEtpd6BvpskuNvN9_qRsA&split_id=379294'
+          URL='https://d.apkpure.net/b/XAPK/com.wtwd.utrawatch?version=latest'
           curl -L --fail --retry 3 --connect-timeout 20 "$URL" -o UtraWatch.zip
           mkdir xapk
           unzip -q UtraWatch.zip -d xapk
