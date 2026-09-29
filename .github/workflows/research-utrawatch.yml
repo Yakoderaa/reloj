@@ -71,35 +71,22 @@ jobs:
           curl -L -sS --max-time 20 "http://watchhealth.com.cn/YueDongService/app/faceConfig.do?deviceId=1180&pageIndex=1" -o evidence/faceConfig-1180-p1.json || true
           echo '--- faceConfig 1180 ---' | tee -a evidence/online-summary.txt
           cat evidence/faceConfig-1180-p1.json | tee -a evidence/online-summary.txt || true
-          python - <<'PY'
-import json, glob, os, urllib.request, re
-urls=[]
-for path in glob.glob('evidence/faces-1180-p*.json'):
-    try: obj=json.load(open(path,encoding='utf-8'))
-    except Exception: continue
-    def walk(x):
-        if isinstance(x,dict):
-            for k,v in x.items():
-                if isinstance(v,str) and (v.startswith('http://') or v.startswith('https://')):
-                    urls.append((k,v))
-                walk(v)
-        elif isinstance(x,list):
-            for v in x: walk(v)
-    walk(obj)
-seen=set()
-with open('evidence/market-urls.txt','w',encoding='utf-8') as out:
-    for k,u in urls:
-        if u in seen: continue
-        seen.add(u); out.write(f'{k}\t{u}\n')
-bins=[u for k,u in urls if any(t in k.lower() for t in ('file','bin')) or u.lower().endswith('.bin')]
-for i,u in enumerate(dict.fromkeys(bins[:12])):
-    try:
-        dest=f'evidence/market-{i:02d}.bin'
-        urllib.request.urlretrieve(u,dest)
-        print('DOWNLOADED',dest,os.path.getsize(dest),u)
-    except Exception as e:
-        print('DOWNLOAD_FAIL',u,repr(e))
-PY
+          : > evidence/market-urls.txt
+          for j in evidence/faces-1180-p*.json; do
+            jq -r '.. | objects | to_entries[]? | select(.value|type=="string") | select(.value|startswith("http://") or startswith("https://")) | [.key,.value] | @tsv' "$j" >> evidence/market-urls.txt 2>/dev/null || true
+          done
+          sort -u evidence/market-urls.txt -o evidence/market-urls.txt
+          n=0
+          while IFS=$'\t' read -r key url; do
+            case "$key $url" in
+              *file*|*File*|*.bin*)
+                [ "$n" -ge 12 ] && break
+                dest=$(printf 'evidence/market-%02d.bin' "$n")
+                curl -L -sS --fail --max-time 30 "$url" -o "$dest" || rm -f "$dest"
+                if [ -f "$dest" ]; then echo "DOWNLOADED $dest $(wc -c < "$dest") $url"; n=$((n+1)); fi
+                ;;
+            esac
+          done < evidence/market-urls.txt
           for f in evidence/market-*.bin; do
             [ -f "$f" ] || continue
             echo "=== $f ===" >> evidence/market-analysis.txt
