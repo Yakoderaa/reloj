@@ -1,7 +1,7 @@
 name: Research UtraWatch Dial Transfer
 on:
   push:
-    branches: [main]
+    branches: [main, research-v120-market]
     paths:
       - '.github/workflows/research-utrawatch.yml'
   workflow_dispatch:
@@ -44,7 +44,7 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir evidence
-          PAT='DIAL_COMPRESS_CTRL|IS_START_BIG_SEND|DATA_TYPE_DIAL_SYNC|DATA_TYPE_DIAL_INFO|FUNCTION_CONTROL|添加大发送数据|大发送|DialInfo|DialSync|dialSync|bigSend|BigSend|GZipUtils|ANSWER_OVER|CUSTOMIZE|FileTransControl|sendFile|sendWatchFileData|getFileDownloadInfo|K6_DATA_TYPE_WATCH_FACE_INFO|WATCH_FACE_INFO|fileDataSendResult|fileStateResult|V2BleFileDownLoadActivity|startFileDownload|jSONObject.put|K6_DATA_TYPE_WATCH_FACE_SYN_NNNOMAL_CHOICE|FACE_SYN_NNNOMAL_CHOICE|ChoiceClockdialAdapter|Clockdial'
+          PAT='DIAL_COMPRESS_CTRL|IS_START_BIG_SEND|DATA_TYPE_DIAL_SYNC|DATA_TYPE_DIAL_INFO|FUNCTION_CONTROL|添加大发送数据|大发送|DialInfo|DialSync|dialSync|bigSend|BigSend|GZipUtils|ANSWER_OVER|CUSTOMIZE|FileTransControl|sendFile|sendWatchFileData|getFileDownloadInfo|K6_DATA_TYPE_WATCH_FACE_INFO|WATCH_FACE_INFO|fileDataSendResult|fileStateResult|V2BleFileDownLoadActivity|startFileDownload|jSONObject.put|K6_DATA_TYPE_WATCH_FACE_SYN_NNNOMAL_CHOICE|FACE_SYN_NNNOMAL_CHOICE|ChoiceClockdialAdapter|Clockdial|FaceMore|faceMore|faceDetail|binId|fileUrl|watch_face'
           grep -R -n -E "$PAT" decompiled > evidence/grep.txt || true
           echo '=== MATCH COUNT ==='
           wc -l evidence/grep.txt
@@ -56,6 +56,58 @@ jobs:
             safe=$(echo "$f" | sed 's#^decompiled/##; s#/#__#g')
             cp "$f" "evidence/$safe" || true
           done < evidence/files.txt
+          cp decompiled/sources/com/utra/entity/FaceMoreBaseBean.java evidence/ 2>/dev/null || true
+          cp decompiled/sources/com/utra/entity/FaceMoreDetailBean.java evidence/ 2>/dev/null || true
+          cp decompiled/sources/com/utra/entity/FaceDetailBean.java evidence/ 2>/dev/null || true
+          cp decompiled/sources/com/utra/ui/module/device/watch/more/V2MoreWatchFaceVM.java evidence/ 2>/dev/null || true
+          cp decompiled/sources/com/utra/vm/V2ModifyClockdialVM.java evidence/ 2>/dev/null || true
+          echo '=== ONLINE DEVICE 1180 ===' | tee evidence/online-summary.txt
+          for page in 0 1 2 3; do
+            curl -L -sS --max-time 20 "http://watchhealth.com.cn/YueDongService/app/faces.do?deviceId=1180&pageIndex=$page" -o "evidence/faces-1180-p$page.json" || true
+            echo "--- faces page $page ---" | tee -a evidence/online-summary.txt
+            cat "evidence/faces-1180-p$page.json" | tee -a evidence/online-summary.txt || true
+            echo | tee -a evidence/online-summary.txt
+          done
+          curl -L -sS --max-time 20 "http://watchhealth.com.cn/YueDongService/app/faceConfig.do?deviceId=1180&pageIndex=1" -o evidence/faceConfig-1180-p1.json || true
+          echo '--- faceConfig 1180 ---' | tee -a evidence/online-summary.txt
+          cat evidence/faceConfig-1180-p1.json | tee -a evidence/online-summary.txt || true
+          python - <<'PY'
+import json, glob, os, urllib.request, re
+urls=[]
+for path in glob.glob('evidence/faces-1180-p*.json'):
+    try: obj=json.load(open(path,encoding='utf-8'))
+    except Exception: continue
+    def walk(x):
+        if isinstance(x,dict):
+            for k,v in x.items():
+                if isinstance(v,str) and (v.startswith('http://') or v.startswith('https://')):
+                    urls.append((k,v))
+                walk(v)
+        elif isinstance(x,list):
+            for v in x: walk(v)
+    walk(obj)
+seen=set()
+with open('evidence/market-urls.txt','w',encoding='utf-8') as out:
+    for k,u in urls:
+        if u in seen: continue
+        seen.add(u); out.write(f'{k}\t{u}\n')
+bins=[u for k,u in urls if any(t in k.lower() for t in ('file','bin')) or u.lower().endswith('.bin')]
+for i,u in enumerate(dict.fromkeys(bins[:12])):
+    try:
+        dest=f'evidence/market-{i:02d}.bin'
+        urllib.request.urlretrieve(u,dest)
+        print('DOWNLOADED',dest,os.path.getsize(dest),u)
+    except Exception as e:
+        print('DOWNLOAD_FAIL',u,repr(e))
+PY
+          for f in evidence/market-*.bin; do
+            [ -f "$f" ] || continue
+            echo "=== $f ===" >> evidence/market-analysis.txt
+            file "$f" >> evidence/market-analysis.txt || true
+            wc -c "$f" >> evidence/market-analysis.txt || true
+            xxd -l 256 "$f" >> evidence/market-analysis.txt || true
+            strings -a -n 4 "$f" | head -80 >> evidence/market-analysis.txt || true
+          done
           find evidence -maxdepth 1 -type f -printf '%f\n' | sort
       - uses: actions/upload-artifact@v4
         with:
