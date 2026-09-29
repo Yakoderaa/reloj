@@ -6,47 +6,58 @@ ROOT=Path(__file__).resolve().parents[1]
 
 def u16(raw,o): return int.from_bytes(raw[o:o+2],'little')
 
+def rec_len(raw,off):
+    if u16(raw,off)!=0x0164: raise AssertionError(hex(off))
+    kind=u16(raw,off+8)
+    return 28 if kind==0x1202 else 18 if kind==0x0804 else 12
+
+def chain(raw,count):
+    off=0x10; starts=[]
+    for _ in range(count):
+        starts.append(off); off+=rec_len(raw,off)
+    return starts,off
+
 def find_field(raw,field):
-    for off in range(0x10,0x800-28):
-        if u16(raw,off)==0x0164 and u16(raw,off+8)==0x1202 and u16(raw,off+10)==field:
+    starts,_=chain(raw,u16(raw,10))
+    for off in starts:
+        if rec_len(raw,off)==28 and u16(raw,off+8)==0x1202 and u16(raw,off+10)==field:
             return off
     return None
 
 class DynamicFaceTests(unittest.TestCase):
-    def test_v122_is_real_market_face_with_live_fields(self):
-        raw=zlib.decompress(base64.b64decode((ROOT/'assets'/'target_face_v121.b64').read_text(encoding='ascii').strip()))
+    def load(self):
+        return zlib.decompress(base64.b64decode((ROOT/'assets'/'target_face_v123.b64').read_text(encoding='ascii').strip()))
+
+    def test_v123_market_table_is_contiguous(self):
+        raw=self.load()
         self.assertEqual(int.from_bytes(raw[:4],'little'),len(raw)-16)
         self.assertEqual(raw[4:6].hex(),'4cc6')
         self.assertEqual(u16(raw,10),12)
+        starts,end=chain(raw,12)
+        self.assertEqual(starts[:7],[0x10,0x1c,0x28,0x34,0x40,0x4c,0x5e])
+        self.assertEqual(starts[7],0x6a)
+        self.assertEqual(starts[7:],[0x6a,0x86,0xa2,0xbe,0xda])
+        self.assertEqual(end,0xf6)
+        self.assertNotEqual(raw[0x6a:0x6c],bytes(2))
+
+    def test_v123_has_all_live_fields(self):
+        raw=self.load()
         for field in (0x8001,0x8002,0x8009,0x800E,0x8013):
             self.assertIsNotNone(find_field(raw,field),hex(field))
-        meta=json.loads((ROOT/'assets'/'target_face_v121.json').read_text(encoding='utf-8'))
+        meta=json.loads((ROOT/'assets'/'target_face_v123.json').read_text(encoding='utf-8'))
         self.assertEqual(meta['raw_sha256'],hashlib.sha256(raw).hexdigest())
-        self.assertEqual(meta['bin_id_hex'],'4cc6')
-        self.assertTrue(meta['checks']['all_pass'])
+        self.assertTrue(meta['checks']['descriptor_chain_contiguous'])
+        self.assertTrue(meta['checks']['no_alignment_gap'])
 
-    def test_approved_layout_fields_are_encoded(self):
-        raw=zlib.decompress(base64.b64decode((ROOT/'assets'/'target_face_v121.b64').read_text(encoding='ascii').strip()))
-        expected={0x8001:(18,24),0x8002:(54,16),0x8013:(178,24),0x8009:(10,255),0x800E:(160,255)}
-        for field,xy in expected.items():
-            off=find_field(raw,field)
-            self.assertEqual((u16(raw,off+2),u16(raw,off+4)),xy)
-
-    def test_app_uses_market_cmd3_and_market_selection(self):
+    def test_app_never_selects_market_before_registration(self):
         source=(ROOT/'app.py').read_text(encoding='utf-8')
-        self.assertIn('APP_VERSION="1.22.0"',source)
+        self.assertIn('APP_VERSION="1.23.0"',source)
         self.assertIn('transfer_slot(3,"DYNAMIC-MARKET"',source)
-        self.assertIn('market_index=face_slots.get("market_index")',source)
-        self.assertIn('expected_market_bin_id_hex',source)
-        self.assertNotIn('transfer_slot(2,"DYNAMIC-CUSTOMIZE"',source)
-
-    def test_market_bin_id_is_assigned_before_first_use(self):
-        source=(ROOT/'app.py').read_text(encoding='utf-8')
-        assignment='path,raw,target_w,target_h,market_fields,market_bin_id,wf_meta=await asyncio.to_thread(build_dynamic_reference_v121)'
-        first_use='emit("1/9 · Cargando esfera aprobada como MARKET REAL 240×296 · BinID "+market_bin_id.upper()+"…")'
-        self.assertIn(assignment,source)
-        self.assertIn(first_use,source)
-        self.assertLess(source.index(assignment),source.index(first_use))
+        guard='if not registration_ok:'
+        select='_,sel_status,_=await tx83_wait(bytes([1,market_index&255]),3.0)'
+        self.assertIn(guard,source); self.assertIn(select,source)
+        self.assertLess(source.index(guard),source.index(select))
+        self.assertIn('NO se selecciona ningún slot viejo',source)
 
 if __name__=='__main__':
     unittest.main()
