@@ -24,7 +24,7 @@ class NativeMarketTests(unittest.TestCase):
     def test_manifest_marks_both_candidates_byte_for_byte(self):
         meta=json.loads((ROOT/'assets'/'market_native_v124.json').read_text(encoding='utf-8'))
         self.assertEqual(meta['version'],'1.25.0')
-        self.assertEqual([x['bin_id_hex'] for x in meta['candidates']],['4cc6','2d7f'])
+        self.assertEqual([x['bin_id_hex'] for x in meta['candidates']],['2d7f','4cc6'])
         self.assertTrue(all(x['byte_for_byte'] for x in meta['candidates']))
 
     def test_app_tries_native_market_and_never_selects_before_registration(self):
@@ -37,7 +37,7 @@ class NativeMarketTests(unittest.TestCase):
         self.assertIn('Ningún MARKET OEM fue registrado; NO se selecciona ninguna esfera vieja.',source)
         self.assertIn('market_id_ok(selected_info,market_bin_id)',source)
 
-    def test_v124_does_not_embed_synthesized_target_market(self):
+    def test_v125_does_not_embed_synthesized_target_market(self):
         source=(ROOT/'app.py').read_text(encoding='utf-8')
         self.assertNotIn('target_face_v123.b64',source)
         self.assertNotIn('approved-market-v123.bin',source)
