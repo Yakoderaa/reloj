@@ -1,0 +1,42 @@
+name: Research V1.32 CUSTOMIZE serialization
+on:
+  push:
+    branches: [research-v132-customize]
+    paths: ['.github/workflows/research-v132-serialization.yml']
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download UtraWatch package
+        shell: bash
+        run: |
+          mkdir -p pkg evidence
+          curl -L --fail --retry 3 'https://d.apkpure.net/b/XAPK/com.wtwd.utrawatch?version=latest' -o pkg/u.xapk
+          unzip -q pkg/u.xapk -d pkg/x
+      - name: Install JADX
+        run: |
+          curl -L --fail --retry 3 https://github.com/skylot/jadx/releases/download/v1.5.3/jadx-1.5.3.zip -o jadx.zip
+          unzip -q jadx.zip -d jadx
+          chmod +x jadx/bin/jadx
+      - name: Decompile and extract watch edit pipeline
+        shell: bash
+        run: |
+          APK=$(find pkg/x -type f -name '*.apk' -printf '%s %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
+          mkdir decompiled
+          jadx/bin/jadx -d decompiled "$APK" || true
+          find decompiled/sources/com/wtwd/cocousa/ui/module/main/device -type f \( -name 'WatchEdit*.java' -o -name 'WatchDownload*.java' \) -print > evidence/files.txt || true
+          grep -R -l -E 'DialInfo|timeLocation|timeUpType|timeDownType|textColor|set.*Color|clock.*dial|WATCH_FACE.*EDIT|watch.*edit' decompiled/sources/com/wr decompiled/sources/com/wtwd/cocousa 2>/dev/null | sort -u >> evidence/files.txt || true
+          sort -u evidence/files.txt -o evidence/files.txt
+          head -200 evidence/files.txt
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            cp "$f" "evidence/$(echo "$f" | sed 's#^decompiled/##;s#/#__#g')" || true
+          done < evidence/files.txt
+          grep -R -n -E 'DialInfo|timeLocation|timeUpType|timeDownType|textColor|setTextColor|WATCH_FACE|watch.?face|cmd.?2|filePath|color' decompiled/sources/com/wr decompiled/sources/com/wtwd/cocousa/ui/module/main/device/editwatch decompiled/sources/com/wtwd/cocousa/ui/module/main/device/morewatch 2>/dev/null > evidence/grep.txt || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v132-customize-serialization
+          path: evidence
