@@ -1,0 +1,44 @@
+name: Research V1.32 CUSTOMIZE SDK
+on:
+  push:
+    branches: [research-v132-customize]
+    paths: ['.github/workflows/research-v132-customize.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download UtraWatch package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir pkg evidence
+          curl -L --fail --retry 3 'https://d.apkpure.net/b/XAPK/com.wtwd.utrawatch?version=latest' -o pkg/UtraWatch.xapk
+          unzip -q pkg/UtraWatch.xapk -d pkg/xapk
+      - name: Install JADX
+        shell: bash
+        run: |
+          curl -L --fail --retry 3 https://github.com/skylot/jadx/releases/download/v1.5.3/jadx-1.5.3.zip -o jadx.zip
+          unzip -q jadx.zip -d jadx
+          chmod +x jadx/bin/jadx
+      - name: Decompile base APK and extract customize classes
+        shell: bash
+        run: |
+          set -euxo pipefail
+          APK=$(find pkg/xapk -type f -name '*.apk' -printf '%s %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
+          mkdir decompiled
+          jadx/bin/jadx -d decompiled "$APK" || true
+          grep -R -n -i -E 'customize|custom.*dial|clockdial|watch.?face.*custom|time.?pos|value.?up|value.?down|picture.?mode|dial.?color|background.?position|cbin' decompiled/sources > evidence/grep.txt || true
+          cut -d: -f1 evidence/grep.txt | sort -u | head -200 > evidence/files.txt || true
+          while IFS= read -r f; do
+            [ -f "$f" ] || continue
+            cp "$f" "evidence/$(echo "$f" | sed 's#^decompiled/##;s#/#__#g')" || true
+          done < evidence/files.txt
+          sed -n '1,2400p' evidence/grep.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v132-customize-sdk
+          path: evidence
