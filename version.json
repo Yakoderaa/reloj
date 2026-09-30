@@ -1,6 +1,6 @@
 {
-  "version": "1.32.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.32.0/RelojLab.exe",
-  "notes": "V1.32 mantiene la ruta CUSTOMIZE ya validada y agrega el WatchEdit OEM real después de instalar y seleccionar la esfera: aplica posición, pasos, pulso y texto blanco, y fuerza la recarga del slot CUSTOMIZE.",
-  "sha256": "d5aeceffbd431363cdab199d1f7ba0f42b8c4ad4ad9ce5221c9e64c46d90c60f"
+  "notes": "V1.33 cambia la esfera al motor MARKET nativo 2D7F para que hora digital, batería, pasos, pulso y las tres agujas sean datos vivos del firmware. Mantiene la conexión/reparación BLE estable de V1.32 y sólo reemplaza el slot MARKET descargable.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.33.0/RelojLab.exe",
+  "sha256": "99a0729d63a56fb5d08ac09b73c9d664e3e82afd6cb24c3a2bc4cf708f14e85a",
+  "version": "1.33.0"
 }
