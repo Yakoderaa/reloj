@@ -26,7 +26,7 @@ jobs:
         run: python prepare_v133_dynamic.py
       - run: python -m unittest discover -s tests
       - run: python -m py_compile app.py connection.py windows_binding.py prepare_v133_dynamic.py
-      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v133_dynamic.b64;assets" --add-data "assets/face_v133.json;assets" app.py
+      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v133_custom_same_id.b64;assets" --add-data "assets/face_v133.json;assets" app.py
       - name: Calculate EXE SHA256 and updater manifest
         shell: pwsh
         run: |

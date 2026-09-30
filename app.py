@@ -700,7 +700,7 @@ class App:
             def load_dynamic_market_v133():
                 import base64,zlib
                 root=getattr(sys,"_MEIPASS",os.path.dirname(os.path.abspath(__file__)))
-                asset=os.path.join(root,"assets","face_v133_dynamic.b64")
+                asset=os.path.join(root,"assets","face_v133_custom_same_id.b64")
                 meta_path=os.path.join(root,"assets","face_v133.json")
                 if not os.path.exists(asset):
                     raise RuntimeError("Falta la esfera dinámica V1.33")
@@ -770,7 +770,7 @@ class App:
                     "strategy":"native 2D7F MARKET dynamic engine with approved Reloj Lab layout",
                     "format":"UtraWatch MARKET nativo · BinID 2D7F",
                     "visual_mode":"black analog face + native firmware live descriptors",
-                    "target_source":"assets/face_v133_dynamic.b64",
+                    "target_source":"assets/face_v133_custom_same_id.b64",
                     "width":240,"height":296,
                     "design":"fondo negro · analógico central · agujas blancas · segundero rojo · hora arriba izquierda · batería arriba derecha · pasos abajo izquierda · pulso abajo derecha",
                     "dynamic_fields":{
