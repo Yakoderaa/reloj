@@ -8,7 +8,7 @@ def approved_raw():
     packed=(ROOT/"assets"/"target_face_v086.b64").read_text(encoding="ascii").strip()
     return zlib.decompress(base64.b64decode(packed))
 
-class ExactCustomizeV130Tests(unittest.TestCase):
+class ExactCustomizeV132Tests(unittest.TestCase):
     def test_approved_asset_is_exact_known_reference(self):
         raw=approved_raw()
         self.assertEqual(len(raw),142090)
@@ -19,13 +19,13 @@ class ExactCustomizeV130Tests(unittest.TestCase):
 
     def test_app_uses_proven_customize_cmd2_route(self):
         source=(ROOT/"app.py").read_text(encoding="utf-8")
-        self.assertIn('APP_VERSION="1.31.0"',source)
+        self.assertIn('APP_VERSION="1.32.0"',source)
         self.assertIn("build_exact_customize_v130",source)
         self.assertIn("build_live_customize_v130",source)
         self.assertIn('transfer_slot(2,"EXACT-CUSTOMIZE"',source)
         self.assertIn('custom_index=face_slots.get("custom_index")',source)
         self.assertIn("expected_cmd2_hex",source)
-        self.assertIn("exact_approved_reference_installed_and_selected",source)
+        self.assertIn("approved_customize_style_applied_and_selected",source)
 
     def test_market_is_not_used_for_custom_artwork(self):
         source=(ROOT/"app.py").read_text(encoding="utf-8")
@@ -42,10 +42,17 @@ class ExactCustomizeV130Tests(unittest.TestCase):
         self.assertIn('raw[3]=0xFF',source)
         self.assertIn('raw[4]=0xFF',source)
         self.assertIn('customize_layout_limit',source)
+        self.assertIn('official_customize_edit',source)
+        self.assertIn('edit_payload=bytes([2])+len(edit_data).to_bytes(4,"little")',source)
+        self.assertIn('edit_time_location=0',source)
+        self.assertIn('edit_time_up=8',source)
+        self.assertIn('edit_time_down=4',source)
+        self.assertIn('edit_color=bytes([0xFF,0xFF])',source)
+        self.assertIn('customize_reload',source)
 
     def test_control_active_toolbar_still_present(self):
         source=(ROOT/"app.py").read_text(encoding="utf-8")
-        self.assertIn('REPARAR VÍNCULO E INSTALAR V1.31',source)
+        self.assertIn('REPARAR VÍNCULO E INSTALAR V1.32',source)
         self.assertIn('COPIAR DIAGNÓSTICO',source)
         self.assertIn('ENVIAR HEX',source)
 

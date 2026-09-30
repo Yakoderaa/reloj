@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math
 
-APP_VERSION="1.31.0"
+APP_VERSION="1.32.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V1.31"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V1.32"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -36,7 +36,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V1.31 · MARKET válido + registro seguro").pack(side="left",padx=12)
+        ttk.Label(top,text="V1.32 · CUSTOMIZE OEM + WatchEdit").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -333,7 +333,7 @@ class App:
         ttk.Label(w,text="Analizador B002 → B001",font=("Segoe UI",14,"bold")).pack(anchor="w",padx=12,pady=(12,4))
         ttk.Label(w,text="Captura respuestas completas y compara bytes. El canal OTA FFC1 permanece separado.").pack(anchor="w",padx=12)
         row=ttk.Frame(w,padding=12); row.pack(fill="x")
-        # V1.31 regression guard: CONTROL ACTIVO toolbar is created before the log
+        # V1.32 regression guard: CONTROL ACTIVO toolbar is created before the log
         # and must remain intact; V1.26 accidentally replaced capture() with installer code.
         ttk.Entry(row,textvariable=self.raw_hex,width=70).pack(side="left",fill="x",expand=True)
         log=tk.Text(w,font=("Consolas",9),wrap="none"); log.pack(fill="both",expand=True,padx=12,pady=(0,12))
@@ -403,7 +403,7 @@ class App:
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.31")
+        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.32")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)
         ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
@@ -653,9 +653,9 @@ class App:
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab(pair=False):
             if self.ble_busy:
-                append("V1.31 NO INICIADA · Bluetooth ocupado.")
+                append("V1.32 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V1.31 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
+            append("V1.32 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
             rep=self.base_report()
             rep["windows_binding_repair"]=dict(getattr(self,"binding_repair",{}))
             rep["single_face_install"]={
@@ -705,7 +705,7 @@ class App:
                     raise RuntimeError("Falta la referencia aprobada target_face_v086.b64")
                 raw=zlib.decompress(base64.b64decode(open(asset,"r",encoding="ascii").read().strip()))
                 if len(raw)!=142090:
-                    raise RuntimeError("Referencia aprobada V1.31 con tamaño inesperado: "+str(len(raw)))
+                    raise RuntimeError("Referencia aprobada V1.32 con tamaño inesperado: "+str(len(raw)))
                 if raw[5]!=2 or int.from_bytes(raw[6:8],"little")!=240 or int.from_bytes(raw[8:10],"little")!=296:
                     raise RuntimeError("Cabecera CUSTOMIZE aprobada inválida: "+raw[:10].hex())
                 folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),
@@ -720,7 +720,7 @@ class App:
                 # time/steps/heart fields. Battery is stamped from DEV_SYNC at install.
                 raw=bytearray(base_raw)
                 if len(raw)!=142090 or raw[5]!=2:
-                    raise RuntimeError("Base CUSTOMIZE V1.31 inválida")
+                    raise RuntimeError("Base CUSTOMIZE V1.32 inválida")
                 raw[0]=0       # firmware clock at top
                 raw[1]=8       # live steps
                 raw[2]=4       # live heart rate
@@ -821,7 +821,7 @@ class App:
                 expected_cmd2=None
                 oem_stream=None
                 deflated=None
-                emit("1/9 · Cargando NUESTRA esfera aprobada 240×296 · perfil visual blanco V1.31…")
+                emit("1/9 · Cargando NUESTRA esfera aprobada 240×296 · perfil visual blanco V1.32…")
                 rep["single_face_install"]["candidate"]={
                     "path":path,
                     "strategy":"proven V1.19 CUSTOMIZE cmd=2 route",
@@ -836,7 +836,7 @@ class App:
                         "heart_rate":"firmware live · CUSTOMIZE value 4",
                         "battery":"read from watch at install time"
                     },
-                    "analog_note":"CUSTOMIZE mantiene las agujas del raster estáticas; V1.31 prioriza aspecto aprobado + hora/pasos/pulso funcionales.",
+                    "analog_note":"CUSTOMIZE mantiene las agujas del raster estáticas; V1.32 prioriza aspecto aprobado + hora/pasos/pulso funcionales.",
                     "base_raw_size":len(base_raw),
                     "base_raw_sha256":hashlib.sha256(base_raw).hexdigest()
                 }
@@ -1123,7 +1123,7 @@ class App:
                                    "continuous_live":False},
                         "analog_hands":{"source":"approved raster","continuous_live":False}
                     }
-                    emit("DISEÑO V1.31 · datos LIVE en blanco; pasos azul + pulso rojo del firmware; batería="+battery_text+".")
+                    emit("DISEÑO V1.32 · datos LIVE en blanco; pasos azul + pulso rojo del firmware; batería="+battery_text+".")
 
                     if device_pid is None:
                         pid_mark=len(messages)
@@ -1167,7 +1167,7 @@ class App:
                     if not face_slots or face_slots.get("custom_index") is None:
                         raise RuntimeError("No se pudo resolver el slot editable de la esfera; no se seleccionará un índice a ciegas.")
 
-                    # V1.31: stop using MARKET for our custom artwork. The same
+                    # V1.32: stop using MARKET for our custom artwork. The same
                     # approved cBin already installed successfully on this physical watch
                     # through CUSTOMIZE cmd=2 in V1.19.
                     post=None
@@ -1250,33 +1250,92 @@ class App:
                         "expected_cmd2_hex":expected_cmd2,
                         "dial_info":selected_info,"attempts":selection_attempts
                     }
+
+                    if not selection_verified:
+                        raise RuntimeError("CUSTOMIZE no quedó seleccionado; no se aplica WatchEdit sobre otro slot.")
+
+                    # V1.32: UtraWatch's own WatchEditModel does NOT rely only on the
+                    # image header. After the CUSTOMIZE image is installed it sends a
+                    # second cmd=2 packet whose six data bytes are:
+                    # timeLocation, timeUpType, timeDownType, color16[2], apply=1.
+                    # This is the missing step that explains why V1.31 metadata changed
+                    # but the physical renderer kept the old red/orange style.
+                    edit_time_location=0
+                    edit_time_up=8
+                    edit_time_down=4
+                    edit_color=bytes([0xFF,0xFF])
+                    edit_data=bytes([
+                        edit_time_location,edit_time_up,edit_time_down,
+                        edit_color[0],edit_color[1],1
+                    ])
+                    edit_payload=bytes([2])+len(edit_data).to_bytes(4,"little")+(0).to_bytes(4,"little")+edit_data
+                    emit("7/9 · APLICANDO ESTILO OEM · WatchEdit cmd=2 · blanco + pasos + pulso…")
+                    _,edit_status,_=await tx83_wait(edit_payload,4.0)
+                    await asyncio.sleep(1.4)
+                    edit_mark=len(messages)
+                    await tx(0x84,b"",3,0)
+                    edit_info=dial_info(await wait_data(0x84,edit_mark,5.0))
+                    edit_expected_hex=(bytes([
+                        edit_time_location,edit_time_up,edit_time_down,
+                        edit_color[0],edit_color[1],1
+                    ])).hex()
+                    edit_metadata_ok=bool(
+                        edit_info and
+                        (edit_info.get("cmd2_hex") or "")[:10]==edit_expected_hex[:10]
+                    )
+                    rep["single_face_install"]["official_customize_edit"]={
+                        "source":"UtraWatch WatchEditModel.h decompiled",
+                        "payload_hex":edit_payload.hex(),
+                        "data_hex":edit_data.hex(),
+                        "time_location":edit_time_location,
+                        "time_up_type":edit_time_up,
+                        "time_down_type":edit_time_down,
+                        "text_color":"white / 0xFFFF",
+                        "status":edit_status,
+                        "dial_info_after_edit":edit_info,
+                        "metadata_prefix_ok":edit_metadata_ok
+                    }
+
+                    # Force the firmware renderer to reload the edited CUSTOMIZE slot.
+                    _,reload_status,_=await tx83_wait(bytes([1,custom_index&255]),3.0)
+                    await asyncio.sleep(1.8)
+                    reload_mark=len(messages)
+                    await tx(0x84,b"",3,0)
+                    reload_info=dial_info(await wait_data(0x84,reload_mark,5.0))
+                    reload_index_ok=bool(reload_info and reload_info.get("index")==custom_index)
+                    rep["single_face_install"]["customize_reload"]={
+                        "status":reload_status,
+                        "dial_info":reload_info,
+                        "index_ok":reload_index_ok
+                    }
                     rep["single_face_install"]["market_attempt"]={
                         "attempted":False,
-                        "reason":"V1.31 vuelve a la ruta CUSTOMIZE cmd=2 físicamente validada; MARKET personalizado fue rechazado por firmware."
+                        "reason":"V1.32 vuelve a la ruta CUSTOMIZE cmd=2 físicamente validada; MARKET personalizado fue rechazado por firmware."
                     }
                     rep["single_face_install"]["factory_faces_deleted"]=False
                     rep["single_face_install"]["factory_faces_note"]="No se tocan esferas integradas de fábrica."
                     rep["single_face_install"]["dial_state_changed"]=bool(
                         pre and selected_info and pre.get("raw_hex")!=selected_info.get("raw_hex"))
 
-                    emit("8/9 · Postcheck de conexión y CUSTOMIZE…")
+                    emit("8/9 · Postcheck de conexión + estilo OEM + CUSTOMIZE…")
                     connected=bool(getattr(c,"is_connected",False))
                     transfer_ok=bool(exact_transfer.get("ok") and connected)
-                    all_ok=bool(transfer_ok and sel_status==1 and selection_verified)
+                    style_ok=bool(edit_status==1 and reload_status==1 and reload_index_ok)
+                    all_ok=bool(transfer_ok and sel_status==1 and selection_verified and style_ok)
                     rep["single_face_install"]["protocol_acks_sent"]=protocol_acks_sent
                     rep["single_face_install"]["wire_protocol"]={
                         "final_dev_type":wire_dev_type,"next_n":tx_n,
                         "note":"CEProtocolB byte1=device_type; byte3=N"
                     }
                     rep["single_face_install"]["classification"]=(
-                        "exact_approved_reference_installed_and_selected" if all_ok else
-                        "exact_approved_reference_transferred_selection_pending" if transfer_ok else
-                        "exact_approved_reference_install_failed"
+                        "approved_customize_style_applied_and_selected" if all_ok else
+                        "approved_customize_installed_style_pending" if transfer_ok and selection_verified else
+                        "approved_customize_install_failed"
                     )
 
                     rep["single_face_install"]["connected_end"]=connected
                     rep["single_face_install"]["phase"]="complete"
-                    emit("9/9 · V1.31 FINALIZADA · "+rep["single_face_install"]["classification"])
+                    emit("9/9 · V1.32 FINALIZADA · "+rep["single_face_install"]["classification"])
                     return rep
                 finally:
                     if c:
@@ -1291,14 +1350,14 @@ class App:
                     rep["errors"].append(type(error).__name__+": "+str(error))
                     rep["single_face_install"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("V1.31 FALLÓ · "+repr(error))
+                    append("V1.32 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V1.31 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V1.32 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
                 append("ESFERA ÚNICA · "+result["single_face_install"]["classification"]+".")
-                self.status.set("V1.31 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
+                self.status.set("V1.32 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
             self.run_async(asyncio.wait_for(work(),timeout=420),done)
         def repair_binding():
             if self.ble_busy:
@@ -1331,9 +1390,9 @@ class App:
                 append("REPARACIÓN · continuando con emparejamiento e instalación…")
                 ota_lab(pair=True)
             self.run_async(repair_selected(self,address,emit_repair),repaired)
-        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.31",command=repair_binding)
+        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.32",command=repair_binding)
         ttk.Button(row,text="INSTALAR SIN REPARAR",command=ota_lab).pack(side="left",padx=4)
-        append("V1.31 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.31; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
+        append("V1.32 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.32; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("La instalación sólo comienza después de confirmar una conexión ATT operativa.")
