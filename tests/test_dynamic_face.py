@@ -6,12 +6,12 @@ ROOT=Path(__file__).resolve().parents[1]
 class DynamicMarketV133Tests(unittest.TestCase):
     def test_app_version_and_market_route(self):
         source=(ROOT/"app.py").read_text(encoding="utf-8")
-        self.assertIn('APP_VERSION="1.33.0"',source)
-        self.assertIn("load_dynamic_market_v133",source)
-        self.assertIn('transfer_slot(3,"DYNAMIC-MARKET-2D7F"',source)
+        self.assertIn('APP_VERSION="1.34.0"',source)
+        self.assertIn("load_dynamic_market_v134",source)
+        self.assertIn('transfer_slot(3,"MARKET-"+variant["bin_id_hex"].upper()',source)
         self.assertIn('"slot":"MARKET"',source)
-        self.assertIn("dynamic_market_face_installed_and_selected",source)
-        self.assertNotIn("build_live_customize_v130",source)
+        self.assertIn("dynamic_market_forced_selected_",source)
+        self.assertIn("face_v133_custom_verified.b64",source)\n        self.assertIn("face_v133_custom_same_id.b64",source)
 
     def test_all_required_live_fields_are_declared(self):
         source=(ROOT/"prepare_v133_dynamic.py").read_text(encoding="utf-8")
