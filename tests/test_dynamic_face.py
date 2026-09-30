@@ -11,7 +11,8 @@ class DynamicMarketV133Tests(unittest.TestCase):
         self.assertIn('transfer_slot(3,"MARKET-"+variant["bin_id_hex"].upper()',source)
         self.assertIn('"slot":"MARKET"',source)
         self.assertIn("dynamic_market_forced_selected_",source)
-        self.assertIn("face_v133_custom_verified.b64",source)\n        self.assertIn("face_v133_custom_same_id.b64",source)
+        self.assertIn("face_v133_custom_verified.b64",source)
+        self.assertIn("face_v133_custom_same_id.b64",source)
 
     def test_all_required_live_fields_are_declared(self):
         source=(ROOT/"prepare_v133_dynamic.py").read_text(encoding="utf-8")
