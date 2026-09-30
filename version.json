@@ -1,6 +1,6 @@
 {
-  "notes": "V1.33 cambia la esfera al motor MARKET nativo 2D7F para que hora digital, batería, pasos, pulso y las tres agujas sean datos vivos del firmware. Mantiene la conexión/reparación BLE estable de V1.32 y sólo reemplaza el slot MARKET descargable.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.33.0/RelojLab.exe",
-  "sha256": "99a0729d63a56fb5d08ac09b73c9d664e3e82afd6cb24c3a2bc4cf708f14e85a",
-  "version": "1.33.0"
+  "sha256": "9ea7eeb8d4fcc00cd29fb7b0cf9ed2657de53d0374573427c423a1bb96465bd1",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.34.0/RelojLab.exe",
+  "notes": "V1.34 corrige el bloqueo de V1.33: prueba MARKET 4CC6 y 2D7F, fuerza la selección del slot aunque WATCH_FACE_INFO no publique antes el BinID y valida principalmente por ACK + cambio real de índice. Conserva los campos dinámicos nativos.",
+  "version": "1.34.0"
 }
