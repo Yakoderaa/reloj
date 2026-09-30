@@ -1,0 +1,29 @@
+name: Research V1.32 CUSTOMIZE DEX strings
+on:
+  push:
+    branches: [research-v132-customize]
+    paths: ['.github/workflows/research-v132-dex.yml']
+permissions:
+  contents: read
+jobs:
+  research:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and scan DEX strings
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p pkg evidence
+          curl -L --fail --retry 3 'https://d.apkpure.net/b/XAPK/com.wtwd.utrawatch?version=latest' -o pkg/u.xapk
+          unzip -q pkg/u.xapk -d pkg/x
+          APK=$(find pkg/x -type f -name '*.apk' -printf '%s %p\n' | sort -nr | head -1 | cut -d' ' -f2-)
+          mkdir pkg/base
+          unzip -q "$APK" -d pkg/base
+          for d in pkg/base/classes*.dex; do
+            strings -a "$d"
+          done | grep -i -E 'customize|clockdial|time.?pos|value.?up|value.?down|picture.?mode|dial.?color|watch.?face|clock.?face|custom.?face|binfile' | sort -u | tee evidence/strings.txt || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v132-customize-dex
+          path: evidence
