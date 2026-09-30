@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.31.0/RelojLab.exe",
-  "notes": "V1.31 mantiene la ruta CUSTOMIZE cmd=2 que ya funciona físicamente y ajusta la estética según la foto real: hora, pasos y pulso del firmware ahora se renderizan en blanco y la batería estampada también pasa a blanco. Conserva fondo negro, dial analógico central y verificación custom_index + cmd2.",
-  "version": "1.31.0",
-  "sha256": "5a7967baebb1d6b45c633d0d95bbb78054f47dc2bbf76cb33ce78bb0967c5d59"
+  "version": "1.32.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.32.0/RelojLab.exe",
+  "notes": "V1.32 mantiene la ruta CUSTOMIZE que ya funciona y agrega el paso OEM que faltaba: después de instalar y seleccionar la esfera envía el mismo WatchEdit cmd=2 de 6 bytes que usa UtraWatch para aplicar posición, pasos, pulso y color blanco; luego recarga el slot CUSTOMIZE.",
+  "sha256": "4a4c92bab31a5d286430a740db1ad8ebbe9e3f0af97b220a18b1540913804212"
 }
