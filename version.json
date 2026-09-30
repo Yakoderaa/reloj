@@ -1,6 +1,6 @@
 {
   "version": "1.32.0",
   "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.32.0/RelojLab.exe",
-  "notes": "V1.32 mantiene la ruta CUSTOMIZE que ya funciona y agrega el paso OEM que faltaba: después de instalar y seleccionar la esfera envía el mismo WatchEdit cmd=2 de 6 bytes que usa UtraWatch para aplicar posición, pasos, pulso y color blanco; luego recarga el slot CUSTOMIZE.",
-  "sha256": "4a4c92bab31a5d286430a740db1ad8ebbe9e3f0af97b220a18b1540913804212"
+  "notes": "V1.32 mantiene la ruta CUSTOMIZE ya validada y agrega el WatchEdit OEM real después de instalar y seleccionar la esfera: aplica posición, pasos, pulso y texto blanco, y fuerza la recarga del slot CUSTOMIZE.",
+  "sha256": "d5aeceffbd431363cdab199d1f7ba0f42b8c4ad4ad9ce5221c9e64c46d90c60f"
 }
