@@ -1269,7 +1269,7 @@ class App:
                         edit_color[0],edit_color[1],1
                     ])
                     edit_payload=bytes([2])+len(edit_data).to_bytes(4,"little")+(0).to_bytes(4,"little")+edit_data
-                    emit("7/9 · APLICANDO ESTILO OEM · WatchEdit cmd=2 · blanco + pasos + pulso…")
+                    emit("7/9 · APLICANDO ESTILO OEM REAL · WatchEdit cmd=2 · blanco + pasos + pulso…")
                     _,edit_status,_=await tx83_wait(edit_payload,4.0)
                     await asyncio.sleep(1.4)
                     edit_mark=len(messages)
