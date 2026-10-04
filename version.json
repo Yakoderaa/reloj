@@ -1,6 +1,6 @@
 {
-  "sha256": "5b2a0ce27365365ca242e804289d790e3a4f1dd0ca1f97b535aef29ab3999c11",
-  "version": "1.40.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.40.0/RelojLab.exe",
-  "notes": "V1.40 cambia de enfoque: toma la esfera que el usuario ya dejó activa, guarda su índice/BinID y mantiene un bloqueo BLE que la re-selecciona automáticamente si el reloj cambia de esfera."
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.41.0/RelojLab.exe",
+  "notes": "V1.41 corrige el KeyError de V1.40: todas las rutas del bloqueo usan single_face_lock. Captura la esfera activa, guarda su índice/BinID y la re-selecciona automáticamente si cambia.",
+  "version": "1.41.0",
+  "sha256": "72d3e8364139a11f737dc724f1c5bc3ad38cec9e358d12a412bca3ab74a13dbd"
 }
