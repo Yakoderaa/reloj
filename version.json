@@ -1,6 +1,6 @@
 {
-  "notes": "V1.36 corrige el fallo de descompresión de V1.35: la esfera 240x296 ahora viaja como asset externo validado en build y se instala por CUSTOMIZE cmd=2. Conserva hora/pasos/pulso vivos del firmware y batería tomada al instalar.",
-  "sha256": "47d49261c48ce541afc12a99d488feb841a93d2f7e4aed3b7cfc4778a3f51533",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.36.0/RelojLab.exe",
-  "version": "1.36.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.37.0/RelojLab.exe",
+  "notes": "V1.37 separa activación de MARKET y validez del diseño: primero instala el donor OEM 2D7F byte-exacto, prueba market_index y market_show_order, y sólo después reemplaza ese MARKET activo por nuestra esfera dinámica.",
+  "sha256": "a181bf77a26f4f2ed525f398a2e7d21e13792fbb7fadb11803f86f0d01d9e57a",
+  "version": "1.37.0"
 }
