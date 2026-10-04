@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.42.0/RelojLab.exe",
-  "version": "1.42.0",
-  "notes": "V1.42 mantiene el bloqueo probado de V1.41 y añade PREPARAR BLOQUEO PERMANENTE para capturar la identidad exacta del reloj, servicios GATT y la esfera objetivo antes de construir el parche autónomo.",
-  "sha256": "4bf61211b9c6296b9dad7dda648bfe4ec067523cb25b91e45bef9206a795fca6"
+  "version": "1.43.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.43.0/RelojLab.exe",
+  "notes": "V1.43 mueve el bloqueo fuera de la ventana Control activo: recuerda la esfera elegida, espera al reloj si está apagado y se reconecta automáticamente tras un reinicio para restaurar índice/BinID.",
+  "sha256": "2568b8a4e81d2db304ed28af76d2fd1823e347839eb1f88ec04fab2d6b458f9f"
 }
