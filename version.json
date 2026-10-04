@@ -1,6 +1,6 @@
 {
-  "sha256": "9ea7eeb8d4fcc00cd29fb7b0cf9ed2657de53d0374573427c423a1bb96465bd1",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.34.0/RelojLab.exe",
-  "notes": "V1.34 corrige el bloqueo de V1.33: prueba MARKET 4CC6 y 2D7F, fuerza la selección del slot aunque WATCH_FACE_INFO no publique antes el BinID y valida principalmente por ACK + cambio real de índice. Conserva los campos dinámicos nativos.",
-  "version": "1.34.0"
+  "version": "1.35.0",
+  "sha256": "1e40eb8abc2e21d8b5e13b3654c09b77593be6b27b8e6510c3b7ceda9a3a0b88",
+  "notes": "V1.35 abandona MARKET como ruta principal y vuelve al CUSTOMIZE cmd=2 que sí queda visible en este reloj. El raster se reconstruye desde la foto aprobada del usuario en 240x296, conserva hora/pasos/pulso vivos del firmware y batería del momento de instalación.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.35.0/RelojLab.exe"
 }
