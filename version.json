@@ -1,6 +1,6 @@
 {
-  "version": "1.39.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.39.0/RelojLab.exe",
-  "sha256": "f72b274c5267716c4d440aa4b3497d108dd24088629dc344a00b7a44162f6de1",
-  "notes": "V1.39 está pensada para partir de la esfera de fábrica. Reconstruye MARKET, prueba primero nuestra esfera 4CC6 y exige índice 7 + BinID correcto; si falla, restaura OEM y prueba 2D7F. Índice 0 ya no cuenta como éxito."
+  "sha256": "5b2a0ce27365365ca242e804289d790e3a4f1dd0ca1f97b535aef29ab3999c11",
+  "version": "1.40.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.40.0/RelojLab.exe",
+  "notes": "V1.40 cambia de enfoque: toma la esfera que el usuario ya dejó activa, guarda su índice/BinID y mantiene un bloqueo BLE que la re-selecciona automáticamente si el reloj cambia de esfera."
 }
