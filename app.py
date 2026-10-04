@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math
 
-APP_VERSION="1.40.0"
+APP_VERSION="1.41.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V1.40"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V1.41"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -36,7 +36,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.face_lock_stop_requested=False; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V1.40 · BLOQUEO DE ESFERA ÚNICA").pack(side="left",padx=12)
+        ttk.Label(top,text="V1.41 · BLOQUEO DE ESFERA ÚNICA · FIX").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -333,7 +333,7 @@ class App:
         ttk.Label(w,text="Analizador B002 → B001",font=("Segoe UI",14,"bold")).pack(anchor="w",padx=12,pady=(12,4))
         ttk.Label(w,text="Captura respuestas completas y compara bytes. El canal OTA FFC1 permanece separado.").pack(anchor="w",padx=12)
         row=ttk.Frame(w,padding=12); row.pack(fill="x")
-        # V1.40 regression guard: CONTROL ACTIVO toolbar is created before the log
+        # V1.41 regression guard: CONTROL ACTIVO toolbar is created before the log
         # and must remain intact; V1.26 accidentally replaced capture() with installer code.
         ttk.Entry(row,textvariable=self.raw_hex,width=70).pack(side="left",fill="x",expand=True)
         log=tk.Text(w,font=("Consolas",9),wrap="none"); log.pack(fill="both",expand=True,padx=12,pady=(0,12))
@@ -653,16 +653,17 @@ class App:
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab(pair=False):
             if self.ble_busy:
-                append("V1.40 NO INICIADA · Bluetooth ocupado.")
+                append("V1.41 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V1.40 · BLOQUEO E91A · captura la esfera activa, la guarda y mantiene una sesión para restaurarla si cambia.")
+            append("V1.41 · BLOQUEO E91A · captura la esfera activa, la guarda y mantiene una sesión para restaurarla si cambia.")
             rep=self.base_report()
             rep["windows_binding_repair"]=dict(getattr(self,"binding_repair",{}))
             self.face_lock_stop_requested=False
             rep["single_face_lock"]={
                 "phase":"prepare","checks":0,"corrections":0,"target":None,
+                "blocks":[],"payload_bytes_written":0,"ack_count":0,
                 "factory_faces_physically_deleted":False,
-                "note":"V1.40 no flashea firmware; fija y re-selecciona la esfera elegida mientras Reloj Lab permanece conectado."
+                "note":"V1.41 no flashea firmware; fija y re-selecciona la esfera elegida mientras Reloj Lab permanece conectado."
             }
             t0=time.monotonic()
 
@@ -699,7 +700,7 @@ class App:
                 hdr[11]=0
                 return bytes(hdr)+comp,comp
 
-            def load_dynamic_market_v140():
+            def load_dynamic_market_v141():
                 import base64,zlib
                 root=getattr(sys,"_MEIPASS",os.path.dirname(os.path.abspath(__file__)))
                 meta_path=os.path.join(root,"assets","face_v133.json")
@@ -715,16 +716,16 @@ class App:
                 ]:
                     asset=os.path.join(root,"assets",name)
                     if not os.path.exists(asset):
-                        raise RuntimeError("Falta asset MARKET V1.40: "+name)
+                        raise RuntimeError("Falta asset MARKET V1.41: "+name)
                     raw=zlib.decompress(base64.b64decode(open(asset,"r",encoding="ascii").read().strip()))
                     if len(raw)<200000 or int.from_bytes(raw[:4],"little")!=len(raw)-16:
-                        raise RuntimeError("MARKET V1.40 inválido: "+name)
+                        raise RuntimeError("MARKET V1.41 inválido: "+name)
                     got=raw[4:6].hex().lower()
                     if got!=expected:
                         raise RuntimeError("BinID "+name+" inesperado: "+got)
                     variants.append({"role":role,"asset":name,"bin_id_hex":got,"raw":raw,
                                      "raw_sha256":hashlib.sha256(raw).hexdigest(),"raw_size":len(raw)})
-                folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","face-v140")
+                folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","face-v141")
                 os.makedirs(folder,exist_ok=True)
                 for v in variants:
                     p=os.path.join(folder,v["role"]+".bin")
@@ -872,7 +873,7 @@ class App:
                             if not c.is_connected:
                                 emit("B001 · Windows marcó la sesión desconectada; no se destruye otra sesión válida innecesariamente.")
                                 break
-                    rep["single_face_install"]["notify_recovery"]={"errors":notify_errors,"ok":notify_ok,"strategy":"same_gatt_session_cccd_settle"}
+                    rep["single_face_lock"]["notify_recovery"]={"errors":notify_errors,"ok":notify_ok,"strategy":"same_gatt_session_cccd_settle"}
                     if not notify_ok: raise RuntimeError("B001 notify no operativo en sesión GATT válida: "+" | ".join(notify_errors))
 
                     async def tx(op,payload=b"",send_type=1,wait=.5):
@@ -981,7 +982,7 @@ class App:
                             app_payload=bytes([command])+len(file_bytes).to_bytes(4,"little")+offset.to_bytes(4,"little")+chunk
                             wire,status,frames=await tx83_wait(app_payload)
                             connected=bool(getattr(c,"is_connected",False))
-                            rep["single_face_install"]["blocks"].append({
+                            rep["single_face_lock"]["blocks"].append({
                                 "slot_cmd":command,"slot":label,"index":idx,
                                 "wire_dev_type":wire.get("dev_type"),"wire_n":wire.get("n"),"offset":offset,
                                 "data_length":len(chunk),"wtwd_payload_length":len(app_payload),
@@ -989,8 +990,8 @@ class App:
                             })
                             result["bytes"]+=len(chunk)
                             if status==1:result["acks"]+=1
-                            rep["single_face_install"]["payload_bytes_written"]+=len(chunk)
-                            if status==1:rep["single_face_install"]["ack_count"]+=1
+                            rep["single_face_lock"]["payload_bytes_written"]+=len(chunk)
+                            if status==1:rep["single_face_lock"]["ack_count"]+=1
                             if idx==1 or idx%10==0 or idx==len(chunks):
                                 emit(label+" · "+str(idx)+"/"+str(len(chunks))+" · "+str(result["bytes"])+"/"+str(len(file_bytes))+" B · ACK="+str(status))
                             if status!=1 or not connected:
@@ -1068,7 +1069,7 @@ class App:
                     if not face_slots or face_slots.get("custom_index") is None:
                         raise RuntimeError("No se pudo resolver el slot editable de la esfera; no se seleccionará un índice a ciegas.")
 
-                    # V1.40: capture the face the user already chose, persist it,
+                    # V1.41: capture the face the user already chose, persist it,
                     # then keep the same GATT session open and immediately re-select it
                     # whenever the watch reports another active index.
                     async def read_face_info(label,tries=3):
@@ -1180,14 +1181,14 @@ class App:
                     rep["errors"].append(type(error).__name__+": "+str(error))
                     rep["single_face_lock"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("V1.40 FALLÓ · "+repr(error))
+                    append("V1.41 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V1.40 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V1.41 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
                 append("ESFERA ÚNICA · "+"face_lock_active"+".")
-                self.status.set("V1.40 bloqueo detenido. Podés COPIAR DIAGNÓSTICO.")
+                self.status.set("V1.41 bloqueo detenido. Podés COPIAR DIAGNÓSTICO.")
             self.run_async(work(),done)
         def repair_binding():
             if self.ble_busy:
@@ -1227,11 +1228,11 @@ class App:
         primary_test.configure(text="FIJAR ESFERA ACTUAL COMO ÚNICA",command=ota_lab)
         ttk.Button(row,text="REPARAR Y FIJAR",command=repair_binding).pack(side="left",padx=4)
         ttk.Button(row,text="DETENER BLOQUEO",command=stop_face_lock).pack(side="left",padx=4)
-        append("V1.40 LISTA · dejá puesta en el reloj la esfera que querés conservar y pulsá FIJAR ESFERA ACTUAL COMO ÚNICA.")
+        append("V1.41 LISTA · dejá puesta en el reloj la esfera que querés conservar y pulsá FIJAR ESFERA ACTUAL COMO ÚNICA.")
         append("Mientras Reloj Lab permanezca conectado, cualquier cambio de esfera se detecta y se revierte automáticamente.")
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
-        append("V1.40 no borra físicamente las caras integradas del firmware; las neutraliza mediante bloqueo/reselección de la esfera elegida.")
+        append("V1.41 no borra físicamente las caras integradas del firmware; las neutraliza mediante bloqueo/reselección de la esfera elegida.")
     def check_update(self):
         self.status.set("Buscando actualización…")
         def work():

@@ -14,8 +14,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify V1.40
-        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.40.0',v"
+      - name: Verify V1.41
+        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.41.0',v"
+      - name: Verify V1.41 lock migration
+        run: python -c "s=open('app.py',encoding='utf-8').read(); assert 'single_face_install' not in s; assert 'single_face_lock' in s; assert 'notify_recovery' in s"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0 pillow numpy
       - name: Fetch proven native 2D7F MARKET engine
         shell: pwsh
@@ -32,30 +34,30 @@ jobs:
         run: |
           $sha=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           $manifest=@{
-            version='1.40.0'
-            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.40.0/RelojLab.exe'
+            version='1.41.0'
+            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.41.0/RelojLab.exe'
             sha256=$sha
-            notes='V1.40 cambia de enfoque: toma la esfera que el usuario ya dejó activa, guarda su índice/BinID y mantiene un bloqueo BLE que la re-selecciona automáticamente si el reloj cambia de esfera.'
+            notes='V1.41 corrige el KeyError de V1.40: todas las rutas del bloqueo usan single_face_lock. Captura la esfera activa, guarda su índice/BinID y la re-selecciona automáticamente si cambia.'
           } | ConvertTo-Json
           Set-Content -Path version.json -Value $manifest -Encoding UTF8
-      - name: Publish V1.40 release asset
+      - name: Publish V1.41 release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.40.0 *> $null
-          if ($LASTEXITCODE -ne 0) { gh release create v1.40.0 dist/RelojLab.exe --title 'Reloj Lab V1.40' --notes 'V1.40: fijar la esfera actualmente activa como única permitida y restaurarla automáticamente ante cualquier cambio mientras Reloj Lab permanezca conectado.' }
-          else { gh release upload v1.40.0 dist/RelojLab.exe --clobber }
+          gh release view v1.41.0 *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create v1.41.0 dist/RelojLab.exe --title 'Reloj Lab V1.41' --notes 'V1.41: corrige el KeyError single_face_install de V1.40 y mantiene el bloqueo de la esfera actualmente activa con restauración automática.' }
+          else { gh release upload v1.41.0 dist/RelojLab.exe --clobber }
       - name: Publish updater manifest
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git commit -m 'Updater: publish V1.40' || echo 'manifest unchanged'
+          git commit -m 'Updater: publish V1.41' || echo 'manifest unchanged'
           git push
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.40
+          name: RelojLab-Windows-V1.41
           path: dist/RelojLab.exe
           if-no-files-found: error
