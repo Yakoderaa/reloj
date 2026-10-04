@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math
 
-APP_VERSION="1.39.0"
+APP_VERSION="1.40.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V1.39"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V1.40"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -33,10 +33,10 @@ class App:
         if self.window_state.get("main_geometry"):
             try: root.geometry(self.window_state["main_geometry"])
             except: pass
-        self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
+        self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.face_lock_stop_requested=False; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V1.39 · MARKET FORZADO · doble identidad").pack(side="left",padx=12)
+        ttk.Label(top,text="V1.40 · BLOQUEO DE ESFERA ÚNICA").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -333,7 +333,7 @@ class App:
         ttk.Label(w,text="Analizador B002 → B001",font=("Segoe UI",14,"bold")).pack(anchor="w",padx=12,pady=(12,4))
         ttk.Label(w,text="Captura respuestas completas y compara bytes. El canal OTA FFC1 permanece separado.").pack(anchor="w",padx=12)
         row=ttk.Frame(w,padding=12); row.pack(fill="x")
-        # V1.39 regression guard: CONTROL ACTIVO toolbar is created before the log
+        # V1.40 regression guard: CONTROL ACTIVO toolbar is created before the log
         # and must remain intact; V1.26 accidentally replaced capture() with installer code.
         ttk.Entry(row,textvariable=self.raw_hex,width=70).pack(side="left",fill="x",expand=True)
         log=tk.Text(w,font=("Consolas",9),wrap="none"); log.pack(fill="both",expand=True,padx=12,pady=(0,12))
@@ -403,7 +403,7 @@ class App:
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.39")
+        primary_test=ttk.Button(row,text="FIJAR ESFERA ACTUAL COMO ÚNICA")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)
         ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
@@ -653,14 +653,16 @@ class App:
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab(pair=False):
             if self.ble_busy:
-                append("V1.39 NO INICIADA · Bluetooth ocupado.")
+                append("V1.40 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V1.39 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
+            append("V1.40 · BLOQUEO E91A · captura la esfera activa, la guarda y mantiene una sesión para restaurarla si cambia.")
             rep=self.base_report()
             rep["windows_binding_repair"]=dict(getattr(self,"binding_repair",{}))
-            rep["single_face_install"]={
-                "phase":"prepare","blocks":[],"payload_bytes_written":0,"ack_count":0,
-                "firmware_actions":0,"factory_faces_deleted":False
+            self.face_lock_stop_requested=False
+            rep["single_face_lock"]={
+                "phase":"prepare","checks":0,"corrections":0,"target":None,
+                "factory_faces_physically_deleted":False,
+                "note":"V1.40 no flashea firmware; fija y re-selecciona la esfera elegida mientras Reloj Lab permanece conectado."
             }
             t0=time.monotonic()
 
@@ -697,7 +699,7 @@ class App:
                 hdr[11]=0
                 return bytes(hdr)+comp,comp
 
-            def load_dynamic_market_v139():
+            def load_dynamic_market_v140():
                 import base64,zlib
                 root=getattr(sys,"_MEIPASS",os.path.dirname(os.path.abspath(__file__)))
                 meta_path=os.path.join(root,"assets","face_v133.json")
@@ -713,16 +715,16 @@ class App:
                 ]:
                     asset=os.path.join(root,"assets",name)
                     if not os.path.exists(asset):
-                        raise RuntimeError("Falta asset MARKET V1.39: "+name)
+                        raise RuntimeError("Falta asset MARKET V1.40: "+name)
                     raw=zlib.decompress(base64.b64decode(open(asset,"r",encoding="ascii").read().strip()))
                     if len(raw)<200000 or int.from_bytes(raw[:4],"little")!=len(raw)-16:
-                        raise RuntimeError("MARKET V1.39 inválido: "+name)
+                        raise RuntimeError("MARKET V1.40 inválido: "+name)
                     got=raw[4:6].hex().lower()
                     if got!=expected:
                         raise RuntimeError("BinID "+name+" inesperado: "+got)
                     variants.append({"role":role,"asset":name,"bin_id_hex":got,"raw":raw,
                                      "raw_sha256":hashlib.sha256(raw).hexdigest(),"raw_size":len(raw)})
-                folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","face-v139")
+                folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","face-v140")
                 os.makedirs(folder,exist_ok=True)
                 for v in variants:
                     p=os.path.join(folder,v["role"]+".bin")
@@ -770,26 +772,8 @@ class App:
                 return bytes([total&255,(total>>8)&255,len(subs)])+body
 
             async def work():
-                market_variants,face_meta=await asyncio.to_thread(load_dynamic_market_v139)
-                emit("1/9 · Cargando esfera V1.39 240×296 · MARKET limpio + esfera propia con validación estricta…")
-                rep["single_face_install"]["candidate"]={
-                    "strategy":"from factory/default face bootstrap OEM MARKET, try custom 4CC6 first with strict index+BinID validation, then re-bootstrap and try 2D7F fallback",
-                    "format":"UtraWatch MARKET nativo dinámico",
-                    "width":240,"height":296,
-                    "design":"fondo negro · analógico central · agujas blancas · segundero rojo · hora arriba izquierda · batería arriba derecha · pasos abajo izquierda · pulso abajo derecha",
-                    "dynamic_fields":{
-                        "digital_hour":"0x8001 firmware live",
-                        "digital_minute":"0x8002 firmware live",
-                        "battery":"0x8013 firmware live",
-                        "steps":"0x8009 firmware live",
-                        "heart_rate":"0x800E firmware live",
-                        "analog_hour":"native 0x0203 / 0x8001",
-                        "analog_minute":"native 0x0203 / 0x8002",
-                        "analog_second":"native 0x0804"
-                    },
-                    "variants":[{k:v for k,v in x.items() if k!="raw"} for x in market_variants],
-                    "build_meta":face_meta
-                }
+                emit("1/6 · Preparando bloqueo de la esfera que YA está activa en el reloj…")
+
 
                 c=None;events=[];messages=[];tx_n=1;wire_dev_type=1
                 current=None
@@ -803,7 +787,7 @@ class App:
                     if pair: rep["windows_binding_repair"]["phase"]="gatt_verified"
                     rep["connection"]={"connected":True,"attempts":n}
                     rep["advertisement"]={k:v for k,v in (self.selected or {}).items() if k not in ("device","_watch_score")}
-                    rep["single_face_install"]["auto_watch_identity"]={
+                    rep["single_face_lock"]["auto_watch_identity"]={
                         "name":(self.selected or {}).get("name"),
                         "address":(self.selected or {}).get("address"),
                         "service_uuids":(self.selected or {}).get("service_uuids"),
@@ -1025,7 +1009,7 @@ class App:
                     # device pair=0; DEV_SYNC (0x09) is then emitted by the watch.
                     sync_mark=len(messages)
                     host_now=datetime.now().astimezone()
-                    rep["single_face_install"]["clock_sync"]={
+                    rep["single_face_lock"]["clock_sync"]={
                         "host_iso":host_now.isoformat(),
                         "utc_offset_seconds":int(host_now.utcoffset().total_seconds()) if host_now.utcoffset() else 0,
                         "method":"OEM DEV_SYNC payload 0x68"
@@ -1048,7 +1032,7 @@ class App:
                     battery_percent=(int(battery_payload[0]) if battery_payload and len(battery_payload)>=1 else None)
                     if battery_percent is not None and not (0<=battery_percent<=100):
                         battery_percent=None
-                    rep["single_face_install"]["battery_at_install"]=battery_percent
+                    rep["single_face_lock"]["battery_at_lock"]=battery_percent
 
                     if device_pid is None and customer_id not in (None,0,255):
                         device_pid=int(customer_id);pid_source="legacy customer_id"
@@ -1069,13 +1053,13 @@ class App:
                         face_slots={"device_id":102,"source":"verified OEM snapshot 2026-09-27",
                                     "custom_show_order":6,"custom_index":5,"market_show_order":7,
                                     "market_index":6,"face_count":6,"editable_id":406}
-                    rep["single_face_install"]["slot_navigation"]={
+                    rep["single_face_lock"]["slot_navigation"]={
                         "pid":device_pid,"pid_source":pid_source,"customer_id":customer_id,
                         "hardware_tuple":hardware_tuple,"dev_sync_hex":dev_sync.hex() if dev_sync else None,
                         "dev_sync_properties":{str(k):v.hex() for k,v in props.items()},
                         "face_slots":face_slots,"face_config_error":slot_error
                     }
-                    rep["single_face_install"]["function_control"]={
+                    rep["single_face_lock"]["function_control"]={
                         "payload_hex":cap.hex() if cap else None,
                         "has_dial_compress":has_dial_compress,
                         "fallback_used":has_dial_compress is None,
@@ -1084,11 +1068,9 @@ class App:
                     if not face_slots or face_slots.get("custom_index") is None:
                         raise RuntimeError("No se pudo resolver el slot editable de la esfera; no se seleccionará un índice a ciegas.")
 
-                    # V1.39: separate MARKET activation from custom payload validity.
-                    # Step A installs the byte-exact OEM 2D7F donor and probes both the
-                    # calculated market_index and market_show_order. Only after a real
-                    # slot change do we overwrite that activated MARKET with our dynamic face.
-                    pre=None
+                    # V1.40: capture the face the user already chose, persist it,
+                    # then keep the same GATT session open and immediately re-select it
+                    # whenever the watch reports another active index.
                     async def read_face_info(label,tries=3):
                         attempts=[];info=None
                         for attempt in range(1,tries+1):
@@ -1100,235 +1082,90 @@ class App:
                                              "raw_hex":payload.hex() if payload else None,
                                              "dial_info":info})
                             if info is not None:break
-                            await asyncio.sleep(.7)
+                            await asyncio.sleep(.5)
                         return info,attempts
 
-                    emit("4/9 · Leyendo WATCH_FACE_INFO antes del bootstrap MARKET OEM…")
-                    pre,state_attempts=await read_face_info("pre",3)
-                    rep["single_face_install"]["file_state_gate"]={"attempts":state_attempts,"ready":pre is not None}
-                    rep["single_face_install"]["pre_dial_info"]=pre
-                    if pre is None:
-                        raise RuntimeError("El reloj no devolvió WATCH_FACE_INFO 0x84.")
+                    emit("4/6 · Leyendo la esfera que dejaste seleccionada…")
+                    target,reads=await read_face_info("capture-target",4)
+                    rep["single_face_lock"]["capture_reads"]=reads
+                    if target is None:
+                        raise RuntimeError("El reloj no devolvió WATCH_FACE_INFO 0x84; no se puede fijar la esfera actual.")
 
-                    market_index=int(face_slots.get("market_index"))
-                    market_show_order=int(face_slots.get("market_show_order"))
-                    selection_codes=[]
-                    for code in (market_index,market_show_order,market_index+1):
-                        if code not in selection_codes and 0<=code<=255:selection_codes.append(code)
-                    use_compressed=(has_dial_compress is True)
-                    activation_log=[]
-                    bootstrap_ok=False
-                    active_code=None
-                    active_info=None
+                    target_index=int(target.get("index",0))
+                    target_cmd3=(target.get("cmd3_raw") or "").lower()
+                    target_cmd2=(target.get("cmd2_hex") or "").lower()
+                    target_is_market=target_cmd3 not in ("","0000")
+                    target_record={
+                        "address":(self.selected or {}).get("address"),
+                        "name":(self.selected or {}).get("name"),
+                        "index":target_index,
+                        "cmd2_hex":target_cmd2,
+                        "cmd3_raw":target_cmd3,
+                        "captured_utc":datetime.now(timezone.utc).isoformat()
+                    }
+                    rep["single_face_lock"]["target"]=target_record
 
-                    # 1) If MARKET 2D7F is already physically active from V1.37,
-                    # do NOT resend the 254-block donor. Go straight to our custom payload.
-                    pre_is_market_2d7f=bool(
-                        pre and pre.get("index")==market_index and
-                        (pre.get("cmd3_raw") or "").lower()=="2d7f"
-                    )
-                    if pre_is_market_2d7f:
-                        bootstrap_ok=True
-                        active_code=market_index
-                        active_info=pre
-                        rep["single_face_install"]["market_bootstrap_activation"]={
-                            "market_index":market_index,"market_show_order":market_show_order,
-                            "selection_codes":selection_codes,"activated":True,
-                            "active_code":active_code,"dial_info":active_info,
-                            "skipped":True,
-                            "reason":"MARKET 2D7F ya estaba activo al iniciar V1.39; se omite donor OEM."
-                        }
-                        emit("5/9 · MARKET 2D7F ya activo en índice "+str(market_index)+" · omitiendo bootstrap OEM.")
-                    else:
-                        # Otherwise use the byte-exact OEM donor once to activate MARKET.
-                        donor=next((v for v in market_variants if v["role"]=="oem_bootstrap_2d7f"),None)
-                        if donor is None: raise RuntimeError("Falta donor OEM 2D7F en V1.39.")
-                        raw=donor["raw"]
-                        oem_stream,deflated=await asyncio.to_thread(oem_dial_compress,raw)
-                        file_bytes=oem_stream if use_compressed else raw
-                        chunks=[file_bytes[i:i+300] for i in range(0,len(file_bytes),300)]
-                        emit("5/9 · BOOTSTRAP OEM 2D7F byte-exacto · "+str(len(chunks))+" bloques…")
-                        donor_transfer=await transfer_slot(3,"OEM-BOOTSTRAP-2D7F",file_bytes,chunks)
-                        rep["single_face_install"]["oem_bootstrap_transfer"]=donor_transfer
+                    lock_path=os.path.join(
+                        os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),
+                        "RelojLab","face-lock.json")
+                    os.makedirs(os.path.dirname(lock_path),exist_ok=True)
+                    with open(lock_path,"w",encoding="utf-8") as fh:
+                        json.dump(target_record,fh,ensure_ascii=False,indent=2)
+                    rep["single_face_lock"]["persisted_path"]=lock_path
 
-                        emit("6/9 · OEM cargado; probando activación MARKET por índice y showOrder…")
-                        for code in selection_codes:
-                            code_attempts=[]
-                            for attempt in range(1,4):
-                                _,status,_=await tx83_wait(bytes([1,code&255]),4.0)
-                                await asyncio.sleep(2.0 if attempt==1 else 2.8)
-                                info,reads=await read_face_info("bootstrap-select-"+str(code)+"-"+str(attempt),1)
-                                changed=bool(info and pre and info.get("index")!=pre.get("index"))
-                                expected_index=bool(info and info.get("index") in (market_index,market_show_order,code))
-                                rec={"selection_code":code,"attempt":attempt,"status":status,
-                                     "dial_info":info,"changed_from_pre":changed,
-                                     "expected_index":expected_index,"reads":reads}
-                                code_attempts.append(rec)
-                                if status==1 and changed and expected_index:
-                                    bootstrap_ok=True;active_code=code;active_info=info;break
-                            activation_log.append({"selection_code":code,"attempts":code_attempts,
-                                                   "activated":bootstrap_ok})
-                            if bootstrap_ok:break
-                        rep["single_face_install"]["market_bootstrap_activation"]={
-                            "market_index":market_index,"market_show_order":market_show_order,
-                            "selection_codes":selection_codes,"activated":bootstrap_ok,
-                            "active_code":active_code,"dial_info":active_info,
-                            "skipped":False,"attempts":activation_log
-                        }
-                        if not bootstrap_ok:
-                            raise RuntimeError("Ni el MARKET OEM 2D7F byte-exacto pudo activarse con index/showOrder.")
+                    emit("5/6 · ESFERA FIJADA · índice "+str(target_index)+
+                         (" · MARKET "+target_cmd3.upper() if target_is_market else " · esfera integrada")+
+                         " · vigilando cambios cada 1 s…")
+                    rep["single_face_lock"]["phase"]="locking"
+                    last_info=target
 
-                    # 2) MARKET is active. Install OUR face, but never treat index 0 as success.
-                    # Prefer the unique 4CC6 identity. If it invalidates MARKET, restore the OEM
-                    # donor and try the same-id 2D7F variant as a fallback.
-                    chosen=None
-                    custom_attempts=[]
+                    def matches_target(info):
+                        if not info:return False
+                        if int(info.get("index",-1))!=target_index:return False
+                        if target_is_market:
+                            return (info.get("cmd3_raw") or "").lower()==target_cmd3
+                        return True
 
-                    async def strict_select_variant(variant,activation_code):
-                        expected_id=variant["bin_id_hex"].lower()
-                        select_codes=[]
-                        for code in (activation_code,market_index,market_show_order):
-                            if code is not None and code not in select_codes and 0<=int(code)<=255:
-                                select_codes.append(int(code))
+                    while not self.face_lock_stop_requested and not self.closing:
+                        await asyncio.sleep(1.0)
+                        current_info,current_reads=await read_face_info("watch",1)
+                        rep["single_face_lock"]["checks"]+=1
+                        if current_info:last_info=current_info
+                        if matches_target(current_info):
+                            continue
+
+                        rep["single_face_lock"]["corrections"]+=1
+                        emit("CAMBIO DETECTADO · "+
+                             (("índice "+str(current_info.get("index"))+" / "+str(current_info.get("cmd3_raw")))
+                              if current_info else "sin WATCH_FACE_INFO")+
+                             " · restaurando índice "+str(target_index)+"…")
+
+                        restored=False
                         attempts=[]
-                        for code in select_codes:
-                            for attempt in range(1,4):
-                                _,status,_=await tx83_wait(bytes([1,code&255]),4.0)
-                                await asyncio.sleep(3.0 if attempt==1 else 2.0)
-                                info,reads=await read_face_info(
-                                    "strict-select-"+expected_id+"-"+str(code)+"-"+str(attempt),1)
-                                got_id=(info.get("cmd3_raw") or "").lower() if info else ""
-                                exact_index=bool(info and info.get("index")==market_index)
-                                exact_id=got_id in (expected_id,bytes.fromhex(expected_id)[::-1].hex())
-                                ok=bool(status==1 and exact_index and exact_id)
-                                attempts.append({
-                                    "selection_code":code,"attempt":attempt,"status":status,
-                                    "dial_info":info,"exact_market_index":exact_index,
-                                    "expected_bin_id_hex":expected_id,"exact_bin_id":exact_id,
-                                    "verified":ok,"reads":reads
-                                })
-                                if ok:return True,info,attempts
-                        return False,(attempts[-1]["dial_info"] if attempts else None),attempts
+                        for attempt in range(1,4):
+                            _,status,_=await tx83_wait(bytes([1,target_index&255]),4.0)
+                            await asyncio.sleep(.8)
+                            verify,verify_reads=await read_face_info("verify-restore-"+str(attempt),1)
+                            ok=bool(status==1 and matches_target(verify))
+                            attempts.append({"attempt":attempt,"status":status,
+                                             "dial_info":verify,"verified":ok,
+                                             "reads":verify_reads})
+                            if ok:
+                                restored=True
+                                last_info=verify
+                                break
+                        rep["single_face_lock"]["last_restore_attempts"]=attempts
+                        if restored:
+                            emit("ESFERA RESTAURADA · bloqueo sigue activo.")
+                        else:
+                            rep["errors"].append("No se pudo restaurar la esfera fijada tras 3 intentos.")
+                            emit("AVISO · no se pudo restaurar en este ciclo; se seguirá vigilando.")
 
-                    async def restore_oem_market(label):
-                        donor=next((v for v in market_variants if v["role"]=="oem_bootstrap_2d7f"),None)
-                        raw=donor["raw"]
-                        stream,df=await asyncio.to_thread(oem_dial_compress,raw)
-                        fb=stream if use_compressed else raw
-                        ch=[fb[i:i+300] for i in range(0,len(fb),300)]
-                        emit(label+" · restaurando MARKET OEM 2D7F · "+str(len(ch))+" bloques…")
-                        tr=await transfer_slot(3,"OEM-RESTORE-2D7F",fb,ch)
-                        activated=False;info=None;acts=[]
-                        for code in selection_codes:
-                            for attempt in range(1,3):
-                                _,status,_=await tx83_wait(bytes([1,code&255]),4.0)
-                                await asyncio.sleep(2.2)
-                                info,reads=await read_face_info("oem-restore-"+str(code)+"-"+str(attempt),1)
-                                good=bool(info and status==1 and info.get("index")==market_index and
-                                          (info.get("cmd3_raw") or "").lower()=="2d7f")
-                                acts.append({"code":code,"attempt":attempt,"status":status,
-                                             "dial_info":info,"verified":good,"reads":reads})
-                                if good:activated=True;break
-                            if activated:break
-                        return tr,activated,info,acts
-
-                    ordered_custom=[]
-                    for wanted in ("custom_verified_4cc6","custom_same_id_2d7f"):
-                        v=next((x for x in market_variants if x["role"]==wanted),None)
-                        if v:ordered_custom.append(v)
-
-                    for vi,variant in enumerate(ordered_custom,1):
-                        # After a failed custom attempt the watch can fall back to index 0.
-                        # Restore a known-good MARKET before trying the second variant.
-                        if vi>1:
-                            tr,restored,restore_info,restore_attempts=await restore_oem_market(
-                                "FALLBACK "+str(vi)+"/"+str(len(ordered_custom)))
-                            custom_attempts.append({
-                                "stage":"oem_restore_before_fallback","transfer":tr,
-                                "restored":restored,"dial_info":restore_info,
-                                "selection_attempts":restore_attempts
-                            })
-                            if not restored:
-                                raise RuntimeError("No se pudo restaurar MARKET OEM antes del fallback 2D7F.")
-
-                        raw=variant["raw"]
-                        oem_stream,deflated=await asyncio.to_thread(oem_dial_compress,raw)
-                        file_bytes=oem_stream if use_compressed else raw
-                        chunks=[file_bytes[i:i+300] for i in range(0,len(file_bytes),300)]
-                        emit("7/9 · INSTALANDO NUESTRA ESFERA "+variant["bin_id_hex"].upper()+
-                             " · variante "+str(vi)+"/"+str(len(ordered_custom))+
-                             " · "+str(len(chunks))+" bloques…")
-                        transfer=await transfer_slot(
-                            3,"CUSTOM-MARKET-"+variant["bin_id_hex"].upper(),file_bytes,chunks)
-
-                        selected,selected_info,sel_attempts=await strict_select_variant(variant,active_code)
-                        rec={
-                            "stage":"custom","role":variant["role"],
-                            "bin_id_hex":variant["bin_id_hex"],
-                            "raw_sha256":variant["raw_sha256"],
-                            "transfer":transfer,
-                            "selection_attempts":sel_attempts,
-                            "selected":selected,
-                            "final_dial_info":selected_info
-                        }
-                        custom_attempts.append(rec)
-                        if selected:
-                            chosen=rec
-                            break
-                        emit("VARIANTE "+variant["bin_id_hex"].upper()+
-                             " transferida pero NO registrada como MARKET índice "+
-                             str(market_index)+"; no se contará como éxito.")
-
-                    rep["single_face_install"]["custom_market_attempts"]=custom_attempts
-                    final_info=chosen.get("final_dial_info") if chosen else None
-                    rep["single_face_install"]["selection_lock"]={
-                        "attempted":True,"slot":"MARKET","index":market_index,
-                        "show_order":market_show_order,
-                        "verified":bool(chosen),
-                        "chosen_bin_id_hex":chosen.get("bin_id_hex") if chosen else None,
-                        "strict_index_required":market_index,
-                        "strict_bin_id_required":True,
-                        "dial_info":final_info
-                    }
-                    if not chosen:
-                        raise RuntimeError(
-                            "Las variantes personalizadas se transfirieron, pero ninguna quedó registrada "
-                            "como MARKET índice 7 con su BinID. V1.39 no acepta índice 0 como éxito.")
-
-                    rep["single_face_install"]["factory_faces_deleted"]=False
-                    rep["single_face_install"]["factory_faces_note"]="V1.39 parte de la esfera de fábrica, reconstruye sólo MARKET descargable y exige índice 7 + BinID antes de declarar éxito."
-                    rep["single_face_install"]["dial_state_changed"]=bool(
-                        pre and chosen["selection_attempts"][-1]["dial_info"] and
-                        pre.get("raw_hex")!=chosen["selection_attempts"][-1]["dial_info"].get("raw_hex"))
-
-                    emit("8/9 · Postcheck · MARKET nativo activo + esfera dinámica + bindings LIVE…")
-                    connected=bool(getattr(c,"is_connected",False))
-                    strict_final=bool(final_info and final_info.get("index")==market_index and
-                                      (final_info.get("cmd3_raw") or "").lower() in (
-                                          chosen["bin_id_hex"].lower(),
-                                          bytes.fromhex(chosen["bin_id_hex"])[::-1].hex()
-                                      )) if chosen else False
-                    all_ok=bool(bootstrap_ok and chosen and chosen["transfer"].get("ok") and
-                                strict_final and connected)
-                    rep["single_face_install"]["protocol_acks_sent"]=protocol_acks_sent
-                    rep["single_face_install"]["wire_protocol"]={
-                        "final_dev_type":wire_dev_type,"next_n":tx_n,
-                        "note":"CEProtocolB byte1=device_type; byte3=N"
-                    }
-                    rep["single_face_install"]["live_validation_plan"]={
-                        "digital_time":"0x8001/0x8002",
-                        "battery":"0x8013",
-                        "steps":"0x8009",
-                        "heart_rate":"0x800E",
-                        "analog_hands":"native MARKET hour/minute/second descriptors"
-                    }
-                    rep["single_face_install"]["classification"]=(
-                        "our_face_strictly_selected_"+chosen["bin_id_hex"] if all_ok else
-                        "dynamic_market_v139_failed"
-                    )
-                    rep["single_face_install"]["connected_end"]=connected
-                    rep["single_face_install"]["phase"]="complete"
-                    emit("9/9 · V1.39 FINALIZADA · "+rep["single_face_install"]["classification"])
+                    rep["single_face_lock"]["phase"]="stopped"
+                    rep["single_face_lock"]["last_info"]=last_info
+                    rep["single_face_lock"]["connected_end"]=bool(getattr(c,"is_connected",False))
+                    emit("6/6 · BLOQUEO DETENIDO · controles devueltos.")
+                    return rep
                     return rep
                 finally:
                     if c:
@@ -1341,17 +1178,17 @@ class App:
                 if error:
                     if pair: rep["windows_binding_repair"]["installation_error"]=repr(error)
                     rep["errors"].append(type(error).__name__+": "+str(error))
-                    rep["single_face_install"]["phase"]="error"
+                    rep["single_face_lock"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("V1.39 FALLÓ · "+repr(error))
+                    append("V1.40 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V1.39 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V1.40 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
-                append("ESFERA ÚNICA · "+result["single_face_install"]["classification"]+".")
-                self.status.set("V1.39 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
-            self.run_async(asyncio.wait_for(work(),timeout=1800),done)
+                append("ESFERA ÚNICA · "+"face_lock_active"+".")
+                self.status.set("V1.40 bloqueo detenido. Podés COPIAR DIAGNÓSTICO.")
+            self.run_async(work(),done)
         def repair_binding():
             if self.ble_busy:
                 append("Esperá a que termine la operación Bluetooth actual.")
@@ -1364,9 +1201,9 @@ class App:
             if not messagebox.askyesno("Reparar vínculo de Windows",
                     "Se quitará únicamente el vínculo Bluetooth de Windows de " +
                     selected.get("name","reloj") + " (" + address + ").\n\n" +
-                    "Después se intentará emparejar y se continuará con la instalación de la esfera. " +
+                    "Después se intentará emparejar y se fijará como objetivo la esfera que está activa ahora. " +
                     "La reparación es de mejor esfuerzo: si Windows no puede consultar el vínculo, la app igualmente continuará con emparejamiento directo a esta misma dirección.\n\n" +
-                    "No restaura el reloj de fábrica ni borra sus esferas. ¿Continuar?",parent=w):
+                    "No flashea firmware ni modifica la esfera elegida. ¿Continuar?",parent=w):
                 return
             from windows_binding import repair_selected
             def emit_repair(message):
@@ -1380,15 +1217,21 @@ class App:
                     append("REPARACIÓN DETENIDA · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False))
                     return
-                append("REPARACIÓN · continuando con emparejamiento e instalación…")
+                append("REPARACIÓN · continuando con emparejamiento y bloqueo de la esfera actual…")
                 ota_lab(pair=True)
             self.run_async(repair_selected(self,address,emit_repair),repaired)
-        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.39",command=repair_binding)
-        ttk.Button(row,text="INSTALAR SIN REPARAR",command=ota_lab).pack(side="left",padx=4)
-        append("V1.39 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.39; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
+        def stop_face_lock():
+            self.face_lock_stop_requested=True
+            append("DETENER BLOQUEO solicitado · cerrará la sesión después del ciclo actual.")
+            self.status.set("Deteniendo bloqueo de esfera…")
+        primary_test.configure(text="FIJAR ESFERA ACTUAL COMO ÚNICA",command=ota_lab)
+        ttk.Button(row,text="REPARAR Y FIJAR",command=repair_binding).pack(side="left",padx=4)
+        ttk.Button(row,text="DETENER BLOQUEO",command=stop_face_lock).pack(side="left",padx=4)
+        append("V1.40 LISTA · dejá puesta en el reloj la esfera que querés conservar y pulsá FIJAR ESFERA ACTUAL COMO ÚNICA.")
+        append("Mientras Reloj Lab permanezca conectado, cualquier cambio de esfera se detecta y se revierte automáticamente.")
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
-        append("La instalación sólo comienza después de confirmar una conexión ATT operativa.")
+        append("V1.40 no borra físicamente las caras integradas del firmware; las neutraliza mediante bloqueo/reselección de la esfera elegida.")
     def check_update(self):
         self.status.set("Buscando actualización…")
         def work():
