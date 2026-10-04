@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math
 
-APP_VERSION="1.34.0"
+APP_VERSION="1.35.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V1.34"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V1.35"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -36,7 +36,7 @@ class App:
         self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V1.34 · MARKET FORZADO · doble identidad").pack(side="left",padx=12)
+        ttk.Label(top,text="V1.35 · MARKET válido + registro seguro").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -333,7 +333,7 @@ class App:
         ttk.Label(w,text="Analizador B002 → B001",font=("Segoe UI",14,"bold")).pack(anchor="w",padx=12,pady=(12,4))
         ttk.Label(w,text="Captura respuestas completas y compara bytes. El canal OTA FFC1 permanece separado.").pack(anchor="w",padx=12)
         row=ttk.Frame(w,padding=12); row.pack(fill="x")
-        # V1.34 regression guard: CONTROL ACTIVO toolbar is created before the log
+        # V1.35 regression guard: CONTROL ACTIVO toolbar is created before the log
         # and must remain intact; V1.26 accidentally replaced capture() with installer code.
         ttk.Entry(row,textvariable=self.raw_hex,width=70).pack(side="left",fill="x",expand=True)
         log=tk.Text(w,font=("Consolas",9),wrap="none"); log.pack(fill="both",expand=True,padx=12,pady=(0,12))
@@ -403,7 +403,7 @@ class App:
                 self.status.set("Diagnóstico copiado al portapapeles.")
             except Exception as ex:
                 messagebox.showerror("Copiar diagnóstico",repr(ex))
-        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.34")
+        primary_test=ttk.Button(row,text="INSTALAR ESFERA SINCRONIZADA V1.35")
         primary_test.pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)
         ttk.Button(row,text="ENVIAR HEX",command=send_raw).pack(side="left",padx=4)
@@ -653,9 +653,9 @@ class App:
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab(pair=False):
             if self.ble_busy:
-                append("V1.34 NO INICIADA · Bluetooth ocupado.")
+                append("V1.35 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V1.34 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
+            append("V1.35 · GATT DIRECTO E91A · consulta sólo el servicio de la esfera durante la instalación. Conserva validación ATT, dos intentos y diagnóstico por intento; no reinicia Bluetooth.")
             rep=self.base_report()
             rep["windows_binding_repair"]=dict(getattr(self,"binding_repair",{}))
             rep["single_face_install"]={
@@ -697,37 +697,80 @@ class App:
                 hdr[11]=0
                 return bytes(hdr)+comp,comp
 
-            def load_dynamic_market_v134():
+            def build_exact_customize_v135():
                 import base64,zlib
-                root=getattr(sys,"_MEIPASS",os.path.dirname(os.path.abspath(__file__)))
-                meta_path=os.path.join(root,"assets","face_v133.json")
-                meta={}
-                if os.path.exists(meta_path):
-                    try:meta=json.load(open(meta_path,"r",encoding="utf-8"))
-                    except Exception:meta={}
-                variants=[]
-                for role,name,expected in [
-                    ("verified_4cc6","face_v133_custom_verified.b64","4cc6"),
-                    ("same_id_2d7f","face_v133_custom_same_id.b64","2d7f"),
-                ]:
-                    asset=os.path.join(root,"assets",name)
-                    if not os.path.exists(asset):
-                        raise RuntimeError("Falta asset MARKET V1.34: "+name)
-                    raw=zlib.decompress(base64.b64decode(open(asset,"r",encoding="ascii").read().strip()))
-                    if len(raw)<200000 or int.from_bytes(raw[:4],"little")!=len(raw)-16:
-                        raise RuntimeError("MARKET V1.34 inválido: "+name)
-                    got=raw[4:6].hex().lower()
-                    if got!=expected:
-                        raise RuntimeError("BinID "+name+" inesperado: "+got)
-                    variants.append({"role":role,"asset":name,"bin_id_hex":got,"raw":raw,
-                                     "raw_sha256":hashlib.sha256(raw).hexdigest(),"raw_size":len(raw)})
-                folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","face-v134")
+                pixels=zlib.decompress(base64.b64decode("""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"""))
+                if len(pixels)!=(240*296*2):
+                    raise RuntimeError("Raster V1.35 inválido: "+str(len(pixels)))
+                header=bytes.fromhex("000804f80002f0002801")
+                raw=header+pixels
+                folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),
+                                    "RelojLab","face-v135")
                 os.makedirs(folder,exist_ok=True)
-                for v in variants:
-                    p=os.path.join(folder,v["role"]+".bin")
-                    with open(p,"wb") as fh:fh.write(v["raw"])
-                    v["path"]=p
-                return variants,meta
+                path=os.path.join(folder,"approved-photo-customize-v135.bin")
+                with open(path,"wb") as fh:fh.write(raw)
+                return path,raw,240,296
+
+            def build_live_customize_v135(base_raw,battery_percent=None):
+                # Proven CUSTOMIZE route from V1.19: exact approved raster + firmware
+                # time/steps/heart fields. Battery is stamped from DEV_SYNC at install.
+                raw=bytearray(base_raw)
+                if len(raw)!=142090 or raw[5]!=2:
+                    raise RuntimeError("Base CUSTOMIZE V1.35 inválida")
+                raw[0]=0       # firmware clock at top
+                raw[1]=8       # live steps
+                raw[2]=4       # live heart rate
+                raw[3]=0xF8    # red live text, matching approved photo
+                raw[4]=0x00
+                raw[5]=2
+
+                w=240;h=296;pix0=10
+                def setpix(x,y,v=0):
+                    if 0<=x<w and 0<=y<h:
+                        off=pix0+((y*w+x)*2)
+                        raw[off]=(v>>8)&255
+                        raw[off+1]=v&255
+
+                # Remove baked sample values; keep the approved central analog art.
+                for x0,y0,x1,y1 in [
+                    (5,15,102,68),
+                    (174,13,238,66),
+                    (3,235,120,294),
+                    (143,235,239,294),
+                ]:
+                    for yy in range(y0,y1):
+                        for xx in range(x0,x1):
+                            setpix(xx,yy,0)
+
+                font={
+                    "0":["01110","10001","10011","10101","11001","10001","01110"],
+                    "1":["00100","01100","00100","00100","00100","00100","01110"],
+                    "2":["01110","10001","00001","00010","00100","01000","11111"],
+                    "3":["11110","00001","00001","01110","00001","00001","11110"],
+                    "4":["00010","00110","01010","10010","11111","00010","00010"],
+                    "5":["11111","10000","10000","11110","00001","00001","11110"],
+                    "6":["01110","10000","10000","11110","10001","10001","01110"],
+                    "7":["11111","00001","00010","00100","01000","01000","01000"],
+                    "8":["01110","10001","10001","01110","10001","10001","01110"],
+                    "9":["01110","10001","10001","01111","00001","00001","01110"],
+                    "%":["10001","00010","00100","01000","10001","00000","00000"],
+                    "-":["00000","00000","11111","00000","00000","00000","00000"],
+                }
+                def text5(txt,x,y,scale=2,color=0x429D):
+                    for ch in txt:
+                        pat=font.get(ch,font["-"])
+                        for ry,row in enumerate(pat):
+                            for rx,on in enumerate(row):
+                                if on=="1":
+                                    for sy in range(scale):
+                                        for sx in range(scale):
+                                            setpix(x+rx*scale+sx,y+ry*scale+sy,color)
+                        x+=6*scale
+
+                battery_text=(str(int(battery_percent))+"%") if battery_percent is not None else "--%"
+                x=max(174,236-len(battery_text)*12)
+                text5(battery_text,x,27,2,0xF800)
+                return bytes(raw),battery_text
 
             def build(dev_type,n_seq,op,payload=b"",send_type=1):
                 # CEProtocolB wire header: byte1=device type, byte3=N sequence.
@@ -769,25 +812,29 @@ class App:
                 return bytes([total&255,(total>>8)&255,len(subs)])+body
 
             async def work():
-                market_variants,face_meta=await asyncio.to_thread(load_dynamic_market_v134)
-                emit("1/9 · Cargando esfera V1.34 240×296 · MARKET dinámico con doble identidad 4CC6/2D7F…")
+                path,base_raw,target_w,target_h=await asyncio.to_thread(build_exact_customize_v135)
+                raw=base_raw
+                expected_cmd2=None
+                oem_stream=None
+                deflated=None
+                emit("1/9 · Cargando NUESTRA esfera aprobada 240×296 · referencia fotográfica V1.35 · ruta visible CUSTOMIZE…")
                 rep["single_face_install"]["candidate"]={
-                    "strategy":"force MARKET selection after transfer; try 4CC6 then 2D7F",
-                    "format":"UtraWatch MARKET nativo dinámico",
-                    "width":240,"height":296,
-                    "design":"fondo negro · analógico central · agujas blancas · segundero rojo · hora arriba izquierda · batería arriba derecha · pasos abajo izquierda · pulso abajo derecha",
+                    "path":path,
+                    "strategy":"proven V1.19 CUSTOMIZE cmd=2 route",
+                    "format":"UtraWatch CUSTOMIZE cBinFile · referencia aprobada + datos vivos",
+                    "visual_mode":"approved raster + firmware live fields",
+                    "target_source":"embedded crop from the user-approved reference photo",
+                    "width":target_w,"height":target_h,"picture_mode":2,
+                    "design":"referencia fotográfica aprobada · fondo negro · dial analógico central · datos rojos; CUSTOMIZE mantiene hora/pasos/pulso vivos",
                     "dynamic_fields":{
-                        "digital_hour":"0x8001 firmware live",
-                        "digital_minute":"0x8002 firmware live",
-                        "battery":"0x8013 firmware live",
-                        "steps":"0x8009 firmware live",
-                        "heart_rate":"0x800E firmware live",
-                        "analog_hour":"native 0x0203 / 0x8001",
-                        "analog_minute":"native 0x0203 / 0x8002",
-                        "analog_second":"native 0x0804"
+                        "time":"firmware live",
+                        "steps":"firmware live · CUSTOMIZE value 8",
+                        "heart_rate":"firmware live · CUSTOMIZE value 4",
+                        "battery":"read from watch at install time"
                     },
-                    "variants":[{k:v for k,v in x.items() if k!="raw"} for x in market_variants],
-                    "build_meta":face_meta
+                    "analog_note":"CUSTOMIZE muestra la esfera aprobada y mantiene hora/pasos/pulso vivos; las agujas analógicas siguen siendo raster porque este firmware no expone binding dinámico de agujas en CUSTOMIZE.",
+                    "base_raw_size":len(base_raw),
+                    "base_raw_sha256":hashlib.sha256(base_raw).hexdigest()
                 }
 
                 c=None;events=[];messages=[];tx_n=1;wire_dev_type=1
@@ -1047,7 +1094,40 @@ class App:
                     battery_percent=(int(battery_payload[0]) if battery_payload and len(battery_payload)>=1 else None)
                     if battery_percent is not None and not (0<=battery_percent<=100):
                         battery_percent=None
-                    rep["single_face_install"]["battery_at_install"]=battery_percent
+                    raw,battery_text=build_live_customize_v135(base_raw,battery_percent)
+                    expected_cmd2=raw[:6].hex()
+                    oem_stream,deflated=await asyncio.to_thread(oem_dial_compress,raw)
+                    rep["single_face_install"]["candidate"].update({
+                        "battery_percent_at_install":battery_percent,
+                        "battery_text":battery_text,
+                        "raw_size":len(raw),
+                        "raw_sha256":hashlib.sha256(raw).hexdigest(),
+                        "raw_header_hex":raw[:10].hex(),
+                        "expected_cmd2_hex":expected_cmd2,
+                        "oem_stream_size":len(oem_stream),
+                        "deflate_size":len(deflated),
+                        "oem_stream_sha256":hashlib.sha256(oem_stream).hexdigest(),
+                        "oem_crc16":f"0x{crc16_8005(deflated):04X}",
+                        "oem_header_hex":oem_stream[:20].hex()
+                    })
+                    rep["single_face_install"]["customize_layout_limit"]={"time_position":0,"firmware_group":"top-center","note":"UtraWatch CUSTOMIZE sólo permite grupo de hora arriba o abajo; no posiciona cada dato en una esquina."}
+                    rep["single_face_install"]["live_bindings"]={
+                        "time":{"source":"watch firmware clock","time_pos":raw[0],"continuous_live":True},
+                        "steps":{"source":"watch firmware","field_value":raw[1],"continuous_live":True},
+                        "heart_rate":{"source":"watch firmware","field_value":raw[2],"continuous_live":True},
+                        "battery":{"source":"DEV_SYNC DATA_TYPE_BATTERY_INFO=3","value_at_install":battery_percent,
+                                   "continuous_live":False},
+                        "analog_hands":{"source":"approved raster","continuous_live":False}
+                    }
+                    emit("DISEÑO V1.35 · datos LIVE en rojo; hora/pasos/pulso del firmware; batería="+battery_text+".")
+
+                    if device_pid is None:
+                        pid_mark=len(messages)
+                        await tx(0x1F,b"",3,0)
+                        pid_payload=await wait_data(0x1F,pid_mark,3.0)
+                        if pid_payload is not None and len(pid_payload)>=2:
+                            candidate_pid=int.from_bytes(pid_payload[:2],"little")
+                            if candidate_pid>0:device_pid=candidate_pid;pid_source="direct NEW_PID"
 
                     if device_pid is None and customer_id not in (None,0,255):
                         device_pid=int(customer_id);pid_source="legacy customer_id"
@@ -1083,10 +1163,12 @@ class App:
                     if not face_slots or face_slots.get("custom_index") is None:
                         raise RuntimeError("No se pudo resolver el slot editable de la esfera; no se seleccionará un índice a ciegas.")
 
-                    # V1.34: V1.33 proved every MARKET block can ACK while 0x84 still
-                    # reports the previous CUSTOMIZE slot. Therefore selection is now an active
-                    # part of registration instead of a postcondition.
+                    # V1.35: stop using MARKET for our custom artwork. The same
+                    # approved cBin already installed successfully on this physical watch
+                    # through CUSTOMIZE cmd=2 in V1.19.
+                    post=None
                     pre=None
+
                     async def read_face_info(label,tries=3):
                         attempts=[];info=None
                         for attempt in range(1,tries+1):
@@ -1098,126 +1180,99 @@ class App:
                                              "raw_hex":payload.hex() if payload else None,
                                              "dial_info":info})
                             if info is not None:break
-                            await asyncio.sleep(.6)
+                            await asyncio.sleep(.7)
                         return info,attempts
 
-                    emit("4/9 · Leyendo WATCH_FACE_INFO antes de la instalación forzada MARKET…")
+                    emit("4/9 · Leyendo estado actual; MARKET queda intacto y se reescribe sólo CUSTOMIZE…")
                     pre,state_attempts=await read_face_info("pre",3)
                     rep["single_face_install"]["file_state_gate"]={"attempts":state_attempts,"ready":pre is not None}
                     rep["single_face_install"]["pre_dial_info"]=pre
-                    if pre is None:
-                        raise RuntimeError("El reloj no devolvió WATCH_FACE_INFO 0x84.")
 
-                    market_index=face_slots.get("market_index")
-                    if market_index is None:
-                        raise RuntimeError("UtraWatch no resolvió market_index.")
-                    market_index=int(market_index)
                     use_compressed=(has_dial_compress is True)
-                    variant_attempts=[]
-                    chosen=None
-                    connected=True
+                    file_bytes=oem_stream if use_compressed else raw
+                    chunks=[file_bytes[i:i+300] for i in range(0,len(file_bytes),300)]
+                    emit("5/9 · Instalando NUESTRA esfera en CUSTOMIZE cmd=2 · "+str(len(chunks))+" bloques…")
+                    exact_transfer=await transfer_slot(2,"EXACT-CUSTOMIZE",file_bytes,chunks)
+                    rep["single_face_install"]["exact_customize_transfer"]=exact_transfer
 
-                    for vi,variant in enumerate(market_variants,1):
-                        raw=variant["raw"]
-                        oem_stream,deflated=await asyncio.to_thread(oem_dial_compress,raw)
-                        file_bytes=oem_stream if use_compressed else raw
-                        chunks=[file_bytes[i:i+300] for i in range(0,len(file_bytes),300)]
-                        emit("5/9 · MARKET "+variant["bin_id_hex"].upper()+" · variante "+str(vi)+"/"+str(len(market_variants))+
-                             " · "+str(len(chunks))+" bloques…")
-                        transfer=await transfer_slot(3,"MARKET-"+variant["bin_id_hex"].upper(),file_bytes,chunks)
-
-                        registration_reads=[]
-                        published=False
-                        for attempt in range(1,4):
-                            info,reads=await read_face_info("post-"+variant["bin_id_hex"]+"-"+str(attempt),1)
-                            registration_reads.extend(reads)
-                            raw_id=(info.get("cmd3_raw") if info else None)
-                            if raw_id and raw_id.lower() in (variant["bin_id_hex"],bytes.fromhex(variant["bin_id_hex"])[::-1].hex()):
-                                published=True
-                                break
-                            await asyncio.sleep(.6)
-
-                        emit("6/9 · "+variant["bin_id_hex"].upper()+
-                             (" publicado; seleccionando MARKET…" if published else
-                              " no publicado por 0x84; forzando igualmente la selección MARKET…"))
-
-                        selection_attempts=[]
-                        selected=False
-                        selected_info=None
-                        sel_status=None
-                        for select_try in range(1,5):
-                            _,sel_status,_=await tx83_wait(bytes([1,market_index&255]),3.5)
-                            await asyncio.sleep(1.5 if select_try==1 else 2.0)
-                            selected_info,reads=await read_face_info("select-"+variant["bin_id_hex"]+"-"+str(select_try),1)
-                            index_ok=bool(selected_info and selected_info.get("index")==market_index)
-                            raw_id=(selected_info.get("cmd3_raw") if selected_info else None)
-                            id_ok=bool(raw_id and raw_id.lower() in (variant["bin_id_hex"],bytes.fromhex(variant["bin_id_hex"])[::-1].hex()))
-                            ack_ok=(sel_status==1)
-                            # The physical slot index change is accepted as the primary proof.
-                            ok=bool(ack_ok and index_ok)
-                            selection_attempts.append({"attempt":select_try,"status":sel_status,
-                                "dial_info":selected_info,"index_ok":index_ok,"market_bin_id_ok":id_ok,
-                                "published_before_select":published,"verified":ok})
-                            if ok:
-                                selected=True
-                                break
-
-                        attempt_rec={
-                            "role":variant["role"],"bin_id_hex":variant["bin_id_hex"],
-                            "raw_sha256":variant["raw_sha256"],"raw_size":variant["raw_size"],
-                            "wire_mode":"compressed" if use_compressed else "raw",
-                            "wire_size":len(file_bytes),"wire_sha256":hashlib.sha256(file_bytes).hexdigest(),
-                            "oem_crc16":f"0x{crc16_8005(deflated):04X}" if use_compressed else None,
-                            "transfer":transfer,"registration_published":published,
-                            "registration_reads":registration_reads,
-                            "selection_attempts":selection_attempts,
-                            "selected":selected
-                        }
-                        variant_attempts.append(attempt_rec)
-                        if selected:
-                            chosen=attempt_rec
+                    emit("6/9 · CUSTOMIZE exacto completo; esperando que el reloj publique su metadata…")
+                    post_attempts=[]
+                    for attempt in range(1,6):
+                        mark=len(messages)
+                        await tx(0x84,b"",3,0)
+                        payload=await wait_data(0x84,mark,5.0)
+                        info=dial_info(payload)
+                        cmd2_ok=bool(info and info.get("cmd2_hex")==expected_cmd2)
+                        post_attempts.append({"attempt":attempt,"dial_info":info,"cmd2_metadata_ok":cmd2_ok})
+                        if cmd2_ok:
+                            post=info
                             break
-                        emit("VARIANTE "+variant["bin_id_hex"].upper()+" no activó MARKET; probando la siguiente identidad.")
+                        await asyncio.sleep(1.0)
+                    rep["single_face_install"]["post_dial_info"]=post
+                    rep["single_face_install"]["post_dial_info_attempts"]=post_attempts
 
-                    rep["single_face_install"]["market_variant_attempts"]=variant_attempts
+                    custom_index=face_slots.get("custom_index")
+                    if custom_index is None:
+                        raise RuntimeError("UtraWatch no resolvió custom_index")
+                    custom_index=int(custom_index)
+
+                    emit("7/9 · Seleccionando y verificando CUSTOMIZE índice "+str(custom_index)+"…")
+                    selection_attempts=[]
+                    selection_verified=False
+                    sel_status=None
+                    selected_info=None
+                    for select_try in range(1,5):
+                        _,sel_status,_=await tx83_wait(bytes([1,custom_index&255]),3.0)
+                        await asyncio.sleep(1.8 if select_try==1 else 2.2)
+                        mark=len(messages)
+                        await tx(0x84,b"",3,0)
+                        payload=await wait_data(0x84,mark,5.0)
+                        selected_info=dial_info(payload)
+                        index_ok=bool(selected_info and selected_info.get("index")==custom_index)
+                        cmd2_ok=bool(selected_info and selected_info.get("cmd2_hex")==expected_cmd2)
+                        ok=bool(sel_status==1 and index_ok and cmd2_ok)
+                        selection_attempts.append({
+                            "attempt":select_try,"status":sel_status,"dial_info":selected_info,
+                            "index_ok":index_ok,"cmd2_metadata_ok":cmd2_ok,"verified":ok
+                        })
+                        if ok:
+                            selection_verified=True
+                            break
+
                     rep["single_face_install"]["selection_lock"]={
-                        "attempted":True,"slot":"MARKET","index":market_index,
-                        "show_order":face_slots.get("market_show_order"),
-                        "verified":bool(chosen),
-                        "chosen_bin_id_hex":chosen.get("bin_id_hex") if chosen else None,
-                        "dial_info":chosen["selection_attempts"][-1]["dial_info"] if chosen else None
+                        "attempted":True,"slot":"CUSTOMIZE","index":custom_index,
+                        "show_order":face_slots.get("custom_show_order"),
+                        "status":sel_status,"verified":selection_verified,
+                        "expected_cmd2_hex":expected_cmd2,
+                        "dial_info":selected_info,"attempts":selection_attempts
                     }
-                    if not chosen:
-                        raise RuntimeError("Ambas identidades MARKET fueron transferidas, pero ninguna cambió físicamente el índice activo.")
-
+                    rep["single_face_install"]["market_attempt"]={
+                        "attempted":False,
+                        "reason":"V1.35 vuelve a la ruta CUSTOMIZE cmd=2 físicamente validada; MARKET personalizado fue rechazado por firmware."
+                    }
                     rep["single_face_install"]["factory_faces_deleted"]=False
-                    rep["single_face_install"]["factory_faces_note"]="V1.34 sólo escribe el slot MARKET descargable; no toca firmware ni caras integradas."
+                    rep["single_face_install"]["factory_faces_note"]="No se tocan esferas integradas de fábrica."
                     rep["single_face_install"]["dial_state_changed"]=bool(
-                        pre and chosen["selection_attempts"][-1]["dial_info"] and
-                        pre.get("raw_hex")!=chosen["selection_attempts"][-1]["dial_info"].get("raw_hex"))
+                        pre and selected_info and pre.get("raw_hex")!=selected_info.get("raw_hex"))
 
-                    emit("8/9 · Postcheck · MARKET activo + motor analógico + hora/batería/pasos/pulso LIVE…")
+                    emit("8/9 · Postcheck de conexión y CUSTOMIZE…")
                     connected=bool(getattr(c,"is_connected",False))
-                    all_ok=bool(chosen and chosen["transfer"].get("ok") and connected)
+                    transfer_ok=bool(exact_transfer.get("ok") and connected)
+                    all_ok=bool(transfer_ok and sel_status==1 and selection_verified)
                     rep["single_face_install"]["protocol_acks_sent"]=protocol_acks_sent
                     rep["single_face_install"]["wire_protocol"]={
                         "final_dev_type":wire_dev_type,"next_n":tx_n,
                         "note":"CEProtocolB byte1=device_type; byte3=N"
                     }
-                    rep["single_face_install"]["live_validation_plan"]={
-                        "digital_time":"0x8001/0x8002",
-                        "battery":"0x8013",
-                        "steps":"0x8009",
-                        "heart_rate":"0x800E",
-                        "analog_hands":"native MARKET hour/minute/second descriptors"
-                    }
                     rep["single_face_install"]["classification"]=(
-                        "dynamic_market_forced_selected_"+chosen["bin_id_hex"] if all_ok else
-                        "dynamic_market_force_failed"
+                        "approved_photo_customize_installed_and_selected" if all_ok else
+                        "approved_photo_customize_transferred_selection_pending" if transfer_ok else
+                        "approved_photo_customize_install_failed"
                     )
+
                     rep["single_face_install"]["connected_end"]=connected
                     rep["single_face_install"]["phase"]="complete"
-                    emit("9/9 · V1.34 FINALIZADA · "+rep["single_face_install"]["classification"])
+                    emit("9/9 · V1.35 FINALIZADA · "+rep["single_face_install"]["classification"])
                     return rep
                 finally:
                     if c:
@@ -1232,14 +1287,14 @@ class App:
                     rep["errors"].append(type(error).__name__+": "+str(error))
                     rep["single_face_install"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("V1.34 FALLÓ · "+repr(error))
+                    append("V1.35 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V1.34 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V1.35 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
                 append("ESFERA ÚNICA · "+result["single_face_install"]["classification"]+".")
-                self.status.set("V1.34 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
+                self.status.set("V1.35 finalizada. Revisá el reloj y COPIAR DIAGNÓSTICO.")
             self.run_async(asyncio.wait_for(work(),timeout=420),done)
         def repair_binding():
             if self.ble_busy:
@@ -1272,9 +1327,9 @@ class App:
                 append("REPARACIÓN · continuando con emparejamiento e instalación…")
                 ota_lab(pair=True)
             self.run_async(repair_selected(self,address,emit_repair),repaired)
-        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.34",command=repair_binding)
+        primary_test.configure(text="REPARAR VÍNCULO E INSTALAR V1.35",command=repair_binding)
         ttk.Button(row,text="INSTALAR SIN REPARAR",command=ota_lab).pack(side="left",padx=4)
-        append("V1.34 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.34; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
+        append("V1.35 LISTA · 1º REPARAR VÍNCULO E INSTALAR V1.35; 2º CONFIRMAR EL RELOJ; 3º COPIAR DIAGNÓSTICO. Quita sólo su vínculo Windows y solicita emparejar antes de consultar GATT.")
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
         append("La instalación sólo comienza después de confirmar una conexión ATT operativa.")

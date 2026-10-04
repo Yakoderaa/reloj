@@ -14,48 +14,42 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify V1.34
-        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.34.0',v"
-      - run: python -m pip install -r requirements.txt pyinstaller==6.22.0 pillow numpy
-      - name: Fetch proven native 2D7F MARKET engine
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force assets | Out-Null
-          Invoke-WebRequest 'http://watchhealth.com.cn/k6File/clock/file/2D7F.bin' -OutFile assets/donor_2D7F.bin
-      - name: Build fully dynamic approved face
-        run: python prepare_v133_dynamic.py
-      - run: python -m unittest discover -s tests
-      - run: python -m py_compile app.py connection.py windows_binding.py prepare_v133_dynamic.py
-      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v133_custom_same_id.b64;assets" --add-data "assets/face_v133_custom_verified.b64;assets" --add-data "assets/face_v133.json;assets" app.py
+      - name: Verify V1.35
+        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.35.0',v"
+      - run: python -m pip install -r requirements.txt pyinstaller==6.22.0
+      - run: python -m py_compile app.py connection.py windows_binding.py
+      - name: Verify photo CUSTOMIZE path
+        run: python -c "s=open('app.py',encoding='utf-8').read(); assert 'build_exact_customize_v135' in s; assert 'approved-photo-customize-v135.bin' in s; assert 'transfer_slot(2,"EXACT-CUSTOMIZE"' in s; assert 'custom_index' in s"
+      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab app.py
       - name: Calculate EXE SHA256 and updater manifest
         shell: pwsh
         run: |
           $sha=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           $manifest=@{
-            version='1.34.0'
-            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.34.0/RelojLab.exe'
+            version='1.35.0'
+            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.35.0/RelojLab.exe'
             sha256=$sha
-            notes='V1.34 corrige el bloqueo de V1.33: prueba MARKET 4CC6 y 2D7F, fuerza la selección del slot aunque WATCH_FACE_INFO no publique antes el BinID y valida principalmente por ACK + cambio real de índice. Conserva los campos dinámicos nativos.'
+            notes='V1.35 abandona MARKET como ruta principal y vuelve al CUSTOMIZE cmd=2 que sí queda visible en este reloj. El raster se reconstruye desde la foto aprobada del usuario en 240x296, conserva hora/pasos/pulso vivos del firmware y batería del momento de instalación.'
           } | ConvertTo-Json
           Set-Content -Path version.json -Value $manifest -Encoding UTF8
-      - name: Publish V1.34 release asset
+      - name: Publish V1.35 release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.34.0 *> $null
-          if ($LASTEXITCODE -ne 0) { gh release create v1.34.0 dist/RelojLab.exe --title 'Reloj Lab V1.34' --notes 'V1.34: doble identidad MARKET 4CC6/2D7F y selección forzada. No aborta sólo porque 0x84 siga mostrando CUSTOMIZE; valida ACK y cambio físico al índice MARKET.' }
-          else { gh release upload v1.34.0 dist/RelojLab.exe --clobber }
+          gh release view v1.35.0 *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create v1.35.0 dist/RelojLab.exe --title 'Reloj Lab V1.35' --notes 'V1.35 vuelve a CUSTOMIZE cmd=2, la ruta físicamente visible del reloj, y usa como raster la referencia fotográfica aprobada. Mantiene hora, pasos y pulso como campos vivos del firmware y selecciona/verifica el índice CUSTOMIZE.' }
+          else { gh release upload v1.35.0 dist/RelojLab.exe --clobber }
       - name: Publish updater manifest
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git commit -m 'Updater: publish V1.34' || echo 'manifest unchanged'
+          git commit -m 'Updater: publish V1.35' || echo 'manifest unchanged'
           git push
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.34
+          name: RelojLab-Windows-V1.35
           path: dist/RelojLab.exe
           if-no-files-found: error
