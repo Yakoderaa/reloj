@@ -14,8 +14,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify V1.37
-        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.37.0',v"
+      - name: Verify V1.38
+        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.38.0',v"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0 pillow numpy
       - name: Fetch proven native 2D7F MARKET engine
         shell: pwsh
@@ -32,30 +32,30 @@ jobs:
         run: |
           $sha=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           $manifest=@{
-            version='1.37.0'
-            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.37.0/RelojLab.exe'
+            version='1.38.0'
+            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.38.0/RelojLab.exe'
             sha256=$sha
-            notes='V1.37 separa activación de MARKET y validez del diseño: primero instala el donor OEM 2D7F byte-exacto, prueba market_index y market_show_order, y sólo después reemplaza ese MARKET activo por nuestra esfera dinámica.'
+            notes='V1.38 detecta si MARKET 2D7F ya está activo y omite el bootstrap OEM de 254 bloques. Sube directamente nuestra esfera dinámica y amplía el timeout total a 900 s para evitar cortes durante la transferencia.'
           } | ConvertTo-Json
           Set-Content -Path version.json -Value $manifest -Encoding UTF8
-      - name: Publish V1.37 release asset
+      - name: Publish V1.38 release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.37.0 *> $null
-          if ($LASTEXITCODE -ne 0) { gh release create v1.37.0 dist/RelojLab.exe --title 'Reloj Lab V1.37' --notes 'V1.37: bootstrap MARKET OEM 2D7F byte-exacto, prueba de selección por index/showOrder y, si activa, reemplazo por nuestra esfera dinámica manteniendo los bindings nativos.' }
-          else { gh release upload v1.37.0 dist/RelojLab.exe --clobber }
+          gh release view v1.38.0 *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create v1.38.0 dist/RelojLab.exe --title 'Reloj Lab V1.38' --notes 'V1.38: reutiliza MARKET 2D7F activo de V1.37, evita repetir el donor OEM, completa la transferencia de nuestra esfera dinámica y aumenta el timeout total a 900 s.' }
+          else { gh release upload v1.38.0 dist/RelojLab.exe --clobber }
       - name: Publish updater manifest
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git commit -m 'Updater: publish V1.37' || echo 'manifest unchanged'
+          git commit -m 'Updater: publish V1.38' || echo 'manifest unchanged'
           git push
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.37
+          name: RelojLab-Windows-V1.38
           path: dist/RelojLab.exe
           if-no-files-found: error
