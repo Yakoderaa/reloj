@@ -1,6 +1,6 @@
 {
-  "sha256": "39b2f09b17601bbc8964342d6868a5b67884151c88f17e0917ec831283986027",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.41.0/RelojLab.exe",
-  "notes": "V1.41 corrige el KeyError de V1.40: todas las rutas del bloqueo usan single_face_lock. Captura la esfera activa, guarda su índice/BinID y la re-selecciona automáticamente si cambia.",
-  "version": "1.41.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.42.0/RelojLab.exe",
+  "version": "1.42.0",
+  "notes": "V1.42 mantiene el bloqueo probado de V1.41 y añade PREPARAR BLOQUEO PERMANENTE para capturar la identidad exacta del reloj, servicios GATT y la esfera objetivo antes de construir el parche autónomo.",
+  "sha256": "4bf61211b9c6296b9dad7dda648bfe4ec067523cb25b91e45bef9206a795fca6"
 }
