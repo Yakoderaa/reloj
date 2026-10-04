@@ -44,7 +44,7 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir evidence
-          PAT='DIAL_COMPRESS_CTRL|IS_START_BIG_SEND|DATA_TYPE_DIAL_SYNC|DATA_TYPE_DIAL_INFO|FUNCTION_CONTROL|添加大发送数据|大发送|DialInfo|DialSync|dialSync|bigSend|BigSend|GZipUtils|ANSWER_OVER|CUSTOMIZE|FileTransControl|sendFile|sendWatchFileData|getFileDownloadInfo|K6_DATA_TYPE_WATCH_FACE_INFO|WATCH_FACE_INFO|fileDataSendResult|fileStateResult|V2BleFileDownLoadActivity|startFileDownload|jSONObject.put|K6_DATA_TYPE_WATCH_FACE_SYN_NNNOMAL_CHOICE|FACE_SYN_NNNOMAL_CHOICE|ChoiceClockdialAdapter|Clockdial'
+          PAT='DIAL_COMPRESS_CTRL|IS_START_BIG_SEND|DATA_TYPE_DIAL_SYNC|DATA_TYPE_DIAL_INFO|FUNCTION_CONTROL|DialInfo|DialSync|dialSync|bigSend|BigSend|GZipUtils|ANSWER_OVER|CUSTOMIZE|FileTransControl|sendFile|sendWatchFileData|getFileDownloadInfo|K6_DATA_TYPE_WATCH_FACE_INFO|WATCH_FACE_INFO|fileDataSendResult|fileStateResult|V2BleFileDownLoadActivity|startFileDownload|K6_DATA_TYPE_WATCH_FACE_SYN_NNNOMAL_CHOICE|FACE_SYN_NNNOMAL_CHOICE|ChoiceClockdialAdapter|Clockdial|long.?press|press.?hold|watch.?face.*switch|switch.*watch.?face|dial.*switch|switch.*dial|screen.?lock|touch.?lock|gesture|长按|切换表盘|表盘切换|锁定表盘|禁止.*表盘'
           grep -R -n -E "$PAT" decompiled > evidence/grep.txt || true
           echo '=== MATCH COUNT ==='
           wc -l evidence/grep.txt
