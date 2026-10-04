@@ -1,6 +1,6 @@
 {
-  "version": "1.38.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.38.0/RelojLab.exe",
-  "notes": "V1.38 detecta si MARKET 2D7F ya está activo y omite el bootstrap OEM de 254 bloques. Sube directamente nuestra esfera dinámica y amplía el timeout total a 900 s para evitar cortes durante la transferencia.",
-  "sha256": "d642415e2c765494be19363759afe392ba419564aa245efde9388f920ddeb9b9"
+  "version": "1.39.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.39.0/RelojLab.exe",
+  "sha256": "f72b274c5267716c4d440aa4b3497d108dd24088629dc344a00b7a44162f6de1",
+  "notes": "V1.39 está pensada para partir de la esfera de fábrica. Reconstruye MARKET, prueba primero nuestra esfera 4CC6 y exige índice 7 + BinID correcto; si falla, restaura OEM y prueba 2D7F. Índice 0 ya no cuenta como éxito."
 }
