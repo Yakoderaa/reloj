@@ -41,6 +41,25 @@ jobs:
           grep -R -n -A80 -B40 -E 'DIAL_SYNC|K6_DATA_TYPE_WATCH_FACE|showOrder - 1|showOrder-1' decompiled/sources/com/utra decompiled/sources/com/wr 2>/dev/null | head -1500 || true
           echo '=== FUNCTION CONTROL constants ==='
           grep -R -n -A80 -B30 -E 'FUNCTION_CONTROL|FunctionControl|DIAL_COMPRESS|LONG|PRESS|GESTURE' decompiled/sources/com/wr 2>/dev/null | head -1500 || true
+      - name: Extract exact watch-face setting classes
+        shell: bash
+        run: |
+          set -euxo pipefail
+          {
+            echo '=== K6_Send_Watch_Face_And_Notification_Set ==='
+            cat decompiled/sources/com/wr/sdk/entity/k6/K6_Send_Watch_Face_And_Notification_Set.java || true
+            echo '=== K6_DATA_TYPE_WATCH_FACE_SYN_NNNOMAL_CHOICE ==='
+            cat decompiled/sources/com/wr/sdk/entity/k6/K6_DATA_TYPE_WATCH_FACE_SYN_NNNOMAL_CHOICE.java || true
+            echo '=== Process MESSAGE DISPLAY ==='
+            cat decompiled/sources/com/wr/sdk/proxy/data/receive/ProcessDATA_TYPE_MESSAGE_DISPLAY.java || true
+            echo '=== SendDataManager relevant ==='
+            grep -n -A25 -B15 -E 'sendWatchFace|sendK6_DATA_TYPE_WATCH_FACE_SYNC' decompiled/sources/com/wr/sdk/proxy/data/send/SendDataManager.java || true
+            echo '=== usages of sendWatchFace ==='
+            grep -R -n -A15 -B15 'sendWatchFace' decompiled/sources/com/utra decompiled/sources/com/wtwd 2>/dev/null || true
+            echo '=== usages watch face notification setting ==='
+            grep -R -n -A25 -B25 -E 'WATCH_FACE_AND_NOTIFICATION_SET|Watch_Face_And_Notification_Set' decompiled/sources 2>/dev/null || true
+          } > evidence/exact-setting.txt
+          cat evidence/exact-setting.txt
       - uses: actions/upload-artifact@v4
         with:
           name: v088-research
