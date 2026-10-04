@@ -1,6 +1,6 @@
 {
-  "version": "1.43.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.43.0/RelojLab.exe",
-  "notes": "V1.43 mueve el bloqueo fuera de la ventana Control activo: recuerda la esfera elegida, espera al reloj si está apagado y se reconecta automáticamente tras un reinicio para restaurar índice/BinID.",
-  "sha256": "2568b8a4e81d2db304ed28af76d2fd1823e347839eb1f88ec04fab2d6b458f9f"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.44.0/RelojLab.exe",
+  "version": "1.44.0",
+  "notes": "V1.44 prepara el bloqueo autónomo real: captura automáticamente la esfera objetivo, DEVINFO, identidad hardware/firmware, servicios GATT y canal OTA sin flashear una imagen desconocida.",
+  "sha256": "1e65d201ba68ac32c28623d2729075fe4f0018e00c20a8f201888f5c0ef91a5c"
 }
