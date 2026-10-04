@@ -1,6 +1,6 @@
 {
-  "version": "1.35.0",
-  "sha256": "1e40eb8abc2e21d8b5e13b3654c09b77593be6b27b8e6510c3b7ceda9a3a0b88",
-  "notes": "V1.35 abandona MARKET como ruta principal y vuelve al CUSTOMIZE cmd=2 que sí queda visible en este reloj. El raster se reconstruye desde la foto aprobada del usuario en 240x296, conserva hora/pasos/pulso vivos del firmware y batería del momento de instalación.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.35.0/RelojLab.exe"
+  "notes": "V1.36 corrige el fallo de descompresión de V1.35: la esfera 240x296 ahora viaja como asset externo validado en build y se instala por CUSTOMIZE cmd=2. Conserva hora/pasos/pulso vivos del firmware y batería tomada al instalar.",
+  "sha256": "47d49261c48ce541afc12a99d488feb841a93d2f7e4aed3b7cfc4778a3f51533",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.36.0/RelojLab.exe",
+  "version": "1.36.0"
 }
