@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from bleak import BleakScanner, BleakClient
 import urllib.request, tempfile, os, subprocess, time, hashlib, queue, math
 
-APP_VERSION="1.42.0"
+APP_VERSION="1.43.0"
 VERSION_URL="https://raw.githubusercontent.com/Yakoderaa/reloj/main/version.json"
 OAD_SERVICE="f000ffc0-0451-4000-b000-000000000000"
 CONTROL_SERVICE="0000e91a-0000-1000-8000-00805f9b34fb"
@@ -16,7 +16,7 @@ def ver_tuple(v):
 
 class App:
     def __init__(self,root):
-        self.root=root; root.title("Reloj Lab V1.42"); root.geometry("1000x700")
+        self.root=root; root.title("Reloj Lab V1.43"); root.geometry("1000x700")
         self.ui_queue=queue.Queue()
         self.ble_loop=asyncio.new_event_loop()
         self.ble_busy=False
@@ -28,15 +28,16 @@ class App:
             self.ble_loop.run_forever()
         threading.Thread(target=bluetooth_worker,daemon=True).start()
         self.root.after(50,self.drain_ui)
+        self.root.after(2500,self.start_saved_face_guard_if_available)
         self.state_path=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","window-state.json")
         self.window_state=self.load_window_state()
         if self.window_state.get("main_geometry"):
             try: root.geometry(self.window_state["main_geometry"])
             except: pass
-        self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.face_lock_stop_requested=False; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
+        self.devices=[]; self.selected=None; self.report=None; self.live_client=None; self.live_loop=None; self.face_lock_stop_requested=False; self.face_guard_future=None; self.face_guard_enabled=False; self.closing=False; root.protocol("WM_DELETE_WINDOW",self.close_app); self.raw_hex=tk.StringVar(value="00ff000101150000010010000000010000000000")
         top=ttk.Frame(root,padding=12); top.pack(fill="x")
         ttk.Label(top,text="Reloj Lab",font=("Segoe UI",18,"bold")).pack(side="left")
-        ttk.Label(top,text="V1.42 · PERFIL PARA BLOQUEO PERMANENTE").pack(side="left",padx=12)
+        ttk.Label(top,text="V1.43 · GUARDIA PERSISTENTE CON RECONEXIÓN").pack(side="left",padx=12)
         ttk.Button(top,text="Buscar actualización",command=self.check_update).pack(side="right")
         ttk.Button(top,text="Buscar relojes",command=self.scan).pack(side="right",padx=8)
         body=ttk.Frame(root,padding=(12,0,12,12)); body.pack(fill="both",expand=True)
@@ -71,6 +72,10 @@ class App:
         try:self.save_window_state()
         except:pass
         self.closing=True
+        self.face_guard_enabled=False
+        if self.face_guard_future:
+            try:self.face_guard_future.cancel()
+            except:pass
         self.status.set("Cerrando…")
         try:self.root.quit()
         except:pass
@@ -109,6 +114,158 @@ class App:
             try:r=fn(); self.root.after(0,lambda:done(r,None))
             except Exception as e:self.root.after(0,lambda error=e:done(None,error))
         threading.Thread(target=w,daemon=True).start()
+    def face_lock_path(self):
+        return os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","face-lock.json")
+
+    def load_saved_face_lock(self):
+        try:
+            with open(self.face_lock_path(),"r",encoding="utf-8") as fh:return json.load(fh)
+        except:return None
+
+    def start_saved_face_guard_if_available(self):
+        target=self.load_saved_face_lock()
+        if not target or self.closing or self.face_guard_enabled:return
+        address=target.get("address")
+        if not address:return
+        self.face_guard_enabled=True
+        self.status.set("Guardia V1.43 activa · esperando el reloj si está apagado…")
+        self.face_guard_future=asyncio.run_coroutine_threadsafe(
+            self.saved_face_guard_loop(target),self.ble_loop)
+
+    async def saved_face_guard_loop(self,target):
+        address=target.get("address")
+        target_index=int(target.get("index",0))
+        target_cmd3=(target.get("cmd3_raw") or "").lower()
+        target_is_market=target_cmd3 not in ("","0000")
+        failures=0
+        while not self.closing and self.face_guard_enabled:
+            client=None
+            try:
+                # Do not steal BLE while a user-triggered operation owns it.
+                if self.ble_busy:
+                    await asyncio.sleep(2)
+                    continue
+                device=await BleakScanner.find_device_by_address(address,timeout=6)
+                if device is None:
+                    self.ui_queue.put(lambda:self.status.set("Guardia V1.43 · reloj fuera de alcance/apagado; reintentando…"))
+                    await asyncio.sleep(4)
+                    continue
+                self.selected={
+                    "device":device,"name":getattr(device,"name",None) or target.get("name") or "Apple Watch Ultra",
+                    "address":address,"service_uuids":[],"manufacturer_data":{},"service_data":{}
+                }
+                client=BleakClient(device,timeout=18)
+                await asyncio.wait_for(client.connect(),timeout=22)
+                if not client.is_connected:raise RuntimeError("GATT no conectado")
+                b001="0000b001-0000-1000-8000-00805f9b34fb"
+                b002="0000b002-0000-1000-8000-00805f9b34fb"
+                messages=[];current=None;tx_n=1;dev_type=1
+                ack83=[];ack_event=asyncio.Event()
+
+                def complete(msg):
+                    messages.append(msg)
+                    if msg.get("send_type")==4 and msg.get("opcode")==0x83 and msg.get("payload"):
+                        ack83.append(msg["payload"][0]);ack_event.set()
+
+                def rx(sender,data):
+                    nonlocal current
+                    b=bytes(data)
+                    if len(b)<1:return
+                    if b[0]==0:
+                        if len(b)<10:return
+                        total=int.from_bytes(b[8:10],"little")
+                        current={"pid":b[1],"n":b[3],"send_type":b[4],"opcode":b[5],
+                                 "total":total,"data":bytearray(b[10:10+min(total,10)]),
+                                 "next":1}
+                        if len(current["data"])>=total:
+                            msg=current;current=None
+                            msg["payload"]=bytes(msg["data"][:total]);complete(msg)
+                    elif current is not None and b[0]==current["next"]:
+                        current["data"].extend(b[1:20]);current["next"]+=1
+                        if len(current["data"])>=current["total"]:
+                            msg=current;current=None
+                            msg["payload"]=bytes(msg["data"][:msg["total"]]);complete(msg)
+
+                await asyncio.wait_for(client.start_notify(b001,rx),timeout=10)
+
+                def build(op,payload=b"",send_type=1):
+                    nonlocal tx_n
+                    payload=bytes(payload);n=len(payload);h=bytearray(20)
+                    h[1]=dev_type;h[3]=tx_n&255;h[4]=send_type;h[5]=op;h[8]=n&255;h[9]=(n>>8)&255
+                    if n<=10:
+                        h[10:10+n]=payload;frames=[bytes(h)]
+                    else:
+                        frags=((n-10)+18)//19;h[2]=frags;h[10:20]=payload[:10];frames=[bytes(h)]
+                        pos=10
+                        for i in range(frags):
+                            c=bytearray(20);c[0]=i+1;part=payload[pos:pos+19];c[1:1+len(part)]=part
+                            frames.append(bytes(c));pos+=len(part)
+                    tx_n=(tx_n+1)&255
+                    return frames
+
+                async def tx(op,payload=b"",send_type=1):
+                    for fr in build(op,payload,send_type):
+                        await asyncio.wait_for(client.write_gatt_char(b002,fr,response=False),timeout=5)
+                        await asyncio.sleep(.045)
+
+                async def read_info():
+                    start=len(messages);await tx(0x84,b"",3)
+                    end=time.monotonic()+4
+                    while time.monotonic()<end:
+                        for m in reversed(messages[start:]):
+                            if m.get("opcode")==0x84 and m.get("send_type")==1:
+                                p=m.get("payload",b"")
+                                if len(p)>=17:
+                                    return {"index":p[0],"cmd3_raw":p[7:9].hex()}
+                        await asyncio.sleep(.08)
+                    return None
+
+                async def select_target():
+                    before=len(ack83);ack_event.clear()
+                    await tx(0x83,bytes([1,target_index&255]),1)
+                    if len(ack83)==before:
+                        try:await asyncio.wait_for(ack_event.wait(),timeout=4)
+                        except asyncio.TimeoutError:pass
+                    await asyncio.sleep(.8)
+                    info=await read_info()
+                    ok=bool(info and int(info.get("index",-1))==target_index and
+                            (not target_is_market or (info.get("cmd3_raw") or "").lower()==target_cmd3))
+                    return ok,info
+
+                info=await read_info()
+                matches=bool(info and int(info.get("index",-1))==target_index and
+                             (not target_is_market or (info.get("cmd3_raw") or "").lower()==target_cmd3))
+                if not matches:
+                    ok,verified=await select_target()
+                    if ok:
+                        self.ui_queue.put(lambda:self.status.set("Guardia V1.43 · esfera restaurada tras reconexión/reinicio."))
+                    else:
+                        self.ui_queue.put(lambda:self.status.set("Guardia V1.43 · conectado, pero no pudo restaurar la esfera; reintentará."))
+                else:
+                    self.ui_queue.put(lambda:self.status.set("Guardia V1.43 · esfera correcta y protegida."))
+
+                failures=0
+                # Keep this connection as a low-frequency guard. If reboot/disconnect happens,
+                # the outer loop reconnects automatically.
+                while client.is_connected and not self.closing and self.face_guard_enabled:
+                    await asyncio.sleep(2)
+                    info=await read_info()
+                    if not info:continue
+                    matches=bool(int(info.get("index",-1))==target_index and
+                                 (not target_is_market or (info.get("cmd3_raw") or "").lower()==target_cmd3))
+                    if not matches:
+                        await select_target()
+            except asyncio.CancelledError:
+                break
+            except Exception:
+                failures+=1
+                self.ui_queue.put(lambda:self.status.set("Guardia V1.43 · conexión perdida; esperando que el reloj vuelva a encender…"))
+                await asyncio.sleep(min(12,3+failures))
+            finally:
+                if client:
+                    try:await asyncio.wait_for(client.disconnect(),timeout=4)
+                    except:pass
+
     def scan(self):
         if self.ble_busy:
             self.status.set("Esperá a que termine la operación Bluetooth actual."); return
@@ -333,7 +490,7 @@ class App:
         ttk.Label(w,text="Analizador B002 → B001",font=("Segoe UI",14,"bold")).pack(anchor="w",padx=12,pady=(12,4))
         ttk.Label(w,text="Captura respuestas completas y compara bytes. El canal OTA FFC1 permanece separado.").pack(anchor="w",padx=12)
         row=ttk.Frame(w,padding=12); row.pack(fill="x")
-        # V1.42 regression guard: CONTROL ACTIVO toolbar is created before the log
+        # V1.43 regression guard: CONTROL ACTIVO toolbar is created before the log
         # and must remain intact; V1.26 accidentally replaced capture() with installer code.
         ttk.Entry(row,textvariable=self.raw_hex,width=70).pack(side="left",fill="x",expand=True)
         log=tk.Text(w,font=("Consolas",9),wrap="none"); log.pack(fill="both",expand=True,padx=12,pady=(0,12))
@@ -406,7 +563,7 @@ class App:
         primary_test=ttk.Button(row,text="FIJAR ESFERA ACTUAL COMO ÚNICA")
         primary_test.pack(side="left",padx=4)
         def permanent_profile():
-            append("V1.42 · PERFIL TÉCNICO · leyendo identidad del reloj y esfera fijada; sin modificarla.")
+            append("V1.43 · PERFIL TÉCNICO · leyendo identidad del reloj y esfera fijada; la guardia automática seguirá usando ese objetivo.")
             async def work():
                 out={"app_version":APP_VERSION,"generated_utc":datetime.now(timezone.utc).isoformat(),
                      "target_face":None,"device":{},"standard_reads":{},"services":[],"errors":[]}
@@ -443,16 +600,16 @@ class App:
                         except:pass
             def done(out,error):
                 if error:
-                    append("PERFIL V1.42 FALLÓ · "+repr(error)); return
+                    append("PERFIL V1.43 FALLÓ · "+repr(error)); return
                 folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab")
                 os.makedirs(folder,exist_ok=True)
                 path=os.path.join(folder,"permanent-lock-profile.json")
                 with open(path,"w",encoding="utf-8") as fh:json.dump(out,fh,ensure_ascii=False,indent=2)
-                append("PERFIL V1.42 LISTO · "+path)
+                append("PERFIL V1.43 LISTO · "+path)
                 append("OBJETIVO · "+json.dumps(out.get("target_face"),ensure_ascii=False,separators=(",",":")))
                 append("IDENTIDAD · "+json.dumps(out.get("standard_reads"),ensure_ascii=False,separators=(",",":")))
                 self.report={"permanent_lock_profile":out}; self.show()
-                self.status.set("Perfil V1.42 listo. COPIAR DIAGNÓSTICO.")
+                self.status.set("Perfil V1.43 listo. COPIAR DIAGNÓSTICO.")
             self.run_async(work(),done)
         ttk.Button(row,text="PREPARAR BLOQUEO PERMANENTE",command=permanent_profile).pack(side="left",padx=4)
         ttk.Button(row,text="COPIAR DIAGNÓSTICO",command=copy_control_diagnostic).pack(side="left",padx=4)
@@ -703,9 +860,9 @@ class App:
         ttk.Button(row,text="HUELLA OTA PROFUNDA",command=ota_fingerprint).pack(side="left",padx=4)
         def ota_lab(pair=False):
             if self.ble_busy:
-                append("V1.42 NO INICIADA · Bluetooth ocupado.")
+                append("V1.43 NO INICIADA · Bluetooth ocupado.")
                 return
-            append("V1.42 · BLOQUEO E91A · captura la esfera activa, la guarda y mantiene una sesión para restaurarla si cambia.")
+            append("V1.43 · BLOQUEO E91A · captura la esfera activa, la guarda y mantiene una sesión para restaurarla si cambia.")
             rep=self.base_report()
             rep["windows_binding_repair"]=dict(getattr(self,"binding_repair",{}))
             self.face_lock_stop_requested=False
@@ -713,7 +870,7 @@ class App:
                 "phase":"prepare","checks":0,"corrections":0,"target":None,
                 "blocks":[],"payload_bytes_written":0,"ack_count":0,
                 "factory_faces_physically_deleted":False,
-                "note":"V1.42 no flashea firmware; fija y re-selecciona la esfera elegida mientras Reloj Lab permanece conectado."
+                "note":"V1.43 no flashea firmware; fija y re-selecciona la esfera elegida mientras Reloj Lab permanece conectado."
             }
             t0=time.monotonic()
 
@@ -750,7 +907,7 @@ class App:
                 hdr[11]=0
                 return bytes(hdr)+comp,comp
 
-            def load_dynamic_market_v142():
+            def load_dynamic_market_v143():
                 import base64,zlib
                 root=getattr(sys,"_MEIPASS",os.path.dirname(os.path.abspath(__file__)))
                 meta_path=os.path.join(root,"assets","face_v133.json")
@@ -766,16 +923,16 @@ class App:
                 ]:
                     asset=os.path.join(root,"assets",name)
                     if not os.path.exists(asset):
-                        raise RuntimeError("Falta asset MARKET V1.42: "+name)
+                        raise RuntimeError("Falta asset MARKET V1.43: "+name)
                     raw=zlib.decompress(base64.b64decode(open(asset,"r",encoding="ascii").read().strip()))
                     if len(raw)<200000 or int.from_bytes(raw[:4],"little")!=len(raw)-16:
-                        raise RuntimeError("MARKET V1.42 inválido: "+name)
+                        raise RuntimeError("MARKET V1.43 inválido: "+name)
                     got=raw[4:6].hex().lower()
                     if got!=expected:
                         raise RuntimeError("BinID "+name+" inesperado: "+got)
                     variants.append({"role":role,"asset":name,"bin_id_hex":got,"raw":raw,
                                      "raw_sha256":hashlib.sha256(raw).hexdigest(),"raw_size":len(raw)})
-                folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","face-v142")
+                folder=os.path.join(os.environ.get("LOCALAPPDATA",os.path.expanduser("~")),"RelojLab","face-v143")
                 os.makedirs(folder,exist_ok=True)
                 for v in variants:
                     p=os.path.join(folder,v["role"]+".bin")
@@ -1119,7 +1276,7 @@ class App:
                     if not face_slots or face_slots.get("custom_index") is None:
                         raise RuntimeError("No se pudo resolver el slot editable de la esfera; no se seleccionará un índice a ciegas.")
 
-                    # V1.42: capture the face the user already chose, persist it,
+                    # V1.43: capture the face the user already chose, persist it,
                     # then keep the same GATT session open and immediately re-select it
                     # whenever the watch reports another active index.
                     async def read_face_info(label,tries=3):
@@ -1163,6 +1320,7 @@ class App:
                     with open(lock_path,"w",encoding="utf-8") as fh:
                         json.dump(target_record,fh,ensure_ascii=False,indent=2)
                     rep["single_face_lock"]["persisted_path"]=lock_path
+                    self.face_guard_enabled=True
 
                     emit("5/6 · ESFERA FIJADA · índice "+str(target_index)+
                          (" · MARKET "+target_cmd3.upper() if target_is_market else " · esfera integrada")+
@@ -1231,14 +1389,14 @@ class App:
                     rep["errors"].append(type(error).__name__+": "+str(error))
                     rep["single_face_lock"]["phase"]="error"
                     self.report=rep;self.show()
-                    append("V1.42 FALLÓ · "+repr(error))
+                    append("V1.43 FALLÓ · "+repr(error))
                     append("DIAGNÓSTICO JSON · "+json.dumps(rep,ensure_ascii=False,separators=(",",":")))
-                    self.status.set("V1.42 terminó con error. COPIAR DIAGNÓSTICO.")
+                    self.status.set("V1.43 terminó con error. COPIAR DIAGNÓSTICO.")
                     return
                 self.report=result;self.show()
                 append("DIAGNÓSTICO JSON · "+json.dumps(result,ensure_ascii=False,separators=(",",":")))
                 append("ESFERA ÚNICA · "+"face_lock_active"+".")
-                self.status.set("V1.42 bloqueo detenido. Podés COPIAR DIAGNÓSTICO.")
+                self.status.set("V1.43 bloqueo detenido. Podés COPIAR DIAGNÓSTICO.")
             self.run_async(work(),done)
         def repair_binding():
             if self.ble_busy:
@@ -1278,11 +1436,11 @@ class App:
         primary_test.configure(text="FIJAR ESFERA ACTUAL COMO ÚNICA",command=ota_lab)
         ttk.Button(row,text="REPARAR Y FIJAR",command=repair_binding).pack(side="left",padx=4)
         ttk.Button(row,text="DETENER BLOQUEO",command=stop_face_lock).pack(side="left",padx=4)
-        append("V1.42 LISTA · mantené fijada tu esfera y luego pulsá PREPARAR BLOQUEO PERMANENTE; después COPIAR DIAGNÓSTICO.")
+        append("V1.43 LISTA · fijá la esfera una vez. Después la guardia queda en la app principal y se reconecta sola si el reloj se apaga y vuelve a encender.")
         append("Mientras Reloj Lab permanezca conectado, cualquier cambio de esfera se detecta y se revierte automáticamente.")
 
         ttk.Button(row,text="CAPTURAR 90 s",command=capture).pack(side="left",padx=4)
-        append("V1.42 no borra físicamente las caras integradas del firmware; las neutraliza mediante bloqueo/reselección de la esfera elegida.")
+        append("V1.43 no borra físicamente las caras integradas del firmware; las neutraliza mediante bloqueo/reselección de la esfera elegida.")
     def check_update(self):
         self.status.set("Buscando actualización…")
         def work():

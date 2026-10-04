@@ -14,9 +14,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify V1.42
-        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.42.0',v"
-      - name: Verify V1.42 lock migration
+      - name: Verify V1.43
+        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.43.0',v"
+      - name: Verify V1.43 lock migration
         run: python -c "s=open('app.py',encoding='utf-8').read(); assert 'single_face_install' not in s; assert 'single_face_lock' in s; assert 'notify_recovery' in s"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0 pillow numpy
       - name: Fetch proven native 2D7F MARKET engine
@@ -34,30 +34,30 @@ jobs:
         run: |
           $sha=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           $manifest=@{
-            version='1.42.0'
-            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.42.0/RelojLab.exe'
+            version='1.43.0'
+            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.43.0/RelojLab.exe'
             sha256=$sha
-            notes='V1.42 mantiene el bloqueo probado de V1.41 y añade PREPARAR BLOQUEO PERMANENTE para capturar la identidad exacta del reloj, servicios GATT y la esfera objetivo antes de construir el parche autónomo.'
+            notes='V1.43 mueve el bloqueo fuera de la ventana Control activo: recuerda la esfera elegida, espera al reloj si está apagado y se reconecta automáticamente tras un reinicio para restaurar índice/BinID.'
           } | ConvertTo-Json
           Set-Content -Path version.json -Value $manifest -Encoding UTF8
-      - name: Publish V1.42 release asset
+      - name: Publish V1.43 release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.42.0 *> $null
-          if ($LASTEXITCODE -ne 0) { gh release create v1.42.0 dist/RelojLab.exe --title 'Reloj Lab V1.42' --notes 'V1.42: mantiene el bloqueo de esfera de V1.41 y añade perfil técnico para preparar el bloqueo permanente autónomo sin modificar todavía el sistema del reloj.' }
-          else { gh release upload v1.42.0 dist/RelojLab.exe --clobber }
+          gh release view v1.43.0 *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create v1.43.0 dist/RelojLab.exe --title 'Reloj Lab V1.43' --notes 'V1.43: guardia persistente en la app principal con reconexión automática tras apagar/encender el reloj y restauración de la esfera fijada.' }
+          else { gh release upload v1.43.0 dist/RelojLab.exe --clobber }
       - name: Publish updater manifest
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git commit -m 'Updater: publish V1.42' || echo 'manifest unchanged'
+          git commit -m 'Updater: publish V1.43' || echo 'manifest unchanged'
           git push
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.42
+          name: RelojLab-Windows-V1.43
           path: dist/RelojLab.exe
           if-no-files-found: error
