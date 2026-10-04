@@ -1,6 +1,6 @@
 {
-  "sha256": "cd2f1c7f1b4e1b7579ee9525cc7e7efcef83da934a79d39088a2a55422ae0f78",
-  "version": "1.45.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.45.0/RelojLab.exe",
-  "notes": "V1.45 fija la huella exacta BK3288-Watch-1.0 / software 6.3.0 / MARKET 5578 y bloquea cualquier paso de firmware si el reloj no coincide al 100%. También permite catalogar una imagen original antes de parchearla."
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.46.0/RelojLab.exe",
+  "version": "1.46.0",
+  "sha256": "f33a3e98bdd9de77f29f52690f0f57408fdafa05d9ff3a7038f4dfd4e6d7310c",
+  "notes": "V1.46 usa la huella BK3288 ya validada y busca automáticamente el firmware original en rutas públicas del proveedor, guarda candidatos y SHA-256, sin realizar escrituras OTA."
 }
