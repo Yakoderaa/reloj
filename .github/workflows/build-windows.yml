@@ -14,8 +14,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify V1.44 wrapper
-        run: python -c "import ast; s=open('app_v144.py',encoding='utf-8').read(); ast.parse(s); assert '1.44.0' in s; assert 'PREPARAR BLOQUEO SIN PC' in s; assert 'autonomous-lock-profile-v144.json' in s"
+      - name: Verify V1.45 wrapper
+        run: python -c "import ast; s=open('app_v145.py',encoding='utf-8').read(); ast.parse(s); assert '1.45.0' in s; assert 'BK3288-Watch-1.0' in s; assert '5578' in s; assert 'VALIDAR BK3288 PARA BLOQUEO' in s"
       - name: Verify base lock code
         run: python -c "s=open('app.py',encoding='utf-8').read(); assert 'single_face_install' not in s; assert 'single_face_lock' in s; assert 'face-lock.json' in s"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0 pillow numpy
@@ -27,37 +27,37 @@ jobs:
       - name: Build fully dynamic approved face
         run: python prepare_v133_dynamic.py
       - run: python -m unittest discover -s tests
-      - run: python -m py_compile app.py app_v144.py connection.py windows_binding.py prepare_v133_dynamic.py
-      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v133_custom_same_id.b64;assets" --add-data "assets/face_v133_custom_verified.b64;assets" --add-data "assets/face_v133_oem_recovery.b64;assets" --add-data "assets/face_v133.json;assets" app_v144.py
+      - run: python -m py_compile app.py app_v144.py app_v145.py connection.py windows_binding.py prepare_v133_dynamic.py
+      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v133_custom_same_id.b64;assets" --add-data "assets/face_v133_custom_verified.b64;assets" --add-data "assets/face_v133_oem_recovery.b64;assets" --add-data "assets/face_v133.json;assets" app_v145.py
       - name: Calculate EXE SHA256 and updater manifest
         shell: pwsh
         run: |
           $sha=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           $manifest=@{
-            version='1.44.0'
-            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.44.0/RelojLab.exe'
+            version='1.45.0'
+            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.45.0/RelojLab.exe'
             sha256=$sha
-            notes='V1.44 prepara el bloqueo autónomo real: captura automáticamente la esfera objetivo, DEVINFO, identidad hardware/firmware, servicios GATT y canal OTA sin flashear una imagen desconocida.'
+            notes='V1.45 fija la huella exacta BK3288-Watch-1.0 / software 6.3.0 / MARKET 5578 y bloquea cualquier paso de firmware si el reloj no coincide al 100%. También permite catalogar una imagen original antes de parchearla.'
           } | ConvertTo-Json
           Set-Content -Path version.json -Value $manifest -Encoding UTF8
-      - name: Publish V1.44 release asset
+      - name: Publish V1.45 release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.44.0 *> $null
-          if ($LASTEXITCODE -ne 0) { gh release create v1.44.0 dist/RelojLab.exe --title 'Reloj Lab V1.44' --notes 'V1.44: botón PREPARAR BLOQUEO SIN PC. Genera y copia automáticamente la huella exacta necesaria para construir el bloqueo dentro del reloj, sin escribir firmware todavía.' }
-          else { gh release upload v1.44.0 dist/RelojLab.exe --clobber }
+          gh release view v1.45.0 *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create v1.45.0 dist/RelojLab.exe --title 'Reloj Lab V1.45' --notes 'V1.45: reconoce exactamente el BK3288-Watch-1.0 identificado por V1.44 y prepara de forma estricta el parche autónomo para MARKET 5578. No flashea una imagen desconocida.' }
+          else { gh release upload v1.45.0 dist/RelojLab.exe --clobber }
       - name: Publish updater manifest
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git commit -m 'Updater: publish V1.44' || echo 'manifest unchanged'
+          git commit -m 'Updater: publish V1.45' || echo 'manifest unchanged'
           git push
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.44
+          name: RelojLab-Windows-V1.45
           path: dist/RelojLab.exe
           if-no-files-found: error
