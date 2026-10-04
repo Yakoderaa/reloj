@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.44.0/RelojLab.exe",
-  "version": "1.44.0",
-  "notes": "V1.44 prepara el bloqueo autónomo real: captura automáticamente la esfera objetivo, DEVINFO, identidad hardware/firmware, servicios GATT y canal OTA sin flashear una imagen desconocida.",
-  "sha256": "1e65d201ba68ac32c28623d2729075fe4f0018e00c20a8f201888f5c0ef91a5c"
+  "sha256": "cd2f1c7f1b4e1b7579ee9525cc7e7efcef83da934a79d39088a2a55422ae0f78",
+  "version": "1.45.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.45.0/RelojLab.exe",
+  "notes": "V1.45 fija la huella exacta BK3288-Watch-1.0 / software 6.3.0 / MARKET 5578 y bloquea cualquier paso de firmware si el reloj no coincide al 100%. También permite catalogar una imagen original antes de parchearla."
 }
