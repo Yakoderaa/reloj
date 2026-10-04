@@ -14,42 +14,44 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify V1.35
-        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.35.0',v"
+      - name: Verify V1.36
+        run: python -c "import ast; t=ast.parse(open('app.py',encoding='utf-8').read()); v=next(n.value.value for n in t.body if isinstance(n,ast.Assign) and any(isinstance(x,ast.Name) and x.id=='APP_VERSION' for x in n.targets)); assert v=='1.36.0',v"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0
       - run: python -m py_compile app.py connection.py windows_binding.py
-      - name: Verify photo CUSTOMIZE path
-        run: python -c "s=open('app.py',encoding='utf-8').read(); assert 'build_exact_customize_v135' in s; assert 'approved-photo-customize-v135.bin' in s; assert 'EXACT-CUSTOMIZE' in s; assert 'custom_index' in s"
-      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab app.py
+      - name: Validate V1.36 face asset
+        run: python -c "import base64,zlib,hashlib; p=zlib.decompress(base64.b64decode(open('assets/approved_face_v136.b64',encoding='ascii').read().strip())); assert len(p)==240*296*2, len(p); print('FACE_OK',len(p),hashlib.sha256(p).hexdigest())"
+      - name: Verify CUSTOMIZE route
+        run: python -c "s=open('app.py',encoding='utf-8').read(); assert 'build_exact_customize_v136' in s; assert 'approved-photo-customize-v136.bin' in s; assert 'EXACT-CUSTOMIZE' in s; assert 'custom_index' in s"
+      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/approved_face_v136.b64;assets" app.py
       - name: Calculate EXE SHA256 and updater manifest
         shell: pwsh
         run: |
           $sha=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           $manifest=@{
-            version='1.35.0'
-            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.35.0/RelojLab.exe'
+            version='1.36.0'
+            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.36.0/RelojLab.exe'
             sha256=$sha
-            notes='V1.35 abandona MARKET como ruta principal y vuelve al CUSTOMIZE cmd=2 que sí queda visible en este reloj. El raster se reconstruye desde la foto aprobada del usuario en 240x296, conserva hora/pasos/pulso vivos del firmware y batería del momento de instalación.'
+            notes='V1.36 corrige el fallo de descompresión de V1.35: la esfera 240x296 ahora viaja como asset externo validado en build y se instala por CUSTOMIZE cmd=2. Conserva hora/pasos/pulso vivos del firmware y batería tomada al instalar.'
           } | ConvertTo-Json
           Set-Content -Path version.json -Value $manifest -Encoding UTF8
-      - name: Publish V1.35 release asset
+      - name: Publish V1.36 release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.35.0 *> $null
-          if ($LASTEXITCODE -ne 0) { gh release create v1.35.0 dist/RelojLab.exe --title 'Reloj Lab V1.35' --notes 'V1.35 vuelve a CUSTOMIZE cmd=2, la ruta físicamente visible del reloj, y usa como raster la referencia fotográfica aprobada. Mantiene hora, pasos y pulso como campos vivos del firmware y selecciona/verifica el índice CUSTOMIZE.' }
-          else { gh release upload v1.35.0 dist/RelojLab.exe --clobber }
+          gh release view v1.36.0 *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create v1.36.0 dist/RelojLab.exe --title 'Reloj Lab V1.36' --notes 'V1.36 corrige el empaquetado del raster que impedía iniciar V1.35. El asset se valida antes de compilar y se instala por CUSTOMIZE cmd=2, con selección/verificación del índice CUSTOMIZE.' }
+          else { gh release upload v1.36.0 dist/RelojLab.exe --clobber }
       - name: Publish updater manifest
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git commit -m 'Updater: publish V1.35' || echo 'manifest unchanged'
+          git commit -m 'Updater: publish V1.36' || echo 'manifest unchanged'
           git push
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.35
+          name: RelojLab-Windows-V1.36
           path: dist/RelojLab.exe
           if-no-files-found: error
