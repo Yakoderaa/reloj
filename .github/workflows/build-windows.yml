@@ -14,8 +14,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify V1.52 wrapper
-        run: python -c "import ast; s=open('app_v152.py',encoding='utf-8').read(); ast.parse(s); assert '1.52.0' in s; assert 'CONSULTAR UPGRADE REAL' in s; assert '/upgrade/getUpgradeInfoList' in s; assert 'firmware_writes' in s"
+      - name: Verify V1.53 wrapper
+        run: python -c "import ast; s=open('app_v153.py',encoding='utf-8').read(); ast.parse(s); assert '1.53.0' in s; assert 'EXTRAER API REAL' in s; assert 'baseURL' in s; assert 'firmware_writes' in s"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0 pillow numpy
       - name: Fetch donor asset
         shell: pwsh
@@ -24,37 +24,37 @@ jobs:
           Invoke-WebRequest 'http://watchhealth.com.cn/k6File/clock/file/2D7F.bin' -OutFile assets/donor_2D7F.bin
       - run: python prepare_v133_dynamic.py
       - run: python -m unittest discover -s tests
-      - run: python -m py_compile app.py app_v144.py app_v145.py app_v146.py app_v147.py app_v148.py app_v149.py app_v150.py app_v151.py app_v152.py connection.py windows_binding.py prepare_v133_dynamic.py
-      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v133_custom_same_id.b64;assets" --add-data "assets/face_v133_custom_verified.b64;assets" --add-data "assets/face_v133_oem_recovery.b64;assets" --add-data "assets/face_v133.json;assets" app_v152.py
+      - run: python -m py_compile app.py app_v144.py app_v145.py app_v146.py app_v147.py app_v148.py app_v149.py app_v150.py app_v151.py app_v152.py app_v153.py connection.py windows_binding.py prepare_v133_dynamic.py
+      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v133_custom_same_id.b64;assets" --add-data "assets/face_v133_custom_verified.b64;assets" --add-data "assets/face_v133_oem_recovery.b64;assets" --add-data "assets/face_v133.json;assets" app_v153.py
       - name: Calculate EXE SHA256 and updater manifest
         shell: pwsh
         run: |
           $sha=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           $manifest=@{
-            version='1.52.0'
-            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.52.0/RelojLab.exe'
+            version='1.53.0'
+            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.53.0/RelojLab.exe'
             sha256=$sha
-            notes='V1.52 consulta el endpoint real /upgrade/getUpgradeInfoList descubierto en el JavaScript de UtraWatch y extrae posibles archivos de firmware. Sólo GET; cero escrituras OTA.'
+            notes='V1.53 analiza completo el cliente HTTP de UtraWatch para extraer baseURL, autenticación y raíces API reales antes de consultar Upgrade. Sólo GET; cero escrituras OTA.'
           } | ConvertTo-Json
           Set-Content -Path version.json -Value $manifest -Encoding UTF8
-      - name: Publish V1.52 release asset
+      - name: Publish V1.53 release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.52.0 *> $null
-          if ($LASTEXITCODE -ne 0) { gh release create v1.52.0 dist/RelojLab.exe --title 'Reloj Lab V1.52' --notes 'V1.52 consulta la API real de Upgrade de UtraWatch para localizar el paquete exacto del BK3288. No realiza escrituras OTA.' }
-          else { gh release upload v1.52.0 dist/RelojLab.exe --clobber }
+          gh release view v1.53.0 *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create v1.53.0 dist/RelojLab.exe --title 'Reloj Lab V1.53' --notes 'V1.53 extrae la configuración HTTP real de UtraWatch para localizar la raíz auténtica de Upgrade. No realiza escrituras OTA.' }
+          else { gh release upload v1.53.0 dist/RelojLab.exe --clobber }
       - name: Publish updater manifest
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git commit -m 'Updater: publish V1.52' || echo 'manifest unchanged'
+          git commit -m 'Updater: publish V1.53' || echo 'manifest unchanged'
           git push
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.52
+          name: RelojLab-Windows-V1.53
           path: dist/RelojLab.exe
           if-no-files-found: error
