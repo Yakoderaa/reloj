@@ -1,6 +1,6 @@
 {
-  "notes": "V1.50 corrige la interfaz: CONSULTAR API UTRAWATCH aparece primero y siempre visible en la barra superior.",
-  "version": "1.50.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.50.0/RelojLab.exe",
-  "sha256": "673393b453fc9132a763dcb13900aba0131482cce85472a8f4e5f8d36085a3e3"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.51.0/RelojLab.exe",
+  "notes": "V1.51 deja de adivinar endpoints y extrae rutas OTA/firmware directamente del JavaScript real del portal UtraWatch. Sólo hace lecturas GET; no escribe firmware.",
+  "version": "1.51.0",
+  "sha256": "089a1cc68f1da02ad13e55760742ef6f46da275e5acce203ca5a139bb77a782d"
 }
