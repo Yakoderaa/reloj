@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.56.0/RelojLab.exe",
-  "version": "1.56.0",
-  "notes": "V1.56 corrige el arranque de V1.55 restaurando la cadena AppV153 -> AppV154 -> AppV155. Conserva DESCUBRIR LOGIN REAL y no realiza escrituras OTA.",
-  "sha256": "9212dd86ba1bd0645d73911fb378f3cebdfe978e7415353e9748817c142230ce"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.57.0/RelojLab.exe",
+  "sha256": "4a854a85930029d5e88fe2b087590fe48fb9555a47b6d94ad9b87a24d5178eb2",
+  "notes": "V1.57 resuelve el endpoint real de login desde user-BMKq3CNS.js y su alias exportado, sin enviar credenciales ni realizar escrituras OTA.",
+  "version": "1.57.0"
 }
