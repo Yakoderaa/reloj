@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import tkinter as tk
 from tkinter import ttk, filedialog
 import app as base
-import app_v173 as v173
+import app_v172 as v172
 import app_v145 as v145
 
 base.APP_VERSION='1.74.0'
@@ -13,7 +13,7 @@ BASEAPI='Lcom/wtwd/cocousa/api/BaseApi;'
 ACCOUNT='Lcom/wtwd/cocousa/ui/module/account/'
 UPDATE='Lcom/wtwd/cocousa/ui/module/main/device/update/'
 
-class AppV174(v173.AppV173):
+class AppV174(v172.AppV172):
     def __init__(self,root):
         super().__init__(root)
         root.title('Reloj Lab V1.74')
@@ -86,7 +86,6 @@ class AppV174(v173.AppV173):
                         rr=rr or row(label,m,code,kind,acc,d);rep['account_api_callers'].append(rr)
                     if cls.startswith(UPDATE) or any(c.get('class')==BASEAPI and c.get('method')=='i' for c in calls):
                         rr=rr or row(label,m,code,kind,acc,d);rep['hardware_update_flow'].append(rr)
-                    # High-confidence chain candidate: same method obtains AccessInfo.a() and passes a String to UserManager.h().
                     if any(c.get('class')==ACCESS and c.get('method')=='a' for c in calls) and any(c.get('class')==UM and c.get('method')=='h' for c in calls):
                         rr=rr or row(label,m,code,kind,acc,d);rep['candidate_token_chain'].append(rr)
             def apk(name,data):
@@ -112,13 +111,7 @@ class AppV174(v173.AppV173):
                     q=(x['dex'],x['method_idx'])
                     if q not in seen:seen.add(q);out.append(x)
                 rep[k]=out[:lim]
-            # Summary based only on static evidence collected above.
-            rep['proof_summary']={
-                'login_callbacks_with_accessinfo_a_and_usermanager_h':len(rep['candidate_token_chain']),
-                'access_info_method_count':len(rep['access_info_methods']),
-                'account_api_caller_count':len(rep['account_api_callers']),
-                'hardware_update_method_count':len(rep['hardware_update_flow']),
-                'interpretation':'If the same login callback calls AccessInfo.a() immediately before UserManager.h(String), AccessInfo.a is the strongest token-source candidate; V1.75 can then reproduce only the official authenticated firmware-check request after explicit login/token input.'}
+            rep['proof_summary']={'login_callbacks_with_accessinfo_a_and_usermanager_h':len(rep['candidate_token_chain']),'access_info_method_count':len(rep['access_info_methods']),'account_api_caller_count':len(rep['account_api_callers']),'hardware_update_method_count':len(rep['hardware_update_flow'])}
             folder=os.path.join(os.environ.get('LOCALAPPDATA',os.path.expanduser('~')),'RelojLab','firmware-v174');os.makedirs(folder,exist_ok=True)
             out=os.path.join(folder,'utrawatch-token-provenance-v174.json');rep['saved_path']=out
             with open(out,'w',encoding='utf-8') as f:json.dump(rep,f,ensure_ascii=False,indent=2)
