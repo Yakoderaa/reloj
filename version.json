@@ -1,6 +1,6 @@
 {
-  "sha256": "872abeaec5cdc5746d3be093f8d16cd6f49b9982fe0dc9f6dba5008a548a48f7",
-  "version": "1.54.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.53.0/RelojLab.exe",
-  "notes": "V1.54 prueba la raíz exacta /web-halfwit descubierta en el cliente UtraWatch, registra la respuesta real de Upgrade y el esquema de autenticación sin intentar evadirlo. Sólo GET; cero escrituras OTA."
+  "version": "1.55.0",
+  "sha256": "fa80cfe268e55e20b2834f1efe222a88e155ef0cdc9a451aef97aed860415403",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.55.0/RelojLab.exe",
+  "notes": "V1.55 descubre el endpoint, método y campos reales de login del portal UtraWatch sin enviar credenciales ni realizar escrituras OTA."
 }
