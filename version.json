@@ -1,6 +1,6 @@
 {
-  "notes": "V1.49 deja de adivinar nombres .bin y consulta endpoints/metadata del servicio UtraWatch para obtener URLs reales de firmware del BK3288.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.49.0/RelojLab.exe",
-  "version": "1.49.0",
-  "sha256": "391302914c190cc0460df6a2a157f88981c585a346c23ffdc47a719963bb4b8f"
+  "notes": "V1.50 corrige la interfaz: CONSULTAR API UTRAWATCH aparece primero y siempre visible en la barra superior.",
+  "version": "1.50.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.50.0/RelojLab.exe",
+  "sha256": "673393b453fc9132a763dcb13900aba0131482cce85472a8f4e5f8d36085a3e3"
 }
