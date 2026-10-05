@@ -1,6 +1,6 @@
 {
   "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.73.0/RelojLab.exe",
-  "sha256": "182e098ed71a94b9dd2b785828ffbaf0a8afac830d7097fbfa4dc16cc913405e",
-  "notes": "V1.74 prueba el origen exacto del token OTA desde AccessInfo y mantiene Buscar actualización automático.",
-  "version": "1.74.0"
+  "sha256": "49075358f6f089a59975f0c5570b18b102f64b6bd48710dba52dfa62f1817648",
+  "notes": "V1.73 reconstruye token + Retrofit y mantiene Buscar actualización automático.",
+  "version": "1.73.0"
 }
