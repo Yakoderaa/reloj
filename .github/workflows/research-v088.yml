@@ -60,6 +60,19 @@ jobs:
             grep -R -n -A25 -B25 -E 'WATCH_FACE_AND_NOTIFICATION_SET|Watch_Face_And_Notification_Set' decompiled/sources 2>/dev/null || true
           } > evidence/exact-setting.txt
           cat evidence/exact-setting.txt
+      - name: Extract OTA firmware and update evidence
+        shell: bash
+        run: |
+          set -euxo pipefail
+          {
+            echo '=== OTA / FIRMWARE / UPGRADE MATCHES ==='
+            grep -R -n -i -E 'firmware|upgrade|ota|oad|update.?firmware|device.?upgrade|version.?check|download.?url|file.?url|\.bin|\.zip|ffc0|ffc1|ffc2|f000ffc|BK3288|Bekencrop' decompiled/sources decompiled/resources 2>/dev/null | head -5000 || true
+            echo '=== NETWORK API DECLARATIONS ==='
+            grep -R -n -A40 -B20 -i -E 'retrofit|@GET|@POST|baseUrl|watchhealth|YueDongService|upgrade|firmware|version' decompiled/sources/com/utra decompiled/sources/com/wr 2>/dev/null | head -5000 || true
+            echo '=== OAD / BLE UPDATE CLASSES ==='
+            grep -R -l -i -E 'f000ffc|ffc1|ffc2|oad|firmware.?update|ota' decompiled/sources 2>/dev/null | head -300 | tee evidence/ota-files.txt
+          } > evidence/ota-firmware.txt
+          cat evidence/ota-firmware.txt
       - uses: actions/upload-artifact@v4
         with:
           name: v088-research
