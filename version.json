@@ -1,6 +1,6 @@
 {
-  "sha256": "20c6768e32616055174585a007cfbf18fb0bb33cc6b1e76958289b7380f2ae7c",
-  "notes": "V1.48 hace la búsqueda de firmware BK3288 en paralelo, muestra progreso y aplica un límite global para que la operación siempre termine.",
-  "version": "1.48.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.48.0/RelojLab.exe"
+  "notes": "V1.49 deja de adivinar nombres .bin y consulta endpoints/metadata del servicio UtraWatch para obtener URLs reales de firmware del BK3288.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.49.0/RelojLab.exe",
+  "version": "1.49.0",
+  "sha256": "391302914c190cc0460df6a2a157f88981c585a346c23ffdc47a719963bb4b8f"
 }
