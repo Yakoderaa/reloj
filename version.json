@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.46.0/RelojLab.exe",
-  "version": "1.46.0",
-  "sha256": "f33a3e98bdd9de77f29f52690f0f57408fdafa05d9ff3a7038f4dfd4e6d7310c",
-  "notes": "V1.46 usa la huella BK3288 ya validada y busca automáticamente el firmware original en rutas públicas del proveedor, guarda candidatos y SHA-256, sin realizar escrituras OTA."
+  "sha256": "ef74748c2557a314963fd2f0c09025c7b83c605ff0ab0203b5a2da701bf58b4f",
+  "version": "1.47.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.47.0/RelojLab.exe",
+  "notes": "V1.47 corrige el falso estado de reloj fuera de alcance y evita que la guardia heredada compita con una conexión Bluetooth ya activa."
 }
