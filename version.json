@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.76.0/RelojLab.exe",
-  "sha256": "726e549d3e085ad5f222ab8b1252cba45ba51d7bd8eeb080507174ed3c029fcf",
-  "notes": "V1.76 reconstruye el grafo OTA exacto de UtraWatch y mantiene Buscar actualización automático.",
-  "version": "1.76.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.77.0/RelojLab.exe",
+  "sha256": "1bd42c0c0e6940b80f3c63995df6624f3ee17a15df06e36e859b4d612c04b226",
+  "notes": "V1.77 extrae framing OTA exacto y mantiene Buscar actualización automático.",
+  "version": "1.77.0"
 }
