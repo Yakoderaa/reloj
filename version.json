@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.71.0/RelojLab.exe",
-  "sha256": "3a713dddfba803a16bc10d0b03994bb3dff86937e30d57372fadb24aa7dbb492",
-  "notes": "V1.71 extrae el contrato HTTP exacto de firmware y mantiene Buscar actualización automático.",
-  "version": "1.71.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.72.0/RelojLab.exe",
+  "sha256": "2bc848c26e88b16833c74bc62f880dfa964e87fa7ad92d2621d26cfcded59ef4",
+  "notes": "V1.72 rastrea token y request OTA y mantiene Buscar actualización automático.",
+  "version": "1.72.0"
 }
