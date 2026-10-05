@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.68.0/RelojLab.exe",
-  "sha256": "101750775383d515d16785108732979cf1fcfddf0bd75d599b33444beef5607d",
-  "notes": "V1.68 corrige el parser DEX OTA y restaura Buscar actualización con publicación automática de cada nueva versión.",
-  "version": "1.68.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.69.0/RelojLab.exe",
+  "sha256": "00c357142c596ec0e6cdd134d07ed48cca42aee2ee6e050c1b6a5ac29fb45e1e",
+  "notes": "V1.69 extrae el contrato OTA final de UtraWatch y mantiene Buscar actualización automático.",
+  "version": "1.69.0"
 }
