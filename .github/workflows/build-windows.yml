@@ -14,8 +14,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify V1.61 wrapper
-        run: python -c "import ast; s=open('app_v161.py',encoding='utf-8').read(); ast.parse(s); assert '1.61.0' in s; assert 'ANALIZAR ALMACENAMIENTO UPGRADE' in s; assert 'oss-file-ByeuKAOC.js' in s; assert 'file_uploads_sent' in s"
+      - name: Verify V1.62 wrapper
+        run: python -c "import ast; s=open('app_v162.py',encoding='utf-8').read(); ast.parse(s); assert '1.62.0' in s; assert 'ANALIZAR CLIENTE OTA MÓVIL' in s; assert 'network_requests' in s"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0 pillow numpy
       - name: Fetch donor asset
         shell: pwsh
@@ -24,13 +24,13 @@ jobs:
           Invoke-WebRequest 'http://watchhealth.com.cn/k6File/clock/file/2D7F.bin' -OutFile assets/donor_2D7F.bin
       - run: python prepare_v133_dynamic.py
       - run: python -m unittest discover -s tests
-      - run: python -m py_compile app.py app_v144.py app_v145.py app_v146.py app_v147.py app_v148.py app_v149.py app_v150.py app_v151.py app_v152.py app_v153.py app_v154.py app_v154_core.py app_v155.py app_v156.py app_v157.py app_v158.py app_v159.py app_v160.py app_v161.py connection.py windows_binding.py prepare_v133_dynamic.py
-      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v133_custom_same_id.b64;assets" --add-data "assets/face_v133_custom_verified.b64;assets" --add-data "assets/face_v133_oem_recovery.b64;assets" --add-data "assets/face_v133.json;assets" app_v161.py
+      - run: python -m py_compile app.py app_v144.py app_v145.py app_v146.py app_v147.py app_v148.py app_v149.py app_v150.py app_v151.py app_v152.py app_v153.py app_v154.py app_v154_core.py app_v155.py app_v156.py app_v157.py app_v158.py app_v159.py app_v160.py app_v161.py app_v162.py connection.py windows_binding.py prepare_v133_dynamic.py
+      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v133_custom_same_id.b64;assets" --add-data "assets/face_v133_custom_verified.b64;assets" --add-data "assets/face_v133_oem_recovery.b64;assets" --add-data "assets/face_v133.json;assets" app_v162.py
       - name: SHA256
         shell: pwsh
         run: Get-FileHash dist/RelojLab.exe -Algorithm SHA256
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.61
+          name: RelojLab-Windows-V1.62
           path: dist/RelojLab.exe
           if-no-files-found: error
