@@ -14,8 +14,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify V1.69 wrapper
-        run: python -c "import ast; s=open('app_v169.py',encoding='utf-8').read(); ast.parse(s); assert '1.69.0' in s; assert 'EXTRAER CONTRATO OTA FINAL' in s; assert 'ota_writes' in s"
+      - name: Verify V1.70 wrapper
+        run: python -c "import ast; s=open('app_v170.py',encoding='utf-8').read(); ast.parse(s); assert '1.70.0' in s; assert 'EXTRAER API FIRMWARE EXACTA' in s; assert 'retrofit_annotations' in s; assert 'ota_writes' in s"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0 pillow numpy
       - name: Fetch donor asset
         shell: pwsh
@@ -24,8 +24,8 @@ jobs:
           Invoke-WebRequest 'http://watchhealth.com.cn/k6File/clock/file/2D7F.bin' -OutFile assets/donor_2D7F.bin
       - run: python prepare_v133_dynamic.py
       - run: python -m unittest discover -s tests
-      - run: python -m py_compile app.py app_v144.py app_v145.py app_v146.py app_v147.py app_v148.py app_v149.py app_v150.py app_v151.py app_v152.py app_v153.py app_v154.py app_v154_core.py app_v155.py app_v156.py app_v157.py app_v158.py app_v159.py app_v160.py app_v161.py app_v162.py app_v163.py app_v164.py app_v165.py app_v166.py app_v167.py app_v168.py app_v169.py connection.py windows_binding.py prepare_v133_dynamic.py
-      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v133_custom_same_id.b64;assets" --add-data "assets/face_v133_custom_verified.b64;assets" --add-data "assets/face_v133_oem_recovery.b64;assets" --add-data "assets/face_v133.json;assets" app_v169.py
+      - run: python -m py_compile app.py app_v144.py app_v145.py app_v146.py app_v147.py app_v148.py app_v149.py app_v150.py app_v151.py app_v152.py app_v153.py app_v154.py app_v154_core.py app_v155.py app_v156.py app_v157.py app_v158.py app_v159.py app_v160.py app_v161.py app_v162.py app_v163.py app_v164.py app_v165.py app_v166.py app_v167.py app_v168.py app_v169.py app_v170.py connection.py windows_binding.py prepare_v133_dynamic.py
+      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v133_custom_same_id.b64;assets" --add-data "assets/face_v133_custom_verified.b64;assets" --add-data "assets/face_v133_oem_recovery.b64;assets" --add-data "assets/face_v133.json;assets" app_v170.py
       - name: SHA256
         id: sha
         shell: pwsh
@@ -35,7 +35,7 @@ jobs:
           Write-Host $hash
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.69
+          name: RelojLab-Windows-V1.70
           path: dist/RelojLab.exe
           if-no-files-found: error
       - name: Publish GitHub Release
@@ -43,19 +43,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete v1.69.0 --yes 2>$null
-          gh release create v1.69.0 dist/RelojLab.exe --title "Reloj Lab V1.69" --notes "Extrae el contrato OTA real de UtraWatch: descarga .fot/.img, HardwareVersion, campos, constantes y escritura ZK/Bluetrum." --latest
+          gh release delete v1.70.0 --yes 2>$null
+          gh release create v1.70.0 dist/RelojLab.exe --title "Reloj Lab V1.70" --notes "Extrae las anotaciones Retrofit exactas del API de firmware UtraWatch y enlaza check/download con el flujo ZK OTA, sin red ni escrituras." --latest
       - name: Advance updater manifest
         shell: pwsh
         run: |
           $obj = [ordered]@{
-            exe_url = 'https://github.com/Yakoderaa/reloj/releases/download/v1.69.0/RelojLab.exe'
+            exe_url = 'https://github.com/Yakoderaa/reloj/releases/download/v1.70.0/RelojLab.exe'
             sha256 = '${{ steps.sha.outputs.sha256 }}'
-            notes = 'V1.69 extrae el contrato OTA final de UtraWatch y mantiene Buscar actualización automático.'
-            version = '1.69.0'
+            notes = 'V1.70 extrae la API exacta de firmware y mantiene Buscar actualización automático.'
+            version = '1.70.0'
           }
           $obj | ConvertTo-Json | Set-Content version.json -Encoding utf8
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git commit -m 'Advance updater manifest to V1.69'; git push }
+          git diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git commit -m 'Advance updater manifest to V1.70'; git push }
