@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.57.0/RelojLab.exe",
-  "sha256": "4a854a85930029d5e88fe2b087590fe48fb9555a47b6d94ad9b87a24d5178eb2",
-  "notes": "V1.57 resuelve el endpoint real de login desde user-BMKq3CNS.js y su alias exportado, sin enviar credenciales ni realizar escrituras OTA.",
-  "version": "1.57.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.64.0/RelojLab.exe",
+  "sha256": "f467dd06a4a14715c52d2b870e08d300071af4d240a6f6d28d71bbf8a95755b8",
+  "notes": "V1.64 corrige el selector manual de UtraWatch y restaura Buscar actualización.",
+  "version": "1.64.0"
 }
