@@ -1,6 +1,6 @@
 {
-  "version": "1.55.0",
-  "sha256": "fa80cfe268e55e20b2834f1efe222a88e155ef0cdc9a451aef97aed860415403",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.55.0/RelojLab.exe",
-  "notes": "V1.55 descubre el endpoint, método y campos reales de login del portal UtraWatch sin enviar credenciales ni realizar escrituras OTA."
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.56.0/RelojLab.exe",
+  "version": "1.56.0",
+  "notes": "V1.56 corrige el arranque de V1.55 restaurando la cadena AppV153 -> AppV154 -> AppV155. Conserva DESCUBRIR LOGIN REAL y no realiza escrituras OTA.",
+  "sha256": "9212dd86ba1bd0645d73911fb378f3cebdfe978e7415353e9748817c142230ce"
 }
