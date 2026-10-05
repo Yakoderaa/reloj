@@ -14,8 +14,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify V1.56 wrapper
-        run: python -c "import ast; s=open('app_v156.py',encoding='utf-8').read(); ast.parse(s); assert '1.56.0' in s; assert 'AppV156' in s; assert 'app_v155' in s"
+      - name: Verify V1.57 wrapper
+        run: python -c "import ast; s=open('app_v157.py',encoding='utf-8').read(); ast.parse(s); assert '1.57.0' in s; assert 'RESOLVER ENDPOINT LOGIN' in s; assert 'user-BMKq3CNS.js' in s; assert 'credentials_sent' in s"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0 pillow numpy
       - name: Fetch donor asset
         shell: pwsh
@@ -24,27 +24,27 @@ jobs:
           Invoke-WebRequest 'http://watchhealth.com.cn/k6File/clock/file/2D7F.bin' -OutFile assets/donor_2D7F.bin
       - run: python prepare_v133_dynamic.py
       - run: python -m unittest discover -s tests
-      - run: python -m py_compile app.py app_v144.py app_v145.py app_v146.py app_v147.py app_v148.py app_v149.py app_v150.py app_v151.py app_v152.py app_v153.py app_v154.py app_v155.py app_v156.py connection.py windows_binding.py prepare_v133_dynamic.py
-      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v133_custom_same_id.b64;assets" --add-data "assets/face_v133_custom_verified.b64;assets" --add-data "assets/face_v133_oem_recovery.b64;assets" --add-data "assets/face_v133.json;assets" app_v156.py
+      - run: python -m py_compile app.py app_v144.py app_v145.py app_v146.py app_v147.py app_v148.py app_v149.py app_v150.py app_v151.py app_v152.py app_v153.py app_v154.py app_v154_core.py app_v155.py app_v156.py app_v157.py connection.py windows_binding.py prepare_v133_dynamic.py
+      - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v133_custom_same_id.b64;assets" --add-data "assets/face_v133_custom_verified.b64;assets" --add-data "assets/face_v133_oem_recovery.b64;assets" --add-data "assets/face_v133.json;assets" app_v157.py
       - name: Calculate EXE SHA256 and updater manifest
         shell: pwsh
         run: |
           $sha=(Get-FileHash dist/RelojLab.exe -Algorithm SHA256).Hash.ToLower()
           $manifest=@{
-            version='1.56.0'
-            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.56.0/RelojLab.exe'
+            version='1.57.0'
+            exe_url='https://github.com/Yakoderaa/reloj/releases/download/v1.57.0/RelojLab.exe'
             sha256=$sha
-            notes='V1.56 corrige el arranque de V1.55 restaurando la cadena AppV153 -> AppV154 -> AppV155. Conserva DESCUBRIR LOGIN REAL y no realiza escrituras OTA.'
+            notes='V1.57 resuelve el endpoint real de login desde user-BMKq3CNS.js y su alias exportado, sin enviar credenciales ni realizar escrituras OTA.'
           } | ConvertTo-Json
           Set-Content -Path version.json -Value $manifest -Encoding UTF8
-      - name: Publish V1.56 release asset
+      - name: Publish V1.57 release asset
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view v1.56.0 *> $null
-          if ($LASTEXITCODE -ne 0) { gh release create v1.56.0 dist/RelojLab.exe --title 'Reloj Lab V1.56' --notes 'V1.56 corrige el error de inicio de V1.55 causado por la cadena de importación. Mantiene DESCUBRIR LOGIN REAL. No realiza escrituras OTA.' }
-          else { gh release upload v1.56.0 dist/RelojLab.exe --clobber }
+          gh release view v1.57.0 *> $null
+          if ($LASTEXITCODE -ne 0) { gh release create v1.57.0 dist/RelojLab.exe --title 'Reloj Lab V1.57' --notes 'V1.57 analiza el módulo real user-BMKq3CNS.js para resolver el endpoint y helper exactos del login UtraWatch. No envía credenciales ni escribe OTA.' }
+          else { gh release upload v1.57.0 dist/RelojLab.exe --clobber }
       - name: Publish updater manifest
         shell: pwsh
         run: |
@@ -52,10 +52,10 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git pull --rebase origin main
           git add version.json
-          git commit -m 'Updater: publish V1.56' || echo 'manifest unchanged'
+          git commit -m 'Updater: publish V1.57' || echo 'manifest unchanged'
           git push
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V1.56
+          name: RelojLab-Windows-V1.57
           path: dist/RelojLab.exe
           if-no-files-found: error
