@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.73.0/RelojLab.exe",
-  "sha256": "49075358f6f089a59975f0c5570b18b102f64b6bd48710dba52dfa62f1817648",
-  "notes": "V1.75 mapea el transporte OTA BLE exacto desde UtraWatch y mantiene Buscar actualización automático.",
-  "version": "1.75.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.76.0/RelojLab.exe",
+  "sha256": "726e549d3e085ad5f222ab8b1252cba45ba51d7bd8eeb080507174ed3c029fcf",
+  "notes": "V1.76 reconstruye el grafo OTA exacto de UtraWatch y mantiene Buscar actualización automático.",
+  "version": "1.76.0"
 }
