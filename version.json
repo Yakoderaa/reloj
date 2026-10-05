@@ -1,6 +1,6 @@
 {
-  "notes": "V1.52 consulta el endpoint real /upgrade/getUpgradeInfoList descubierto en el JavaScript de UtraWatch y extrae posibles archivos de firmware. Sólo GET; cero escrituras OTA.",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.52.0/RelojLab.exe",
-  "sha256": "e5d95145d556fe664f2ec5f08678589e3ab434e7312e26430e51bb8794f89d80",
-  "version": "1.52.0"
+  "version": "1.53.0",
+  "notes": "V1.53 analiza completo el cliente HTTP de UtraWatch para extraer baseURL, autenticación y raíces API reales antes de consultar Upgrade. Sólo GET; cero escrituras OTA.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.53.0/RelojLab.exe",
+  "sha256": "d9c94385a5abdffe0a84e0b525b1c7512e28732ef5d6dd8332c96e8444aa2262"
 }
