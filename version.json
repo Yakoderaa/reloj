@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.51.0/RelojLab.exe",
-  "notes": "V1.51 deja de adivinar endpoints y extrae rutas OTA/firmware directamente del JavaScript real del portal UtraWatch. Sólo hace lecturas GET; no escribe firmware.",
-  "version": "1.51.0",
-  "sha256": "089a1cc68f1da02ad13e55760742ef6f46da275e5acce203ca5a139bb77a782d"
+  "notes": "V1.52 consulta el endpoint real /upgrade/getUpgradeInfoList descubierto en el JavaScript de UtraWatch y extrae posibles archivos de firmware. Sólo GET; cero escrituras OTA.",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.52.0/RelojLab.exe",
+  "sha256": "e5d95145d556fe664f2ec5f08678589e3ab434e7312e26430e51bb8794f89d80",
+  "version": "1.52.0"
 }
