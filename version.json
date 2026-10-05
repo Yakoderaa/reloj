@@ -1,6 +1,6 @@
 {
-  "version": "1.53.0",
-  "notes": "V1.53 analiza completo el cliente HTTP de UtraWatch para extraer baseURL, autenticación y raíces API reales antes de consultar Upgrade. Sólo GET; cero escrituras OTA.",
+  "sha256": "de476c259912b3b1211832a26e35566d1c3cb1e748b63e69589fa415a77d3aa2",
   "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.53.0/RelojLab.exe",
-  "sha256": "d9c94385a5abdffe0a84e0b525b1c7512e28732ef5d6dd8332c96e8444aa2262"
+  "version": "1.53.0",
+  "notes": "V1.53 analiza completo el cliente HTTP de UtraWatch para extraer baseURL, autenticación y raíces API reales antes de consultar Upgrade. Sólo GET; cero escrituras OTA."
 }
