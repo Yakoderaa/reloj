@@ -1,6 +1,6 @@
 {
-  "sha256": "ef74748c2557a314963fd2f0c09025c7b83c605ff0ab0203b5a2da701bf58b4f",
-  "version": "1.47.0",
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.47.0/RelojLab.exe",
-  "notes": "V1.47 corrige el falso estado de reloj fuera de alcance y evita que la guardia heredada compita con una conexión Bluetooth ya activa."
+  "sha256": "20c6768e32616055174585a007cfbf18fb0bb33cc6b1e76958289b7380f2ae7c",
+  "notes": "V1.48 hace la búsqueda de firmware BK3288 en paralelo, muestra progreso y aplica un límite global para que la operación siempre termine.",
+  "version": "1.48.0",
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.48.0/RelojLab.exe"
 }
