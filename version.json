@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.69.0/RelojLab.exe",
-  "sha256": "00c357142c596ec0e6cdd134d07ed48cca42aee2ee6e050c1b6a5ac29fb45e1e",
-  "notes": "V1.69 extrae el contrato OTA final de UtraWatch y mantiene Buscar actualización automático.",
-  "version": "1.69.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.70.0/RelojLab.exe",
+  "sha256": "55ea020bd17359a267b92592838d94360c1aba9a0b456c052c821084b7a00493",
+  "notes": "V1.70 extrae la API exacta de firmware y mantiene Buscar actualización automático.",
+  "version": "1.70.0"
 }
