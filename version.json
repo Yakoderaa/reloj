@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.92.0/RelojLab.exe",
-  "sha256": "787c5b92baf47b1f3c182d7f3882791ac7d2a1d046e9998a2186a986517e1e7f",
-  "notes": "V1.92 analiza el alta/registro del reloj requerida antes de checkForUpdate y mantiene Buscar ubicacion.",
-  "version": "1.92.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.93.0/RelojLab.exe",
+  "sha256": "2192dd6d00dbfbe3513e2c94c6ec8540f491f6d8cf7e91801929eca9d9840127",
+  "notes": "V1.93 analiza el contrato exacto del paso previo y mantiene Buscar ubicacion.",
+  "version": "1.93.0"
 }
