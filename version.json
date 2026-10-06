@@ -1,6 +1,6 @@
 {
   "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.15.0/RelojLab.exe",
-  "sha256": "2643eaf10ea7c7a05da6dcef87fe876110c27460d244b332f64e985c0f1ec3b4",
+  "sha256": "379e33a3a7e704c14e2b22e9014f17c75351cea0edf3e2ee73a2023cf06f4c90",
   "notes": "V2.15 closes writer precedence and MAC origin while keeping Buscar ubicacion.",
   "version": "2.15.0"
 }
