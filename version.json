@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.05.0/RelojLab.exe",
-  "sha256": "65d7390ae78162afb8b092fe4de24c3d3c6ac97a67a114dd30620fc3d5d2045e",
-  "notes": "V2.05 rastrea directamente Location hacia latitud y longitud sin escaneo global; mantiene Buscar ubicacion.",
-  "version": "2.05.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.06.0/RelojLab.exe",
+  "sha256": "35445fafda61fcd2e7544e3180ad7a8220bf0cf56951b345d72883ba0b907318",
+  "notes": "V2.06 resuelve watchId y area localmente; mantiene Buscar ubicacion.",
+  "version": "2.06.0"
 }
