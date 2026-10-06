@@ -1,9 +1,9 @@
-name: Build V2.01
+name: Build V2.02
 on:
   push:
     branches: [main]
     paths:
-      - 'app_v201.py'
+      - 'app_v202.py'
       - 'app_v173.py'
       - '.github/workflows/build-v201.yml'
   workflow_dispatch:
@@ -24,7 +24,7 @@ jobs:
           Invoke-WebRequest 'http://watchhealth.com.cn/k6File/clock/file/2D7F.bin' -OutFile assets/donor_2D7F.bin
       - run: python prepare_v133_dynamic.py
       - run: python -m unittest discover -s tests
-      - run: python -m py_compile app_v173.py app_v201.py
+      - run: python -m py_compile app_v173.py app_v202.py
       - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v133_custom_same_id.b64;assets" --add-data "assets/face_v133_custom_verified.b64;assets" --add-data "assets/face_v133_oem_recovery.b64;assets" --add-data "assets/face_v133.json;assets" app_v173.py
       - name: SHA256
         id: sha
@@ -35,28 +35,28 @@ jobs:
           Write-Host $hash
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V2.01
+          name: RelojLab-Windows-V2.02
           path: dist/RelojLab.exe
           if-no-files-found: error
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.01.0
-          name: Reloj Lab V2.01
-          body: V2.01 filters the exact app caller and reconstructs the semantic parameter slots for the local UtraWatch analysis. No device writes.
+          tag_name: v2.02.0
+          name: Reloj Lab V2.02
+          body: V2.02 improves local XAPK scan performance by skipping unrelated DEX files.
           files: dist/RelojLab.exe
           make_latest: true
       - name: Update manifest
         shell: pwsh
         run: |
           $obj = [ordered]@{
-            exe_url = 'https://github.com/Yakoderaa/reloj/releases/download/v2.01.0/RelojLab.exe'
+            exe_url = 'https://github.com/Yakoderaa/reloj/releases/download/v2.02.0/RelojLab.exe'
             sha256 = '${{ steps.sha.outputs.sha256 }}'
-            notes = 'V2.01 corrige el caller real y el mapeo de WEATHER/lat/lng/MAC/watchId; mantiene Buscar ubicacion.'
-            version = '2.01.0'
+            notes = 'V2.02 acelera el analisis local del XAPK y mantiene Buscar ubicacion.'
+            version = '2.02.0'
           }
           $obj | ConvertTo-Json | Set-Content version.json -Encoding utf8
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git commit -m 'Advance updater manifest to V2.01'; git push }
+          git diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git commit -m 'Advance updater manifest to V2.02'; git push }
