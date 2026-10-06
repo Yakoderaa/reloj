@@ -14,8 +14,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify V2.09 wrapper
-        run: python -c "import ast; s=open('app_v173.py',encoding='utf-8').read(); ast.parse(s); assert 'app_v209' in s; t=open('app_v209.py',encoding='utf-8').read(); ast.parse(t); assert '2.09.0' in t; assert 'CERRAR WATCHID REAL + ACTIVACIÓN' in t; assert '_restore_location_button' in t; assert 'ota_writes' in t"
+      - name: Verify V2.10 wrapper
+        run: python -c "import ast; s=open('app_v173.py',encoding='utf-8').read(); ast.parse(s); assert 'app_v210' in s; t=open('app_v210.py',encoding='utf-8').read(); ast.parse(t); assert '2.10.0' in t; assert 'CERRAR BODY ACTIVATION EXACTO' in t; assert '_restore_location_button' in t; assert 'ota_writes' in t"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0 pillow numpy
       - name: Prepare assets
         shell: pwsh
@@ -24,7 +24,7 @@ jobs:
           Invoke-WebRequest 'http://watchhealth.com.cn/k6File/clock/file/2D7F.bin' -OutFile assets/donor_2D7F.bin
       - run: python prepare_v133_dynamic.py
       - run: python -m unittest discover -s tests
-      - run: python -m py_compile app_v173.py app_v209.py app_v208.py app_v183.py app_v199.py app_v180.py app_v179.py app_v145.py
+      - run: python -m py_compile app_v173.py app_v210.py app_v209.py app_v208.py app_v183.py app_v199.py app_v180.py app_v179.py app_v145.py
       - run: python -m PyInstaller --noconfirm --clean --onefile --windowed --name RelojLab --add-data "assets/face_v133_custom_same_id.b64;assets" --add-data "assets/face_v133_custom_verified.b64;assets" --add-data "assets/face_v133_oem_recovery.b64;assets" --add-data "assets/face_v133.json;assets" app_v173.py
       - name: SHA256
         id: sha
@@ -35,28 +35,28 @@ jobs:
           Write-Host $hash
       - uses: actions/upload-artifact@v4
         with:
-          name: RelojLab-Windows-V2.09
+          name: RelojLab-Windows-V2.10
           path: dist/RelojLab.exe
           if-no-files-found: error
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v2.09.0
-          name: Reloj Lab V2.09
-          body: V2.09 maps the selected watch identifier and activation input fields using targeted local analysis. No device firmware writes.
+          tag_name: v2.10.0
+          name: Reloj Lab V2.10
+          body: V2.10 resolves the exact activation request body and watch identifier semantics using targeted local analysis. No firmware or OTA writes.
           files: dist/RelojLab.exe
           make_latest: true
       - name: Advance updater manifest
         shell: pwsh
         run: |
           $obj = [ordered]@{
-            exe_url = 'https://github.com/Yakoderaa/reloj/releases/download/v2.09.0/RelojLab.exe'
+            exe_url = 'https://github.com/Yakoderaa/reloj/releases/download/v2.10.0/RelojLab.exe'
             sha256 = '${{ steps.sha.outputs.sha256 }}'
-            notes = 'V2.09 maps the selected watch identifier and activation input fields and keeps Buscar ubicacion.'
-            version = '2.09.0'
+            notes = 'V2.10 resolves the exact activation request body and keeps Buscar ubicacion.'
+            version = '2.10.0'
           }
           $obj | ConvertTo-Json | Set-Content version.json -Encoding utf8
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add version.json
-          git diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git commit -m 'Advance updater manifest to V2.09'; git pull --rebase; git push }
+          git diff --cached --quiet; if ($LASTEXITCODE -ne 0) { git commit -m 'Advance updater manifest to V2.10'; git pull --rebase; git push }
