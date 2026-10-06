@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.85.0/RelojLab.exe",
-  "sha256": "6363e2938d6b5449c80685ea548d86611f6b8bc2960bae13c1d04b948b9ae4a7",
-  "notes": "V1.85 resuelve el contrato de sesión oficial de UtraWatch. OTA sigue bloqueado.",
-  "version": "1.85.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.86.0/RelojLab.exe",
+  "sha256": "7aaa1f01bdafeefd5d0e02d045dd7c7de824c814555d43b7fc70f6f3973ea5cf",
+  "notes": "V1.86 acelera el análisis de autenticación y restaura Buscar ubicación.",
+  "version": "1.86.0"
 }
