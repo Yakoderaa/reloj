@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.84.0/RelojLab.exe",
-  "sha256": "40786c029126bd7d1ef4f38625f8751ed2dc239fcbd539e72dbab4d24c7610e1",
-  "notes": "V1.84 consulta metadata oficial de firmware con el contrato exacto de UtraWatch. OTA sigue bloqueado.",
-  "version": "1.84.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.85.0/RelojLab.exe",
+  "sha256": "6363e2938d6b5449c80685ea548d86611f6b8bc2960bae13c1d04b948b9ae4a7",
+  "notes": "V1.85 resuelve el contrato de sesión oficial de UtraWatch. OTA sigue bloqueado.",
+  "version": "1.85.0"
 }
