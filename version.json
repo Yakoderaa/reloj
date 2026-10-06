@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.00.0/RelojLab.exe",
-  "sha256": "97187fa85325f764d34b47601079ec485e6f12fe7f015c1de43e8d4b2d325198",
-  "notes": "V2.00 rastrea los cinco parametros reales de HealthModel.h y mantiene Buscar ubicacion.",
-  "version": "2.00.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.01.0/RelojLab.exe",
+  "sha256": "7b8578a444c9d0cff826a5811885c310c895286567f45f00ec039d3ab5644947",
+  "notes": "V2.01 corrige el caller real y el mapeo de WEATHER/lat/lng/MAC/watchId; mantiene Buscar ubicacion.",
+  "version": "2.01.0"
 }
