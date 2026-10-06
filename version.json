@@ -1,6 +1,6 @@
 {
   "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.19.0/RelojLab.exe",
-  "sha256": "f790304c42b968f6111ceedf59238c389dbe86dd62e6f32c5c560e91b2c14c5b",
+  "sha256": "eb6a52138c00047978d678232cb9980619efebe461e3fb2643ef3aa1f4c082fc",
   "notes": "V2.19 prevents stale diagnostics and forces a fresh base URL + token run.",
   "version": "2.19.0"
 }
