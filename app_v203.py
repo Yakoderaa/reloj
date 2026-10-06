@@ -34,6 +34,7 @@ class AppV203(v202.AppV202):
                             try:c.grid_remove()
                             except:pass
                             try:c.place_forget()
+                            except:pass
                     else:walk(c)
                 except:pass
         walk(self.root)
@@ -78,8 +79,7 @@ class AppV203(v202.AppV202):
                 except Exception as ex:
                     rep.setdefault('errors',[]).append({'dex':label,'error':repr(ex)});return
                 relevant=[m for m in methods if str(m.get('class') or '').startswith(HEALTH_PREFIX) or m.get('class') in (HEALTH,HEALTH_PRESENTER)]
-                if not relevant:
-                    return
+                if not relevant:return
                 stats['dex_targeted']+=1
                 rep['target_dexes'].append({'dex':label,'relevant_method_refs':len(relevant)})
                 exact,err=v199.AppV199._exact_code_map(b,types)
