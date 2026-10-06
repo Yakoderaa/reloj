@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.83.0/RelojLab.exe",
-  "sha256": "8cd8c98e5264a4651f03d59a7ae9cce5488db8220309573cc1b40a59156e9176",
-  "notes": "V1.83 reconstruye la llamada oficial de firmware leyendo anotaciones Retrofit reales. Mantiene OTA bloqueado hasta validar archivo oficial.",
-  "version": "1.83.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.84.0/RelojLab.exe",
+  "sha256": "40786c029126bd7d1ef4f38625f8751ed2dc239fcbd539e72dbab4d24c7610e1",
+  "notes": "V1.84 consulta metadata oficial de firmware con el contrato exacto de UtraWatch. OTA sigue bloqueado.",
+  "version": "1.84.0"
 }
