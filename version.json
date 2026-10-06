@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.98.0/RelojLab.exe",
-  "sha256": "66871a8559234b6ddd97944e73bfbdb75ec02d017cbc14400df87302d8ff610c",
-  "notes": "V1.98 rastrea los valores exactos de activationDevice y mantiene Buscar ubicacion.",
-  "version": "1.98.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.99.0/RelojLab.exe",
+  "sha256": "16eb78e6e5421cf412ce97e98a4fb89500d26ec3f77e87322e8e9946410e4717",
+  "notes": "V1.99 corrige el mapa DEX de activationDevice y mantiene Buscar ubicacion.",
+  "version": "1.99.0"
 }
