@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.22.0/RelojLab.exe",
-  "sha256": "ac247a8679ebf3f76ef4e0f1309414294c21f23504cc035d3855a73c44e5d741",
-  "notes": "V2.22 closes appDeviceId generation locally and keeps Buscar ubicacion.",
-  "version": "2.22.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.23.0/RelojLab.exe",
+  "sha256": "e17df2fe6fb48969dd4cea385e2d5a8cf62b23962b82a4f1b72cec7473919e64",
+  "notes": "V2.23 closes touristLogin + appDeviceId locally and keeps Buscar ubicacion.",
+  "version": "2.23.0"
 }
