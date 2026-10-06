@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.06.0/RelojLab.exe",
-  "sha256": "2c95357fa94584827babe75dc47c4f68aab81d8f445f2b441ca1986ae381d911",
-  "notes": "V2.07 cierra el writer de watchId y el flujo de area localmente; mantiene Buscar ubicacion.",
-  "version": "2.07.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.97.0/RelojLab.exe",
+  "sha256": "cc58eaeb52a8dba2dec86c824b4e6435613500327a2bcd6b48fe7a73db2cbf67",
+  "notes": "V1.97 resuelve el contrato de activationDevice y mantiene Buscar ubicacion.",
+  "version": "1.97.0"
 }
