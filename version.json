@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.90.0/RelojLab.exe",
-  "sha256": "89f10c91447c84b1137ff92627c1ffcc777c62a15d69ee32c2845b8700c69127",
-  "notes": "V1.90 valida el contrato exacto de sesión invitado y mantiene Buscar ubicación.",
-  "version": "1.90.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.91.0/RelojLab.exe",
+  "sha256": "6151251aa4d3f0d333573f8cd97305a854f16120dcf9755e25f716e7aa744919",
+  "notes": "V1.91 crea sesión invitado oficial y consulta metadata de firmware; OTA permanece bloqueado.",
+  "version": "1.91.0"
 }
