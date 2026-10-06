@@ -1,4 +1,4 @@
-import io,json,os,zipfile,struct
+import io,json,os,zipfile
 from datetime import datetime,timezone
 import tkinter as tk
 from tkinter import ttk,filedialog
@@ -18,7 +18,7 @@ class AppV220(v219.AppV219):
     def __init__(self,root):
         super().__init__(root)
         root.title('Reloj Lab V2.20')
-        self._clean_v220();self._install_v220();self._restore_location_button()
+        self._clean_v220(); self._install_v220(); self._restore_location_button()
         self.status.set('V2.20 lista · cierra localmente de dónde sale y dónde se guarda access-token. Sin red ni OTA.')
 
     def _clean_v220(self):
@@ -34,7 +34,9 @@ class AppV220(v219.AppV219):
                             try:c.grid_remove()
                             except:pass
                             try:c.place_forget()
-                    else:walk(c)
+                            except:pass
+                    else:
+                        walk(c)
                 except:pass
         walk(self.root)
 
@@ -72,14 +74,15 @@ class AppV220(v219.AppV219):
             def inspect(label,b):
                 stats['dex_seen']+=1
                 try:strings,types,methods,classes,enc,fields=self._dex_full(b)
-                except Exception as ex:rep.setdefault('errors',[]).append({'dex':label,'error':repr(ex)});return
+                except Exception as ex:
+                    rep.setdefault('errors',[]).append({'dex':label,'error':repr(ex)});return
                 exact,err=v199.AppV199._exact_code_map(b,types)
                 if err:rep.setdefault('exact_map_errors',[]).append({'dex':label,'error':err})
                 try:key_idx=next(i for i,s in enumerate(strings) if s==KEY)
                 except StopIteration:key_idx=None
                 candidates=[];seen=set()
                 for m in methods:
-                    ex=exact.get(m.get('idx')) or {};code=ex.get('code_off');acc=ex.get('access_flags',0)
+                    ex=exact.get(m.get('idx')) or {}; code=ex.get('code_off'); acc=ex.get('access_flags',0)
                     if not code:continue
                     stats['methods_checked_raw']+=1
                     hit=key_idx is not None and v208.AppV208._code_refs_string(b,code,key_idx)
@@ -101,11 +104,11 @@ class AppV220(v219.AppV219):
                         rep.setdefault('symbolic_errors',[]).append({'class':m.get('class'),'method':m.get('name'),'error':repr(ex2)});continue
                     events=[]
                     for inv in sym.get('invokes') or []:
-                        t=inv.get('target') or {};cls=t.get('class') or '';mn=t.get('method')
-                        if any(x.lower() in cls.lower() for x in ('UserManager','PrefUtil','Welcome','UserInfo','Login','BaseApi','JsonUtils')) or mn in ('getAccess_token','getAccessToken','getToken','a','b','c','d','e','h'):
+                        t=inv.get('target') or {}; cls=t.get('class') or ''; mn=t.get('method')
+                        if any(x.lower() in cls.lower() for x in ('UserManager','PrefUtil','Welcome','UserInfo','Login','BaseApi','JsonUtils')) or mn in ('getAccess_token','getAccessToken','getToken'):
                             events.append({'unit':inv.get('unit'),'class':cls,'method':mn,'args':[self._simple(a) for a in (inv.get('args') or [])],'arg_regs':inv.get('arg_regs')})
-                    row={'dex':label,'class':m.get('class'),'method':m.get('name'),'method_idx':m.get('idx'),'proto':m.get('proto'),'hit_pref_key':hit,'target_class':target,'incoming_registers':pmap,'events':events,'trace':(sym.get('trace') or [])[:2600]}
-                    rep['symbolized_methods'].append(row);stats['symbolized']+=1
+                    rep['symbolized_methods'].append({'dex':label,'class':m.get('class'),'method':m.get('name'),'method_idx':m.get('idx'),'proto':m.get('proto'),'hit_pref_key':hit,'target_class':target,'incoming_registers':pmap,'events':events,'trace':(sym.get('trace') or [])[:2600]})
+                    stats['symbolized']+=1
             def apk(name,data):
                 with zipfile.ZipFile(io.BytesIO(data),'r') as z:
                     dexes=[n for n in z.namelist() if n=='classes.dex' or (n.startswith('classes') and n.endswith('.dex'))]
@@ -131,7 +134,7 @@ class AppV220(v219.AppV219):
                 if 'getAccess_token' in txt or 'getAccessToken' in txt:getters.append({'class':r['class'],'method':r['method'],'proto':r['proto'],'events':r['events']})
             rep['scan_stats']=stats
             rep['resolved']={'pref_access_token_xrefs_found':len(rep['raw_token_pref_xrefs']),'candidate_writers':writers[:20],'access_token_getter_contexts':getters[:20],
-                'network_gate':'NO_NETWORK_IN_THIS_VERSION','next':'If the guest response getter and PREF_KEY_ACCESS_TOKEN writer are unambiguous, next version can attempt one touristLogin request and log only HTTP status plus token presence/length/fingerprint, never the raw token.','write_gate':'NO_DEVICE_WRITES_IN_THIS_VERSION'}
+                'network_gate':'NO_NETWORK_IN_THIS_VERSION','next':'If guest response getter and PREF_KEY_ACCESS_TOKEN writer are unambiguous, next version can attempt one touristLogin request and log only HTTP status plus token presence/length/fingerprint, never the raw token.','write_gate':'NO_DEVICE_WRITES_IN_THIS_VERSION'}
             rep['summary']={'pref_xrefs':len(rep['raw_token_pref_xrefs']),'symbolized':stats['symbolized'],'writer_contexts':len(writers),'getter_contexts':len(getters)}
             folder=os.path.join(os.environ.get('LOCALAPPDATA',os.path.expanduser('~')),'RelojLab','firmware-v220');os.makedirs(folder,exist_ok=True)
             out=os.path.join(folder,'utrawatch-token-response-v220.json');rep['saved_path']=out
