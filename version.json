@@ -1,6 +1,6 @@
 {
   "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.17.0/RelojLab.exe",
-  "sha256": "2fc1812f181a8e23fe7a231d30c5bc75f502b5f2ee86ece2a01d869330747462",
+  "sha256": "216bc51584c1a6c511e840b82786ff4e4d8121e3d3824ee612a1d77a68423bcc",
   "notes": "V2.17 prepares AUTH + ACTIVATION locally and keeps Buscar ubicacion.",
   "version": "2.17.0"
 }
