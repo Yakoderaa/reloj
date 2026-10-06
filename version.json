@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.82.0/RelojLab.exe",
-  "sha256": "b36dd0baa4cf4338bc028c7606add7c256ba6129b0de74e4c4ca56211280ae25",
-  "notes": "V1.82 resuelve endpoint oficial, campos HardwareVersion y metadatos OTA. Mantiene Buscar actualización automático.",
-  "version": "1.82.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.83.0/RelojLab.exe",
+  "sha256": "8cd8c98e5264a4651f03d59a7ae9cce5488db8220309573cc1b40a59156e9176",
+  "notes": "V1.83 reconstruye la llamada oficial de firmware leyendo anotaciones Retrofit reales. Mantiene OTA bloqueado hasta validar archivo oficial.",
+  "version": "1.83.0"
 }
