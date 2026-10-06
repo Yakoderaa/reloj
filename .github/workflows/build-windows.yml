@@ -15,7 +15,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Verify V1.87 wrapper
-        run: python -c "import ast; s=open('app_v173.py',encoding='utf-8').read(); ast.parse(s); assert 'app_v187' in s; t=open('app_v187.py',encoding='utf-8').read(); ast.parse(t); assert '1.87.0' in t; assert 'RECONSTRUIR SESIÓN INVITADO' in t; assert 'Buscar ubicación' in t; assert 'ota_writes' in t"
+        run: python -c "import ast; s=open('app_v173.py',encoding='utf-8').read(); ast.parse(s); assert 'app_v187' in s; t=open('app_v187.py',encoding='utf-8').read(); ast.parse(t); assert '1.87.0' in t; assert 'RECONSTRUIR SESIÓN INVITADO' in t; assert '_restore_location_button' in t; assert 'ota_writes' in t"
       - run: python -m pip install -r requirements.txt pyinstaller==6.22.0 pillow numpy
       - name: Fetch donor asset
         shell: pwsh
