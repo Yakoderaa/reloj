@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.78.0/RelojLab.exe",
-  "sha256": "238fcd240b57bdfadde7b7f72558e3156e4d2891442b2f372057de168f7c8fd5",
-  "notes": "V1.78 elimina falsos edges DEX y mantiene Buscar actualización automático.",
-  "version": "1.78.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.79.0/RelojLab.exe",
+  "sha256": "fdb3aac6b0c676816f088f61c02392022019b7e5883e48607d2ef57fe64b8246",
+  "notes": "V1.79 reconstruye argumentos y secuencia OTA exacta y mantiene Buscar actualización automático.",
+  "version": "1.79.0"
 }
