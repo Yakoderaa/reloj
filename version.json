@@ -1,6 +1,6 @@
 {
   "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.09.0/RelojLab.exe",
-  "sha256": "4715207768ed3040084080510026be59baec8f3d1271ef246894a63b9526653d",
+  "sha256": "79cfccc7befe15471585404155e3ed6dd32b38fb74dd6aaefa757c0a3a8b5b68",
   "notes": "V2.09 maps the selected watch identifier and activation input fields and keeps Buscar ubicacion.",
   "version": "2.09.0"
 }
