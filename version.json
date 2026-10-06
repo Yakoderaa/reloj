@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.89.0/RelojLab.exe",
-  "sha256": "a3372bced9cca5fbd34290bb080a8d13545451c95ddd1ea1c4dd21657c6c193d",
-  "notes": "V1.89 analiza la cadena local de identidad de UtraWatch y mantiene Buscar ubicación.",
-  "version": "1.89.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.90.0/RelojLab.exe",
+  "sha256": "89f10c91447c84b1137ff92627c1ffcc777c62a15d69ee32c2845b8700c69127",
+  "notes": "V1.90 valida el contrato exacto de sesión invitado y mantiene Buscar ubicación.",
+  "version": "1.90.0"
 }
