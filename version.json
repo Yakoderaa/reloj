@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.87.0/RelojLab.exe",
-  "sha256": "7b83a5272cb0cf0746b701f798aedb3fdcd89f5ea848cec47309704a088f97e7",
-  "notes": "V1.87 reconstruye el body exacto de touristLogin y la extracción de AccessInfo; mantiene Buscar ubicación.",
-  "version": "1.87.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.88.0/RelojLab.exe",
+  "sha256": "3ccc0c7fb3bb57813a1b9d666b0e873813379a34e23090547f9582288c01adb8",
+  "notes": "V1.88 resuelve appDeviceId y AccessInfo exactos para el flujo oficial de sesión; mantiene Buscar ubicación.",
+  "version": "1.88.0"
 }
