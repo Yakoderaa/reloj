@@ -1,6 +1,6 @@
 {
   "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.16.0/RelojLab.exe",
-  "sha256": "6b6d7fa6176806d053bd2f28e21f0e8ecaaeb789bfc2ad3db120c45e439468c9",
+  "sha256": "e2313ae01ac9f5b1fddc5a155bd0920f982f80e77e7875070c64b90c08b58a8b",
   "notes": "V2.16 traces real WATCH_ID ordering and clear triggers, keeping Buscar ubicacion.",
   "version": "2.16.0"
 }
