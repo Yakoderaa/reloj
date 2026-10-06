@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.03.0/RelojLab.exe",
-  "sha256": "160f3119d44c6c2de99a88a84fa6f33e28bffb0539a6f478fa9dfd6b4f20d4da",
-  "notes": "V2.03 analiza solo Health y Weather para evitar esperas largas; mantiene Buscar ubicacion.",
-  "version": "2.03.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.04.0/RelojLab.exe",
+  "sha256": "f6fb8411af2334792bf0b8de1153de91b162756241768ae592c7b602a510fe14",
+  "notes": "V2.04 busca directamente el caller exacto de S0 sin escanear simbolicamente miles de metodos; mantiene Buscar ubicacion.",
+  "version": "2.04.0"
 }
