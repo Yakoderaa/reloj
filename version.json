@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.02.0/RelojLab.exe",
-  "sha256": "2edeafe41ebbc4e95eed8ea48aeced48a740aee5f7cf32e2375a6606e795fc6c",
-  "notes": "V2.02 acelera el analisis local del XAPK y mantiene Buscar ubicacion.",
-  "version": "2.02.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.03.0/RelojLab.exe",
+  "sha256": "160f3119d44c6c2de99a88a84fa6f33e28bffb0539a6f478fa9dfd6b4f20d4da",
+  "notes": "V2.03 analiza solo Health y Weather para evitar esperas largas; mantiene Buscar ubicacion.",
+  "version": "2.03.0"
 }
