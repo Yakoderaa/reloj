@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.01.0/RelojLab.exe",
-  "sha256": "7b8578a444c9d0cff826a5811885c310c895286567f45f00ec039d3ab5644947",
-  "notes": "V2.01 corrige el caller real y el mapeo de WEATHER/lat/lng/MAC/watchId; mantiene Buscar ubicacion.",
-  "version": "2.01.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v2.02.0/RelojLab.exe",
+  "sha256": "2edeafe41ebbc4e95eed8ea48aeced48a740aee5f7cf32e2375a6606e795fc6c",
+  "notes": "V2.02 acelera el analisis local del XAPK y mantiene Buscar ubicacion.",
+  "version": "2.02.0"
 }
