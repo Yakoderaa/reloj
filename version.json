@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.79.0/RelojLab.exe",
-  "sha256": "fdb3aac6b0c676816f088f61c02392022019b7e5883e48607d2ef57fe64b8246",
-  "notes": "V1.79 reconstruye argumentos y secuencia OTA exacta y mantiene Buscar actualización automático.",
-  "version": "1.79.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.80.0/RelojLab.exe",
+  "sha256": "0ff87032aab0b703d426f8d90a3c0527e47031374ccefcf73fccc8872b88ac41",
+  "notes": "V1.80 cierra parámetros/bytes OTA y rastrea firmware oficial. Mantiene Buscar actualización automático.",
+  "version": "1.80.0"
 }
