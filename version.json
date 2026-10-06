@@ -1,6 +1,6 @@
 {
-  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.94.0/RelojLab.exe",
-  "sha256": "394ec504fe7fdcad97c733e01bfa0f8768b4008a476c2811ea6be48242adf357",
-  "notes": "V1.94 resuelve los valores exactos de alta antes de una única vinculación oficial y mantiene Buscar ubicacion.",
-  "version": "1.94.0"
+  "exe_url": "https://github.com/Yakoderaa/reloj/releases/download/v1.95.0/RelojLab.exe",
+  "sha256": "689c28456619c37959adf117d1b53aa4081b127cd385089ccbb5969dfab8e6d9",
+  "notes": "V1.95 prepara la identidad BLE exacta para la vinculacion y mantiene Buscar ubicacion.",
+  "version": "1.95.0"
 }
