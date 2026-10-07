@@ -1,8 +1,8 @@
 # Compatibility entrypoint for the existing build workflow.
 import tkinter as tk
-import app_v223 as v223
+import app_v224 as v224
 
-AppV173 = v223.AppV223
+AppV173 = v224.AppV224
 
 if __name__=='__main__':
     root=tk.Tk();AppV173(root);root.mainloop()
